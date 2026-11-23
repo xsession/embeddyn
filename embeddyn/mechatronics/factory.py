@@ -41,6 +41,8 @@ def renode_kwargs(project: MechatronicProject, cfg) -> dict:
         "startup_timeout": float(options.get("startup_timeout", 120.0)),
         "log_path": path("log"),
         "uarts": list(options.get("uarts", [])),
+        "api": str(options.get("api", "auto")),
+        "can": dict(options.get("can") or {}),
     }
 
 

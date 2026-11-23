@@ -26,6 +26,7 @@ pytest tests/mechatronics/test_rc_servo_l476.py
 | PC0 | ADC1_IN1 | `operator.command_voltage`, 0–3.3 V = −90…+90° |
 | PC1 | ADC1_IN2 | `servo.feedback_voltage`, the servo's feedback potentiometer |
 | PA5 | GPIO out | `mcu.fault_led` |
+| PA11 / PA12 | CAN1 (bxCAN), `rc-servo-l476-can.yaml` only (Renode ≥ 1.17) | status `0x101` every 100 ms → `mcu.can*`; `0x200 [1]` clears a fault |
 | PA2 / PA3 | USART2 TX/RX (AF7), 115200 8N1 | `mcu.console` events: telemetry every 100 ms; `R` clears a fault, `?` prints the calibration |
 
 ## Firmware

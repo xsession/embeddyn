@@ -76,7 +76,9 @@ Next:
   Control can't trigger them, and `Load` replaces the server the adapter talks
   to (see Limits in [RENODE.md](RENODE.md#limits)).
 - [x] UART consoles through Renode socket terminals: lines as events, writes from the Lab ([RENODE.md](RENODE.md#uart-consoles)).
-- [ ] SPI/I²C/CAN: rebase the fork onto Renode ≥ 1.17 (External Control CAN and SPI hooks) and bind them.
+- [x] Fork merged with Renode v1.17.1 on local branches (not pushed yet), with the message protocol client ([RENODE_1_17_MERGE.md](RENODE_1_17_MERGE.md)).
+- [x] CAN through External Control: frames as events, decoded fields, `can_write` (RC-servo CAN example).
+- [ ] SPI/I²C sensor feeds (External Control SPI, RESD); push the merge branches to the forks.
 
 ## Phase R2: electronics with state (ngspice shared library)
 

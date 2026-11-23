@@ -100,6 +100,36 @@ and by `tools/renode/build-custom-cores.sh`. Both are verified on a real build:
 They still have to be committed to `xsession/renode-infrastructure` (the
 `src/Infrastructure` submodule of the custom-cores branch).
 
+## Renode 1.17 and the External Control protocols
+
+Renode 1.17 replaced the External Control handshake protocol with framed
+messages and added CAN and SPI. embeddyn speaks both:
+
+* `api: legacy`: the custom-cores fork up to 1.16 (`renode_api.py`).
+* `api: message`: Renode ≥ 1.17 (`renode_api_v2.py`).
+* `api: auto` (default): chosen from `renode --version`.
+
+The fork has been merged with v1.17.1 on local branches (not pushed yet), and
+every test passes on both. The merge and all its decisions are recorded in
+[RENODE_1_17_MERGE.md](RENODE_1_17_MERGE.md).
+
+### CAN (Renode ≥ 1.17)
+
+```yaml
+options:
+  script: renode/stm32l476-servo-can.resc     # bxCAN + CANExternalControlBus on one CAN hub
+  can:
+    bus: extcan
+    signal: mcu.can                          # every received frame -> event {id, data}
+    fields:                                  # decode into numeric signals
+      - {signal: mcu.can_setpoint_deg, id: 0x101, offset: 0, format: "<h", scale: 0.01}
+```
+
+`RenodeAdapter.can_write(frame_id, data)` sends a frame. Like UART input it
+arrives at Renode's next sync point and is a logged boundary input. In
+`rc-servo-l476-can.yaml` the firmware sends status frame `0x101` every
+100 ms, and frame `0x200` with `[1]` clears a latched fault (tested).
+
 ## UART consoles
 
 ```yaml

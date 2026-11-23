@@ -1,0 +1,11 @@
+# RC-servo platform plus CAN (needs Renode >= 1.17: CAN.CANExternalControlBus).
+# can1 is the L476's bxCAN (STMCAN model); extcan is the External Control CAN
+# endpoint embeddyn talks to. Both sit on one CAN hub, so embeddyn sees every
+# frame the firmware sends and can send frames to it.
+include $ORIGIN/stm32l476-servo.resc
+
+machine LoadPlatformDescriptionFromString "can1: CAN.STMCAN @ sysbus <0x40006400, +0x400>"
+machine LoadPlatformDescriptionFromString "extcan: CAN.CANExternalControlBus @ sysbus"
+emulation CreateCANHub "canHub"
+connector Connect sysbus.can1 canHub
+connector Connect sysbus.extcan canHub

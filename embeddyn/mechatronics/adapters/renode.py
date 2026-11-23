@@ -31,6 +31,22 @@ lock-step pin bindings::
 
     uarts:
       - {name: console, peripheral: sysbus.usart2, signal: mcu.console}   # port: 0 = pick a free one
+
+Protocol (``options.api``): Renode >= 1.17 speaks the framed message protocol
+(``renode_api_v2``); older builds, such as the original custom-cores fork, the
+handshake protocol (``renode_api``). ``auto`` (default) reads ``renode --version``.
+
+CAN (message protocol only): a ``CAN.CANExternalControlBus`` peripheral on the
+machine's CAN hub carries frames to and from embeddyn::
+
+    can:
+      bus: extcan                     # the CANExternalControlBus peripheral
+      signal: mcu.can                 # received frames -> events {id, data}
+      fields:                         # decode received frames into signals
+        - {signal: mcu.can_setpoint, id: 0x101, offset: 0, format: "<h", scale: 0.01}
+
+``can_write(frame_id, data)`` sends a frame. Like UART input it is a logged
+boundary input that takes effect at Renode's next sync point.
 """
 from __future__ import annotations
 
@@ -47,6 +63,7 @@ from typing import Any, Mapping
 
 from .base import SimulatorAdapter, StepResult
 from .renode_api import GpioEvent, RenodeExternalControl
+from .renode_api_v2 import CanFrame, RenodeMessageClient
 
 
 @dataclass
@@ -59,6 +76,22 @@ class _Uart:
     buffer: bytes = b""
     rx_bytes: int = 0
     tx_bytes: int = 0
+
+
+_VERSION_CACHE: dict[str, tuple[int, ...] | None] = {}
+
+
+def renode_version(executable: str) -> tuple[int, ...] | None:
+    """(major, minor, patch) from `renode --version`, or None if it can't be read."""
+    if executable not in _VERSION_CACHE:
+        import re
+        try:
+            text = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=120).stdout
+            match = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
+            _VERSION_CACHE[executable] = tuple(int(x) for x in match.groups()) if match else None
+        except (OSError, subprocess.SubprocessError):
+            _VERSION_CACHE[executable] = None
+    return _VERSION_CACHE[executable]
 
 
 def _free_port() -> int:
@@ -210,6 +243,8 @@ class RenodeAdapter(SimulatorAdapter):
         startup_timeout: float = 120.0,
         log_path: str | None = None,
         uarts: list[dict[str, Any]] | None = None,
+        api: str = "auto",
+        can: dict[str, Any] | None = None,
     ) -> None:
         self.host, self.port, self.timeout = host, int(port), float(timeout)
         self.machine = machine
@@ -233,6 +268,12 @@ class RenodeAdapter(SimulatorAdapter):
         self._duty: dict[str, _DutyTracker] = {}
         self._pulses: dict[str, _PulseTracker] = {}
         self._window = (0, 0)
+        if api not in {"auto", "legacy", "message"}:
+            raise ValueError("api must be auto, legacy or message")
+        self.api = api
+        self.can = dict(can or {})
+        self._can_frames: list[CanFrame] = []
+        self._can_last: dict[int, bytes] = {}
         self.uarts: list[_Uart] = []
         for spec in uarts or []:
             name, peripheral = str(spec["name"]), str(spec["peripheral"])
@@ -299,6 +340,12 @@ class RenodeAdapter(SimulatorAdapter):
         for uart in self.uarts:
             uart.sock = socket.create_connection((self.host, uart.port), timeout=self.timeout)
             uart.sock.setblocking(False)
+        self._can_frames.clear()
+        self._can_last.clear()
+        if self.can:
+            if not isinstance(self.client, RenodeMessageClient):
+                raise RuntimeError("CAN bindings need Renode >= 1.17 (External Control message protocol)")
+            self.client.can_subscribe(self.machine or "", str(self.can["bus"]), self._on_can_frame)
         self._apply_inputs(initial_signals)
 
     def _drain_uarts(self, now_seconds: float) -> list[dict[str, Any]]:
@@ -357,6 +404,14 @@ class RenodeAdapter(SimulatorAdapter):
         diagnostics: dict[str, Any] = {"renode_time_us": target_us, "run_for_us": interval}
         if self.uarts:
             diagnostics["events"] = self._drain_uarts((target_us - self._origin_us) / 1_000_000)
+        if self.can:
+            outputs.update(self._can_outputs())
+            topic = str(self.can.get("signal", "can"))
+            events = diagnostics.setdefault("events", [])
+            for frame in self._can_frames:
+                events.append({"time_seconds": frame.time_ns / 1e9 - self._origin_us / 1e6, "topic": topic,
+                               "payload": {"id": frame.frame_id, "data": frame.data.hex()}})
+            self._can_frames.clear()
         return StepResult(outputs, diagnostics)
 
     def stop(self) -> None:
@@ -434,6 +489,8 @@ class RenodeAdapter(SimulatorAdapter):
                 if error:
                     raise RuntimeError(f"Renode script failed: {error} (see {self.log_path})")
             try:
+                if self.protocol() == "message":
+                    return RenodeMessageClient.connect(self.host, self.port, timeout=self.timeout)
                 return RenodeExternalControl.connect(self.host, self.port, timeout=self.timeout)
             except (ConnectionRefusedError, socket.timeout, OSError) as exc:
                 last_error = exc
@@ -449,6 +506,11 @@ class RenodeAdapter(SimulatorAdapter):
             raw = float(inputs[binding.signal]) * float(binding.opt("scale", 1.0)) + float(binding.opt("offset", 0.0))
             if binding.property == "adc":
                 raw = min(max(raw, float(binding.opt("min", 0))), float(binding.opt("max", 0xFFFFFFFF)))
+                vref = binding.opt("counts_vref")
+                if vref is not None and isinstance(self.client, RenodeMessageClient):
+                    # The binding is in conversion counts (patched pre-1.17 STM32_ADC); Renode >= 1.17
+                    # ADCs take microvolts, so convert with the ADC's reference and full scale.
+                    raw = raw / float(binding.opt("counts_full_scale", 4095)) * float(vref) * 1e6
                 self.client.adc_set(binding.machine, binding.peripheral, _int(binding.opt("channel")), round(raw))
             elif binding.property == "gpio":
                 level = raw >= float(binding.opt("threshold", 0.5))
@@ -460,6 +522,36 @@ class RenodeAdapter(SimulatorAdapter):
                 width = 4 if binding.opt("float32", False) else int(binding.opt("width", 4))
                 self.client.bus_write(binding.machine, _int(binding.opt("address")), value,
                                       width=width, context=binding.peripheral)
+
+    def protocol(self) -> str:
+        if self.api != "auto":
+            return self.api
+        version = renode_version(self.executable) if self.launch else None
+        return "message" if version and version >= (1, 17, 0) else "legacy"
+
+    def _on_can_frame(self, frame: CanFrame) -> None:
+        self._can_frames.append(frame)
+        self._can_last[frame.frame_id] = frame.data
+
+    def _can_outputs(self) -> dict[str, float]:
+        outputs = {}
+        for field_spec in self.can.get("fields", []):
+            data = self._can_last.get(int(field_spec["id"]))
+            if data is None:
+                continue
+            fmt = str(field_spec.get("format", "<h"))
+            offset = int(field_spec.get("offset", 0))
+            if offset + struct.calcsize(fmt) > len(data):
+                continue
+            (raw,) = struct.unpack_from(fmt, data, offset)
+            outputs[str(field_spec["signal"])] = float(raw) * float(field_spec.get("scale", 1.0)) + float(field_spec.get("offset_value", 0.0))
+        return outputs
+
+    def can_write(self, frame_id: int, data: bytes) -> None:
+        """Send a CAN frame from the host (asynchronous boundary input)."""
+        if not self.can or not isinstance(self.client, RenodeMessageClient):
+            raise KeyError("CAN needs `can:` options and Renode >= 1.17 (message protocol)")
+        self.client.can_send(self.machine or "", str(self.can["bus"]), int(frame_id), bytes(data))
 
     def _read_outputs(self, start_us: int, end_us: int) -> dict[str, float]:
         assert self.client is not None

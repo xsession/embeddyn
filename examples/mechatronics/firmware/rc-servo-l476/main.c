@@ -9,6 +9,10 @@
  *   PA5  GPIO out        -> fault LED (LD2 on a Nucleo-L476RG)
  *   PA2/PA3 USART2 (AF7) -> 115200 8N1 console: telemetry every 100 ms;
  *                           'R' clears a latched fault, '?' prints the calibration
+ *   PA11/PA12 CAN1 (AF9)  -> 500 kbit/s: status frame 0x101 every 100 ms
+ *                           (setpoint, feedback, trim in 0.01 deg, pulse in us,
+ *                           fault); frame 0x200 with data[0] = 1 clears a fault.
+ *                           Skipped when the platform has no bxCAN.
  *
  * Clock: HSI16 -> PLL -> 80 MHz SYSCLK. TIM2 counts at 1 MHz (PSC = 79) and
  * runs one 20 ms servo frame per period; its update interrupt runs the
@@ -80,6 +84,30 @@
 #define USART2_TDR    REG(USART2_BASE + 0x28u)
 #define USART_TXE     (1u << 7)
 #define USART_RXNE    (1u << 5)
+
+/* bxCAN1 (RM0351 section 55.9) */
+#define CAN1_BASE     0x40006400u
+#define CAN_MCR       REG(CAN1_BASE + 0x000u)
+#define CAN_MSR       REG(CAN1_BASE + 0x004u)
+#define CAN_TSR       REG(CAN1_BASE + 0x008u)
+#define CAN_RF0R      REG(CAN1_BASE + 0x00Cu)
+#define CAN_BTR       REG(CAN1_BASE + 0x01Cu)
+#define CAN_TI0R      REG(CAN1_BASE + 0x180u)
+#define CAN_TDT0R     REG(CAN1_BASE + 0x184u)
+#define CAN_TDL0R     REG(CAN1_BASE + 0x188u)
+#define CAN_TDH0R     REG(CAN1_BASE + 0x18Cu)
+#define CAN_RI0R      REG(CAN1_BASE + 0x1B0u)
+#define CAN_RDT0R     REG(CAN1_BASE + 0x1B4u)
+#define CAN_RDL0R     REG(CAN1_BASE + 0x1B8u)
+#define CAN_FMR       REG(CAN1_BASE + 0x200u)
+#define CAN_FM1R      REG(CAN1_BASE + 0x204u)
+#define CAN_FS1R      REG(CAN1_BASE + 0x20Cu)
+#define CAN_FFA1R     REG(CAN1_BASE + 0x214u)
+#define CAN_FA1R      REG(CAN1_BASE + 0x21Cu)
+#define CAN_F0R1      REG(CAN1_BASE + 0x240u)
+#define CAN_F0R2      REG(CAN1_BASE + 0x244u)
+#define CAN_STATUS_ID 0x101u
+#define CAN_CMD_ID    0x200u
 
 #define NVIC_ISER0    REG(0xE000E100u)
 #define SCB_VTOR      REG(0xE000ED08u)
@@ -212,6 +240,90 @@ static void console(void)
     }
 }
 
+static uint32_t can_ready;
+
+/* bxCAN: accept-all filter into FIFO0, 500 kbit/s at 80 MHz. Bounded waits, so
+ * a platform without the controller (unmapped, reads 0) just skips CAN. */
+static void can_init(void)
+{
+    CAN_MCR = 1u;                                           /* INRQ, leave sleep */
+    for (uint32_t i = 0; (CAN_MSR & 1u) == 0; i++) {        /* INAK */
+        if (i > 10000u) {
+            return;
+        }
+    }
+    CAN_BTR = (1u << 24) | (6u << 20) | (7u << 16) | 9u;   /* SJW 2, TS2 7, TS1 8, BRP 10 */
+    CAN_FMR |= 1u;                                          /* filter init */
+    CAN_FM1R &= ~1u;                                        /* bank 0: mask mode */
+    CAN_FS1R |= 1u;                                         /* 32-bit */
+    CAN_FFA1R &= ~1u;                                       /* -> FIFO0 */
+    CAN_F0R1 = 0;
+    CAN_F0R2 = 0;                                           /* mask 0: accept all */
+    CAN_FA1R |= 1u;
+    CAN_FMR &= ~1u;
+    CAN_MCR &= ~1u;                                         /* normal mode */
+    for (uint32_t i = 0; CAN_MSR & 1u; i++) {
+        if (i > 10000u) {
+            return;
+        }
+    }
+    can_ready = 1u;
+}
+
+static void can_send(uint32_t id, const uint8_t *data, uint32_t length)
+{
+    if (!can_ready || (CAN_TSR & (1u << 26)) == 0) {        /* TME0: mailbox 0 empty */
+        return;
+    }
+    uint32_t low = 0, high = 0;
+    for (uint32_t i = 0; i < length && i < 8u; i++) {
+        if (i < 4u) {
+            low |= (uint32_t)data[i] << (8u * i);
+        } else {
+            high |= (uint32_t)data[i] << (8u * (i - 4u));
+        }
+    }
+    CAN_TDT0R = length;
+    CAN_TDL0R = low;
+    CAN_TDH0R = high;
+    CAN_TI0R = (id << 21) | 1u;                             /* standard ID, TXRQ */
+}
+
+static void put16(uint8_t *p, int32_t v)
+{
+    p[0] = (uint8_t)(v & 0xFF);
+    p[1] = (uint8_t)((v >> 8) & 0xFF);
+}
+
+/* Status frame every 5 frames (100 ms); command frames are polled every frame. */
+static void can_poll(void)
+{
+    if (!can_ready) {
+        return;
+    }
+    while (CAN_RF0R & 3u) {                                 /* FMP0: messages pending */
+        uint32_t id = CAN_RI0R >> 21;
+        uint32_t length = CAN_RDT0R & 0xFu;
+        uint32_t data = CAN_RDL0R;
+        CAN_RF0R |= (1u << 5);                              /* RFOM0: release */
+        if (id == CAN_CMD_ID && length >= 1u && (data & 0xFFu) == 1u && tm.fault_latched) {
+            tm.fault_latched = 0;
+            tm.stall_frames = 0;
+            GPIO_BSRR(GPIOA_BASE) = (1u << (5 + 16));
+            uart_puts("fault cleared (CAN)\r\n");
+        }
+    }
+    if (tm.frame_count % 5u == 0u) {
+        uint8_t frame[8];
+        put16(&frame[0], centi(tm.setpoint_deg));
+        put16(&frame[2], centi(tm.feedback_deg));
+        put16(&frame[4], (int32_t)tm.pulse_us);
+        frame[6] = (uint8_t)(int8_t)(tm.trim_deg * 10.0f);   /* 0.1 deg */
+        frame[7] = (uint8_t)tm.fault_latched;
+        can_send(CAN_STATUS_ID, frame, 8u);
+    }
+}
+
 static float clampf(float v, float lo, float hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -280,6 +392,7 @@ void TIM2_IRQHandler(void)
 {
     frame();
     console();
+    can_poll();
 }
 
 static void clock_80mhz(void)
@@ -343,6 +456,8 @@ int main(void)
     GPIO_ASCR(GPIOC_BASE) |= 3u;
 
     adc_init();
+    RCC_APB1ENR1 |= (1u << 25);                             /* CAN1 */
+    can_init();
 
     /* Start at the commanded position so the servo doesn't jump at power-up. */
     float cmd = ((float)adc_read(1) / ADC_FULL - 0.5f) * 180.0f;

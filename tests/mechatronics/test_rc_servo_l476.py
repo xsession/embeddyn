@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from embeddyn.mechatronics.adapters.renode import RenodeAdapter, _PulseTracker
+from embeddyn.mechatronics.adapters.renode import RenodeAdapter, _PulseTracker, renode_version
 from embeddyn.mechatronics.adapters.renode_api import GpioEvent
 from embeddyn.mechatronics.factory import build_adapters
 from embeddyn.mechatronics.metrics import compute_metrics, parse_metric_specs
@@ -22,6 +22,7 @@ from embeddyn.mechatronics.plants import RCServo
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples/mechatronics/rc-servo-l476.yaml"
+CAN_EXAMPLE = ROOT / "examples/mechatronics/rc-servo-l476-can.yaml"
 FIRMWARE = ROOT / "examples/mechatronics/firmware/rc-servo-l476.elf"
 RENODE = os.environ.get("RENODE_BIN")
 CAL_TRIM_KI = 0x2000001C      # servo_cal.trim_ki (float32)
@@ -196,3 +197,45 @@ def test_console_command_clears_a_latched_fault(tmp_path):
     cleared = [t for t, line in lines if line == "fault cleared"]
     assert cleared and sent_at < cleared[0] < sent_at + 0.05            # handled within the next frames
     assert rows[-1]["mcu.fault_led"] == 0.0 and rows[-1]["servo.signal_valid"] == 1.0
+
+
+needs_renode_117 = pytest.mark.skipif(not RENODE or not FIRMWARE.exists() or (renode_version(RENODE) or (0,)) < (1, 17, 0),
+                                      reason="needs Renode >= 1.17 (External Control CAN) and the firmware")
+
+
+def _can_project(tmp_path, profile: str, duration: float) -> MechatronicProject:
+    project = _project(tmp_path, profile, duration)
+    can = MechatronicProject.load(CAN_EXAMPLE)
+    mcu = project.instances["mcu"]
+    for key in ("script", "api", "can"):
+        mcu.options[key] = can.instances["mcu"].options[key]
+    mcu.options["script"] = str((CAN_EXAMPLE.parent / mcu.options["script"]).resolve())
+    project.signals.update({k: v for k, v in can.signals.items() if k not in project.signals})
+    return project
+
+
+@needs_renode_117
+def test_can_status_frames_reach_embeddyn(tmp_path):
+    """bxCAN status frame 0x101 every 100 ms -> CAN hub -> External Control CAN -> decoded signals."""
+    rows = _run(_can_project(tmp_path, "0.0,1.65,0.0\n0.1,2.475,0.0\n", 0.5))
+    frames = [e["payload"] for row in rows for e in row.get("__events__", []) if e["topic"] == "mcu.can"]
+    assert len(frames) == 5 and {f["id"] for f in frames} == {0x101}
+    last = rows[-1]
+    assert last["mcu.can_setpoint_deg"] == pytest.approx(last["mcu.setpoint_deg"], abs=0.01)
+    assert last["mcu.can_pulse_us"] == pytest.approx(2000, abs=3) and last["mcu.can_fault"] == 0.0
+
+
+@needs_renode_117
+def test_can_command_clears_a_latched_fault(tmp_path):
+    project = _can_project(tmp_path, "0.0,2.2,0.0\n0.3,2.2,1.0\n1.0,2.2,0.0\n", 1.6)
+    orchestrator = CoSimulationOrchestrator(project, build_adapters(project))
+    sent_at, rows = None, []
+    for row in orchestrator.iterate():
+        rows.append(row)
+        if sent_at is None and row["mcu.fault_led"] == 1.0 and row["time"] > 1.1:
+            orchestrator.adapters["mcu"].can_write(0x200, b"\x01")
+            sent_at = row["time"]
+    assert sent_at is not None
+    cleared = [t for t, line in _console(rows) if line == "fault cleared (CAN)"]
+    assert cleared and sent_at < cleared[0] < sent_at + 0.05
+    assert rows[-1]["mcu.fault_led"] == 0.0 and rows[-1]["mcu.can_fault"] == 0.0
