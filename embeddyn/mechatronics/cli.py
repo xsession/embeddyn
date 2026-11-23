@@ -360,6 +360,31 @@ def gui_command(
         server.server_close()
 
 
+@mechatronics_app.command("bindings-from-pinplan")
+def bindings_from_pinplan(
+    plan_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Forge pin plan (.pinplan.json)."),
+    device_file: Path = typer.Option(..., "--device", exists=True, dir_okay=False, help="Device with renode pin data."),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Bindings YAML to write (default: stdout)."),
+    merge: Optional[Path] = typer.Option(None, "--merge", exists=True, dir_okay=False,
+                                         help="Existing bindings whose non-pin entries (sysbus...) are kept."),
+    machine: Optional[str] = typer.Option(None, "--machine"),
+) -> None:
+    """Generate Renode GPIO/PWM/ADC bindings from a CodeLayer Forge pin plan."""
+    from .pinplan import load_json_or_yaml, merge_bindings, renode_bindings, to_yaml
+    generated = renode_bindings(load_json_or_yaml(plan_file), load_json_or_yaml(device_file), machine)
+    for item in generated["diagnostics"]:
+        typer.echo(f"{item['severity']}: {item['message']}", err=True)
+    manifest = merge_bindings(generated, load_json_or_yaml(merge) if merge else None) if merge else generated
+    text = to_yaml(manifest, plan_file.name)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {output} ({len(generated['bindings'])} pin bindings)")
+    else:
+        typer.echo(text)
+    if any(item["severity"] == "error" for item in generated["diagnostics"]):
+        raise typer.Exit(1)
+
+
 @mechatronics_app.command("doctor")
 def doctor() -> None:
     tools = {name: shutil.which(name) for name in ("webots", "ngspice", "ltspice", "kicad-cli", "renode")}
