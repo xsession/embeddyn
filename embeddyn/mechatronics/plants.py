@@ -280,3 +280,29 @@ class RCServo:
                 "current": current, "motor_voltage": voltage, "power": voltage * current,
                 "feedback_voltage": self.pot0 + self.pot_slope * x[0], "output_torque": drive,
                 "signal_valid": float(valid)}
+
+
+class HBridgePWM:
+    """Sign-magnitude H-bridge seen from its two PWM inputs: duty = in1 - in2.
+
+    Algebraic (no states). Feeds `DCMotorRL.duty` when a controller drives the
+    bridge's IN1/IN2 with two PWM channels, as on a real board.
+    """
+
+    inputs = ("in1", "in2")
+    outputs = ("duty",)
+    states = ()
+
+    def __init__(self, shoot_through_is_brake: bool = True) -> None:
+        self.brake = bool(shoot_through_is_brake)
+
+    def initial_state(self) -> list[float]:
+        return []
+
+    def derivatives(self, t, x, u):
+        return []
+
+    def output(self, t, x, u):
+        in1 = min(1.0, max(0.0, u.get("in1", 0.0)))
+        in2 = min(1.0, max(0.0, u.get("in2", 0.0)))
+        return {"duty": in1 - in2}

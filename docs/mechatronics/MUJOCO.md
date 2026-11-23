@@ -71,6 +71,24 @@ motor turns a MuJoCo 0.25 m link with a 0.2 kg payload under gravity through a
 | −1 N·m disturbance | rejected by the integrator; the motor supplies the extra 1 N·m |
 | Peak current | 11.5 A, under the 12 A stall current |
 
+## With firmware in the loop
+
+[`examples/mechatronics/mujoco-arm-firmware.yaml`](../../examples/mechatronics/mujoco-arm-firmware.yaml)
+closes the same joint through real STM32L476 firmware
+(`firmware/arm-joint-l476`, Renode ≥ 1.17):
+
+| Path | How |
+|---|---|
+| Encoder | MuJoCo angle × 13 038 counts/rad (4096 cpr × 20 / 2π) is written into `TIM3_CNT` every step. The timer is in encoder mode, so it holds the value, and the firmware unwraps the 16-bit counter. |
+| H-bridge | TIM2 CH1/CH2 at 20 kHz, sign-magnitude. Each pin's duty is measured from GPIO edges, and `HBridgePWM` gives duty = IN1 − IN2 for `DCMotorRL`. |
+| Command | ADC1 IN1 (PC0), 0–3.3 V = ±1.5 rad |
+| Control | 1 kHz PID with anti-windup, run from TIM2's update interrupt. Gains in `arm_cal` at 0x20000000 can be tuned over the bus. |
+
+Result: 0 → 1.2 rad settles in 0.68 s with 0.35 % overshoot and a 3 mrad
+error. The firmware's encoder angle stays within 2 mrad of MuJoCo, and the
+duty measured on the pins equals the firmware's duty one step later. 4 s of
+simulation take about 30 s (`tests/mechatronics/test_arm_firmware.py`).
+
 ## Determinism
 
 `tests/mechatronics/test_mujoco.py` runs the example twice and requires every

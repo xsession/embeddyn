@@ -1,0 +1,81 @@
+# Whole-system loop: real STM32L476 firmware (Renode >= 1.17) reads a
+# quadrature encoder and drives an H-bridge; a DC motor model turns a MuJoCo
+# arm joint through a 20:1 gear; the joint angle comes back as encoder counts.
+#   make -C examples/mechatronics/firmware/arm-joint-l476
+#   embeddyn mechatronics run examples/mechatronics/mujoco-arm-firmware.yaml -o arm.csv
+name: mujoco-arm-firmware
+step_seconds: 0.001
+duration_seconds: 4.0
+instances:
+  mcu:
+    domain: firmware
+    options:
+      backend: renode
+      launch: true
+      api: message
+      script: renode/stm32l476-arm.resc
+      firmware: firmware/arm-joint-l476.elf
+      machine: l476
+      port: 21260
+      bindings: bindings/renode-arm-joint.yaml
+      log: ../../.embeddyn/renode-arm-joint.log
+  command:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      # 0 V -> -1.5 rad, 3.3 V -> +1.5 rad: 1.65 V +- 1.32 V = 0 <-> 1.2 rad steps
+      parameters: {waveform: pulse, amplitude: 1.32, offset: 1.65, frequency: 0.5, duty: 0.5}
+      outputs: {value: operator.command_voltage}
+  bridge:
+    domain: electrical
+    model: embeddyn.mechatronics.plants:HBridgePWM
+    options:
+      backend: python
+      inputs: {in1: mcu.in1_duty, in2: mcu.in2_duty}
+      outputs: {duty: bridge.duty}
+  motor:
+    domain: electrical
+    model: embeddyn.mechatronics.plants:DCMotorRL
+    options:
+      backend: python
+      max_step: 1.0e-5
+      parameters: {resistance: 2.0, inductance: 0.003, ke: 0.08, kt: 0.08}
+      inputs: {duty: bridge.duty, speed: motor.shaft_speed}
+      outputs: {current: motor.current, torque: motor.torque, power: motor.power}
+  arm:
+    domain: mechanical
+    model: mujoco/arm-joint.xml
+    options:
+      backend: mujoco
+      inputs: {"ctrl:shoulder_motor": motor.torque, "qfrc:shoulder": load.value}
+      outputs: {"qpos:shoulder": arm.angle, "qvel:shoulder": arm.speed, "qfrc_act:shoulder": arm.joint_torque}
+signals:
+  operator.command_voltage: {domain: environment, unit: V, initial: 1.65}
+  load.value: {domain: environment, unit: N*m, initial: 0.0}
+  mcu.in1_duty: {domain: firmware, initial: 0.0}
+  mcu.in2_duty: {domain: firmware, initial: 0.0}
+  mcu.target: {domain: firmware, unit: rad, initial: 0.0}
+  mcu.angle: {domain: firmware, unit: rad, initial: 0.0}
+  mcu.duty: {domain: firmware, initial: 0.0}
+  bridge.duty: {domain: electrical, initial: 0.0}
+  motor.shaft_speed: {domain: electrical, unit: rad/s, initial: 0.0}
+  motor.current: {domain: electrical, unit: A, initial: 0.0}
+  motor.torque: {domain: electrical, unit: N*m, initial: 0.0}
+  motor.power: {domain: electrical, unit: W, initial: 0.0}
+  arm.angle: {domain: mechanical, unit: rad, initial: 0.0}
+  arm.speed: {domain: mechanical, unit: rad/s, initial: 0.0}
+  arm.joint_torque: {domain: mechanical, unit: N*m, initial: 0.0}
+  arm.encoder_counts: {domain: firmware, initial: 0.0}
+couplings:
+  - {source: arm.speed, target: motor.shaft_speed, transform: {type: affine, gain: 20.0}}             # gear ratio
+  - {source: arm.angle, target: arm.encoder_counts, transform: {type: affine, gain: 13037.97}}       # 4096 cpr x 20 / 2 pi
+metrics:
+  lift: {type: step_response, signal: arm.angle, target: 1.2, start: 2.0, end: 3.0, settling_band: 0.05}
+  current: {type: stats, signal: motor.current}
+  energy: {type: integral, signal: motor.power}
+metadata:
+  description: >
+    Real STM32L476 firmware (Renode >= 1.17) closes a position loop around a
+    MuJoCo arm joint: quadrature encoder in (TIM3 encoder mode), sign-magnitude
+    H-bridge PWM out (TIM2 CH1/CH2, 20 kHz), DC motor model in between.

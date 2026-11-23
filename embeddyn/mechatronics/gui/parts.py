@@ -46,6 +46,8 @@ _PLANTS = [
      "gear", "Rotor, gearbox with backlash, compliant shaft, load with friction, encoder."),
     ("embeddyn.mechatronics.plants:DCMotorRL", "dc_motor_rl", "DC motor (armature)", "Electrical", "electrical",
      "motor", "PWM-driven armature circuit L di/dt = duty*V - R i - Ke w."),
+    ("embeddyn.mechatronics.plants:HBridgePWM", "h_bridge", "H-bridge (2 PWM inputs)", "Electrical", "electrical",
+     "circuit", "Sign-magnitude bridge: duty = IN1 - IN2, for firmware driving two PWM channels."),
     ("embeddyn.mechatronics.plants:ThermalRC", "thermal_rc", "Winding thermal RC", "Thermal", "thermal", "thermo",
      "First-order copper heating with R(T) feedback."),
     ("embeddyn.mechatronics.plants:PIController", "pi_controller", "PI controller", "Controllers", "firmware", "chip",

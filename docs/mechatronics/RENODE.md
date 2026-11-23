@@ -130,6 +130,15 @@ arrives at Renode's next sync point and is a logged boundary input. In
 `rc-servo-l476-can.yaml` the firmware sends status frame `0x101` every
 100 ms, and frame `0x200` with `[1]` clears a latched fault (tested).
 
+## Quadrature encoders
+
+On Renode ≥ 1.17 the STM32 timer models encoder mode, which stops internal
+counting. embeddyn feeds an encoder by writing the count into the timer's
+`CNT` every step with an ordinary `sysbus` input binding, scaled with a
+coupling (counts per radian). The count is exact at every sync point, and
+there is no edge-rate limit as with GPIO toggling. The firmware reads CNT as
+it would on hardware. See `bindings/renode-arm-joint.yaml`.
+
 ## UART consoles
 
 ```yaml

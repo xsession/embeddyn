@@ -167,7 +167,7 @@ checked against the code.* Order is the build order: each group unblocks the nex
 | 6 | ✅ Verification checks: energy balance, step-size convergence, golden waveforms, scenario matrices | INTEGRATION_PLAN 7 | done: `mechatronics verify` ([VERIFICATION.md](VERIFICATION.md)), CI workflow |
 | 7 | ✅ Physical parameter estimation from bench traces (R, L, Kt, J, friction) with confidence intervals | R4; PHASE6 next steps | done: `mechatronics estimate` ([ESTIMATION.md](ESTIMATION.md)) |
 | 8 | ✅ Monte Carlo tolerance runs with yield; Sobol sensitivity | R4; PHASE6 | done: `mechatronics tolerance` ([TOLERANCE.md](TOLERANCE.md)), local process pool; experiment-queue execution still open |
-| 9 | Renode sensor/bus signals: quadrature encoder, UART/SPI/I²C/CAN frames, fault injection | R1; INTEGRATION_PLAN 4 | UART consoles done; encoder, SPI/I²C/CAN frames and fault injection missing |
+| 9 | Renode sensor/bus signals: quadrature encoder, UART/SPI/I²C/CAN frames, fault injection | R1; INTEGRATION_PLAN 4 | UART consoles, CAN frames and quadrature encoders (TIM CNT injection, Renode ≥ 1.17) done; SPI/I²C sensors and fault injection missing |
 | 10 | Renode fork fixes upstreamed (pins, patches 0001–0003, platform files), checkpoints via Save/Load | R1 | patches local only |
 | 11 | ngspice: gate drive/dead time/MOSFET models, `.save` filtering, KiCad round trip | R2; INTEGRATION_PLAN 6 | missing |
 | 12 | Webots bridge using real physics (Supervisor motors/sensors, timestep alignment) | R3 | MuJoCo backend now provides multibody physics ([MUJOCO.md](MUJOCO.md)); the Webots bridge still computes the plant itself |

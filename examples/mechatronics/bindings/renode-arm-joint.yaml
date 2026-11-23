@@ -1,0 +1,25 @@
+# Renode bindings for firmware/arm-joint-l476 (platform renode/stm32l476-arm.resc).
+adapter: renode
+machine: l476
+bindings:
+  # H-bridge inputs: TIM2 CH1 (PA0) forward, CH2 (PA1) reverse, 20 kHz PWM;
+  # duty from GPIO edge timestamps, averaged over each co-simulation step.
+  - signal: mcu.in1_duty
+    endpoint: {object: sysbus.timer2, property: gpio_duty, pin: 0, direction: output}
+  - signal: mcu.in2_duty
+    endpoint: {object: sysbus.timer2, property: gpio_duty, pin: 1, direction: output}
+  # Position command on ADC1 IN1 (PC0), microvolts.
+  - signal: operator.command_voltage
+    endpoint: {object: sysbus.adc1, property: adc, channel: 1, scale: 1.0e6, min: 0, max: 3300000, direction: input, unit: V}
+  # Quadrature encoder: the joint angle in counts is written into TIM3_CNT each
+  # step (the timer is in encoder mode, so it holds the value; the firmware
+  # unwraps the 16-bit counter).
+  - signal: arm.encoder_counts
+    endpoint: {object: sysbus, property: sysbus, address: 0x40000424, width: 4, direction: input}
+  # Firmware telemetry (struct arm_telemetry tm at 0x20000024).
+  - signal: mcu.target
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000028, float32: true, direction: output, unit: rad}
+  - signal: mcu.angle
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000002C, float32: true, direction: output, unit: rad}
+  - signal: mcu.duty
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000034, float32: true, direction: output}
