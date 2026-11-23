@@ -122,8 +122,11 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
         return [{"name": column, "direction": "out", "signal": signal, "mappable": False,
                  "unit": _unit(signals, signal)} for column, signal in columns.items()]
     bound = _binding_ports(spec, root, signals)
-    if bound is not None:
-        return bound
+    uarts = [{"name": f"uart:{u.get('name')}", "direction": "out", "signal": u.get("signal") or f"uart.{u.get('name')}",
+              "label": f"{str(u.get('peripheral', '')).removeprefix('sysbus.')} console", "unit": "", "mappable": False,
+              "kind": "event"} for u in (options.get("uarts") or []) if isinstance(u, dict)]
+    if bound is not None or uarts:
+        return (bound or []) + uarts
     domain = str(spec.get("domain") or domain_fallback or "")
     targets = {c.get("target") for c in couplings}
     ports = []

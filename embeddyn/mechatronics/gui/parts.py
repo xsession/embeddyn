@@ -67,6 +67,8 @@ _INSTRUMENTS = [
     ("gauge", "Gauge", "gauge", 1, "Analog dial with a configurable range.", {"minimum": -1.0, "maximum": 1.0}),
     ("led", "LED", "led", 1, "Lights when the signal exceeds the threshold.", {"threshold": 0.5, "color": "#ff3b30"}),
     ("data_table", "Watch table", "table", 8, "Live values of up to eight signals.", {}),
+    ("serial_monitor", "Serial monitor", "terminal", 1, "UART console of a Renode MCU: received lines and a send box.",
+     {"line_end": "CRLF"}),
 ]
 
 _SCENE = [

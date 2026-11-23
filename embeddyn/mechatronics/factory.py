@@ -40,6 +40,7 @@ def renode_kwargs(project: MechatronicProject, cfg) -> dict:
         "server_name": str(options.get("server_name", "embeddyn")),
         "startup_timeout": float(options.get("startup_timeout", 120.0)),
         "log_path": path("log"),
+        "uarts": list(options.get("uarts", [])),
     }
 
 

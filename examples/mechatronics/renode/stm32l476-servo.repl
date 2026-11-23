@@ -80,3 +80,8 @@ adc1: Analog.STM32F3_ADC @ sysbus 0x50040000
     referenceVoltage: 3.3
     externalEventFrequency: 80000000
     -> nvic@18
+
+// USART2 (PA2 TX / PA3 RX, AF7): same register layout as the F7 USART model.
+usart2: UART.STM32F7_USART @ sysbus 0x40004400
+    frequency: 80000000
+    IRQ -> nvic@38

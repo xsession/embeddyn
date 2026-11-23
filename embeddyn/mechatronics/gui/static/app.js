@@ -168,6 +168,10 @@ function openStream(session) {
     if (info.status === 'error') { toast(info.error, true); showDock('console'); }
     if (info.metrics && Object.keys(info.metrics).length) renderMetrics(info.metrics);
   });
+  stream.addEventListener('events', (e) => {
+    data.events.push(...JSON.parse(e.data).events);
+    frameDirty = true;
+  });
   stream.addEventListener('rows', (e) => {
     const payload = JSON.parse(e.data);
     if (payload.from !== data.length) return;            // out of order: ignore (reconnect replays)

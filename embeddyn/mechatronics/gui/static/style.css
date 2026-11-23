@@ -152,3 +152,7 @@ label { user-select: none; }
 .sch-wire-label { font-size: 10px; fill: #1b5fc1; }
 .sch-drag { fill: none; stroke: #d9822b; stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
 .sch-empty { font-size: 15px; fill: #9aa09a; }
+.serial-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.serial { flex: 1; margin: 0; padding: 6px 8px; overflow: auto; background: #0b0f0c; color: #9cf59c;
+  font: 12px ui-monospace, monospace; white-space: pre; }
+.serial-input { display: flex; gap: 6px; padding: 4px 6px; border-top: 1px solid var(--line); align-items: center; }

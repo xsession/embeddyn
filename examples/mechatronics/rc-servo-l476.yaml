@@ -10,6 +10,33 @@ metadata:
     servo (pulse decoder, amplifier, motor, gearbox, horn) is a Python model;
     an operator profile (command voltage, load torque) is replayed from CSV.
     Build the firmware first: make -C examples/mechatronics/firmware/rc-servo-l476
+  gui:
+    nodes:
+      - id: console
+        kind: instrument
+        part: serial_monitor
+        label: USART2 console
+        icon: terminal
+        settings: {line_end: CRLF}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: mcu.console}
+      - id: scope
+        kind: instrument
+        part: oscilloscope
+        label: scope
+        icon: scope
+        settings: {timebase: all, mode: roll, layout: stack}
+        ports: [{name: A, direction: in, unit: ''}, {name: B, direction: in, unit: ''}, {name: C, direction: in, unit: ''},
+                {name: D, direction: in, unit: ''}]
+        channels: {A: operator.command_voltage, B: mcu.setpoint_deg, C: servo.angle_deg, D: mcu.trim_deg}
+      - id: fault
+        kind: instrument
+        part: led
+        label: fault LED (PA5)
+        icon: led
+        settings: {threshold: 0.5, color: '#ff3b30'}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: mcu.fault_led}
 
 instances:
   mcu:
@@ -24,6 +51,8 @@ instances:
       bindings: bindings/renode-rc-servo.yaml
       variables: {quantum: "0.00001"}       # 10 us edge resolution = 0.9 deg
       log: ../../.embeddyn/renode-rc-servo.log
+      uarts:                                # USART2 console: telemetry lines every 100 ms, 'R' clears a fault
+        - {name: console, peripheral: sysbus.usart2, signal: mcu.console}
   servo:
     domain: mechanical
     model: "embeddyn.mechatronics.plants:RCServo"
@@ -49,6 +78,7 @@ signals:
   mcu.fault_led: {domain: firmware, initial: 0.0}
   mcu.setpoint_deg: {domain: firmware, unit: deg, initial: 0.0}
   mcu.trim_deg: {domain: firmware, unit: deg, initial: 0.0}
+  mcu.console: {domain: firmware, kind: event}
   servo.angle_deg: {domain: mechanical, unit: deg, initial: 0.0}
   servo.speed: {domain: mechanical, unit: rad/s, initial: 0.0}
   servo.decoded_angle: {domain: mechanical, unit: rad, initial: 0.0}

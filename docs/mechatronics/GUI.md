@@ -65,7 +65,7 @@ the built-in mocks.
 | Mechanical | RC servo, geared drivetrain, MuJoCo model (pins from the MJCF), Webots world, FMU |
 | Thermal | winding thermal RC |
 | Sources | function generator (sine, square, triangle, sawtooth, step, ramp, pulse, DC), CSV replay, slider, switch |
-| Instruments | oscilloscope, multimeter, logic analyser, X-Y plotter, gauge, LED, watch table |
+| Instruments | oscilloscope, multimeter, logic analyser, X-Y plotter, gauge, LED, watch table, serial monitor (Renode UART console with a send box) |
 | 3-D bodies | servo + arm, motor shaft, pendulum, wheeled cart, linear slide, lamp, bar |
 
 The function generator runs inside the simulation as a python plant

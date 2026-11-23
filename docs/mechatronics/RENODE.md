@@ -100,6 +100,37 @@ and by `tools/renode/build-custom-cores.sh`. Both are verified on a real build:
 They still have to be committed to `xsession/renode-infrastructure` (the
 `src/Infrastructure` submodule of the custom-cores branch).
 
+## UART consoles
+
+```yaml
+options:
+  uarts:
+    - {name: console, peripheral: sysbus.usart2, signal: mcu.console}   # port: 0 = pick a free one
+signals:
+  mcu.console: {domain: firmware, kind: event}
+```
+
+The fork's External Control API has no UART command, so each UART goes
+through a Renode socket terminal instead. At launch the adapter adds
+`emulation CreateServerSocketTerminal <port> "<name>" false; connector Connect
+<peripheral> <name>` and then connects to the port.
+
+* **Output:** after every `RunFor` the adapter drains what the firmware
+  transmitted. Each complete line becomes an event on the UART's signal, stamped
+  with the step's end time. On loopback the bytes are already in the socket
+  when `RunFor` returns, and two runs give identical lines at identical times
+  (test).
+* **Input:** `RenodeAdapter.uart_write()` (from the Lab's serial monitor, or
+  `POST /api/uart`) sends text to the UART. Renode delivers it asynchronously
+  at its next sync point. That makes it a logged, non-deterministic boundary
+  input, recorded as a `<signal>.tx` event, unlike the lock-step pin
+  bindings.
+* CAN and SPI hooks need Renode ≥ 1.17's External Control commands, which the
+  custom-cores fork doesn't have yet (see the integration research).
+
+In the RC-servo example, USART2 prints a telemetry line every 100 ms. `R`
+clears a latched stall fault and `?` prints the calibration.
+
 ## Project configuration
 
 See `examples/mechatronics/dc-motor-renode.yaml`:

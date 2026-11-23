@@ -58,6 +58,8 @@ def test_renode_ports_come_from_the_binding_file():
     ports = {(p["signal"], p["direction"]): p["label"] for p in mcu["ports"]}
     assert ports[("mcu.servo_pulse", "out")] == "timer2 gpio_pulse_width pin 0"
     assert ports[("operator.command_voltage", "in")] == "adc1 adc channel 1"
+    assert ports[("mcu.console", "out")] == "usart2 console"                       # UART pin from options.uarts
+    assert ("probe", "mcu.console", "console") in {(w["kind"], w["signal"], w["target"]["node"]) for w in graph["wires"]}
     assert {w["signal"] for w in graph["wires"] if w["kind"] == "net"} == {
         "mcu.servo_pulse", "operator.command_voltage", "arm.load_torque", "servo.feedback_voltage"}
 

@@ -31,6 +31,7 @@ class RunSession:
         self.units: dict[str, str] = {}
         self.rows: list[list[float | None]] = []
         self.dict_rows: list[dict[str, Any]] = []
+        self.events: list[dict[str, Any]] = []        # UART lines and other adapter events, in order
         self.metrics: dict[str, Any] = {}
         self.wall_seconds = 0.0
         self.forced: dict[str, float] = controls(graph)
@@ -80,6 +81,30 @@ class RunSession:
     def finished(self) -> bool:
         return self.status in {"done", "stopped", "error"}
 
+    def events_since(self, cursor: int) -> tuple[list[dict[str, Any]], int]:
+        with self._lock:
+            items = self.events[cursor:]
+            return items, cursor + len(items)
+
+    def uart_write(self, signal: str, text: str) -> dict[str, Any]:
+        """Send text to the UART whose events go to `signal`. Logged as a `<signal>.tx` event."""
+        orchestrator = self._orchestrator
+        if orchestrator is None or self.finished:
+            raise LookupError("the run is not active")
+        for name, adapter in orchestrator.adapters.items():
+            writer = getattr(adapter, "uart_write", None)
+            if writer is None:
+                continue
+            try:
+                count = writer(signal, text)
+            except KeyError:
+                continue
+            with self._lock:
+                self.events.append({"time_seconds": orchestrator.current_time, "topic": f"{signal}.tx",
+                                    "payload": text, "source": "lab"})
+            return {"instance": name, "bytes": count}
+        raise LookupError(f"no UART publishes {signal}")
+
     def snapshot(self, cursor: int) -> tuple[list[list[float | None]], int]:
         with self._lock:
             rows = self.rows[cursor:]
@@ -104,6 +129,8 @@ class RunSession:
         with self._lock:
             self.rows.append(values)
             self.dict_rows.append({k: v for k, v in row.items() if k != "__events__"})
+            for event in row.get("__events__", []):
+                self.events.append({k: event.get(k) for k in ("time_seconds", "topic", "payload", "source")})
 
     def _run(self) -> None:
         from ..factory import build_adapters
@@ -114,7 +141,9 @@ class RunSession:
             project = project_from_graph(self.graph)
             if self.duration:
                 project.duration_seconds = float(self.duration)
-            self.names = [name for name in project.signals]
+            from ..model import SignalKind
+            self.names = [name for name, sig in project.signals.items()
+                          if sig.kind in (SignalKind.CONTINUOUS, SignalKind.DISCRETE)]
             self.units = {name: signal.unit for name, signal in project.signals.items()}
             self.log.append(f"building adapters for {', '.join(project.simulator_instances()) or 'no instances'}"
                             + (" (mock hardware)" if self.mock else ""))

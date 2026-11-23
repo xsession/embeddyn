@@ -7,6 +7,8 @@
  *   PC0  ADC1_IN1        <- command potentiometer (0..3.3 V = -90..+90 deg)
  *   PC1  ADC1_IN2        <- servo feedback potentiometer (analog-feedback servo)
  *   PA5  GPIO out        -> fault LED (LD2 on a Nucleo-L476RG)
+ *   PA2/PA3 USART2 (AF7) -> 115200 8N1 console: telemetry every 100 ms;
+ *                           'R' clears a latched fault, '?' prints the calibration
  *
  * Clock: HSI16 -> PLL -> 80 MHz SYSCLK. TIM2 counts at 1 MHz (PSC = 79) and
  * runs one 20 ms servo frame per period; its update interrupt runs the
@@ -69,6 +71,16 @@
 #define ADC1_DR       REG(ADC1_BASE + 0x40u)
 #define ADC_CCR       REG(ADC1_BASE + 0x308u)
 
+/* USART2 (RM0351 section 40.8) */
+#define USART2_BASE   0x40004400u
+#define USART2_CR1    REG(USART2_BASE + 0x00u)
+#define USART2_BRR    REG(USART2_BASE + 0x0Cu)
+#define USART2_ISR    REG(USART2_BASE + 0x1Cu)
+#define USART2_RDR    REG(USART2_BASE + 0x24u)
+#define USART2_TDR    REG(USART2_BASE + 0x28u)
+#define USART_TXE     (1u << 7)
+#define USART_RXNE    (1u << 5)
+
 #define NVIC_ISER0    REG(0xE000E100u)
 #define SCB_VTOR      REG(0xE000ED08u)
 #define TIM2_IRQ      28u
@@ -129,6 +141,75 @@ static uint32_t adc_read(uint32_t channel)
     while ((ADC1_ISR & (1u << 2)) == 0) {
     }
     return ADC1_DR & 0xFFFu;
+}
+
+static void uart_putc(char c)
+{
+    while ((USART2_ISR & USART_TXE) == 0) {
+    }
+    USART2_TDR = (uint32_t)(unsigned char)c;
+}
+
+static void uart_puts(const char *text)
+{
+    while (*text) {
+        uart_putc(*text++);
+    }
+}
+
+static void uart_put_int(int32_t value)
+{
+    char digits[12];
+    int n = 0;
+    uint32_t magnitude = value < 0 ? (uint32_t)(-value) : (uint32_t)value;
+    if (value < 0) {
+        uart_putc('-');
+    }
+    do {
+        digits[n++] = (char)('0' + magnitude % 10u);
+        magnitude /= 10u;
+    } while (magnitude && n < 11);
+    while (n) {
+        uart_putc(digits[--n]);
+    }
+}
+
+static void uart_field(const char *name, int32_t value)
+{
+    uart_puts(name);
+    uart_put_int(value);
+}
+
+static int32_t centi(float v)
+{
+    return (int32_t)(v * 100.0f + (v < 0 ? -0.5f : 0.5f));
+}
+
+/* Console: one telemetry line every 5 frames (100 ms), commands from the host. */
+static void console(void)
+{
+    while (USART2_ISR & USART_RXNE) {
+        char c = (char)USART2_RDR;
+        if (c == 'R' && tm.fault_latched) {
+            tm.fault_latched = 0;
+            tm.stall_frames = 0;
+            GPIO_BSRR(GPIOA_BASE) = (1u << (5 + 16));        /* LED off */
+            uart_puts("fault cleared\r\n");
+        } else if (c == '?') {
+            uart_field("cal trim_ki=", centi(servo_cal.trim_ki));
+            uart_field(" fault_deg=", centi(servo_cal.fault_deg));
+            uart_puts("\r\n");
+        }
+    }
+    if (tm.frame_count % 5u == 0u) {
+        uart_field("t=", (int32_t)(tm.frame_count * (FRAME_US / 1000u)));
+        uart_field(" sp=", centi(tm.setpoint_deg));
+        uart_field(" fb=", centi(tm.feedback_deg));
+        uart_field(" trim=", centi(tm.trim_deg));
+        uart_field(" pulse=", (int32_t)tm.pulse_us);
+        uart_field(" fault=", (int32_t)tm.fault_latched);
+        uart_puts("\r\n");
+    }
 }
 
 static float clampf(float v, float lo, float hi)
@@ -198,6 +279,7 @@ static void frame(void)
 void TIM2_IRQHandler(void)
 {
     frame();
+    console();
 }
 
 static void clock_80mhz(void)
@@ -244,12 +326,18 @@ int main(void)
     SCB_VTOR = (uint32_t)vectors;
     clock_80mhz();
     RCC_AHB2ENR |= (1u << 0) | (1u << 2) | (1u << 13);  /* GPIOA, GPIOC, ADC */
-    RCC_APB1ENR1 |= 1u;                                 /* TIM2 */
+    RCC_APB1ENR1 |= 1u | (1u << 17);                    /* TIM2, USART2 */
 
     /* PA0 = AF1 (TIM2_CH1), PA5 = output (fault LED, off) */
     GPIO_BSRR(GPIOA_BASE) = (1u << (5 + 16));
     GPIO_MODER(GPIOA_BASE) = (GPIO_MODER(GPIOA_BASE) & ~((3u << 0) | (3u << 10))) | (2u << 0) | (1u << 10);
     GPIO_AFRL(GPIOA_BASE) = (GPIO_AFRL(GPIOA_BASE) & ~0xFu) | 1u;
+    /* PA2 = USART2_TX, PA3 = USART2_RX (AF7), 115200 8N1 */
+    GPIO_MODER(GPIOA_BASE) = (GPIO_MODER(GPIOA_BASE) & ~((3u << 4) | (3u << 6))) | (2u << 4) | (2u << 6);
+    GPIO_AFRL(GPIOA_BASE) = (GPIO_AFRL(GPIOA_BASE) & ~(0xFFu << 8)) | (7u << 8) | (7u << 12);
+    USART2_BRR = 80000000u / 115200u;
+    USART2_CR1 = (1u << 3) | (1u << 2) | 1u;           /* TE, RE, UE */
+    uart_puts("rc-servo-l476 ready\r\n");
     /* PC0, PC1 analog (reset default) and connected to the ADC */
     GPIO_MODER(GPIOC_BASE) |= (3u << 0) | (3u << 2);
     GPIO_ASCR(GPIOC_BASE) |= 3u;

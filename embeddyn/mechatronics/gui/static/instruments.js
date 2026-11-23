@@ -293,6 +293,7 @@ function buildCard(node) {
       for (const p of chans) table.append(h('tr', {}, h('td', {}, p.signal), h('td', {}, formatValue(signalValue(p.signal), signalUnit(p.signal)))));
     } };
   }
+  if (kind === 'serial_monitor') return serialCard(node);
   if (kind === 'slider') return sliderCard(node);
   if (kind === 'switch') return switchCard(node);
   return null;
@@ -310,6 +311,39 @@ export async function setControl(node, value) {
   if (session && !['done', 'stopped', 'error'].includes(session.status)) {
     try { await api('force', { session: session.session, signal, value }); } catch (error) { emit('error', error); }
   }
+}
+
+function serialCard(node) {
+  const screenEl = h('pre', { class: 'serial' });
+  const input = h('input', { placeholder: 'send to the firmware (Enter)…', style: 'flex:1' });
+  const status = h('span', { class: 'note' });
+  const endings = { CRLF: '\r\n', LF: '\n', none: '' };
+  const send = async () => {
+    const signal = node.ports[0]?.signal;
+    const session = state.session;
+    if (!signal) return (status.textContent = 'wire a UART pin to A');
+    if (!session || ['done', 'stopped', 'error'].includes(session.status)) return (status.textContent = 'run the simulation first');
+    try {
+      await api('uart', { session: session.session, signal, text: input.value + (endings[node.settings.line_end] ?? '\r\n') });
+      input.value = ''; status.textContent = '';
+    } catch (error) { status.textContent = error.message; }
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+  const ending = select(['CRLF', 'LF', 'none'], node.settings.line_end || 'CRLF', (v) => setting(node, 'line_end', v));
+  const root = h('div', { class: 'card wide' }, header(node, ending),
+    h('div', { class: 'serial-body' }, screenEl, h('div', { class: 'serial-input' }, input, h('button', { onclick: send }, 'Send'), status)));
+  root.style.height = '230px';
+  let shown = -1;
+  return { root, draw: () => {
+    const signal = node.ports[0]?.signal;
+    const now = data.now();
+    const lines = signal ? data.events.filter((e) => (e.topic === signal || e.topic === signal + '.tx') && e.time_seconds <= now + 1e-9) : [];
+    if (lines.length === shown) return;
+    shown = lines.length;
+    screenEl.textContent = !signal ? 'Wire a Renode UART pin (uart:…) to channel A.'
+      : lines.slice(-400).map((e) => `${e.time_seconds.toFixed(3).padStart(8)}  ${e.topic.endsWith('.tx') ? '> ' : ''}${String(e.payload).replace(/[\r\n]+$/, '')}`).join('\n') || '(no data yet)';
+    screenEl.scrollTop = screenEl.scrollHeight;
+  } };
 }
 
 function sliderCard(node) {

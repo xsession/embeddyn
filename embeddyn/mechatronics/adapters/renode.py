@@ -20,6 +20,17 @@ Binding manifest (``options.bindings``)::
 Output properties: ``gpio_duty``, ``gpio_pulse_width``, ``gpio_state``, ``sysbus``,
 ``register_ratio``.
 Input properties: ``adc``, ``gpio``, ``sysbus``.  See docs/mechatronics/RENODE.md.
+
+UARTs (``options.uarts``) are exposed by Renode as TCP socket terminals
+(``CreateServerSocketTerminal`` + ``connector Connect``). After every step the
+adapter drains what the firmware transmitted during that step and publishes
+each complete line as an event on the UART's signal (topic). ``uart_write``
+sends text to the firmware. That input crosses into the emulation
+asynchronously, so it is a logged, non-deterministic boundary, unlike the
+lock-step pin bindings::
+
+    uarts:
+      - {name: console, peripheral: sysbus.usart2, signal: mcu.console}   # port: 0 = pick a free one
 """
 from __future__ import annotations
 
@@ -36,6 +47,24 @@ from typing import Any, Mapping
 
 from .base import SimulatorAdapter, StepResult
 from .renode_api import GpioEvent, RenodeExternalControl
+
+
+@dataclass
+class _Uart:
+    name: str
+    peripheral: str
+    signal: str
+    port: int
+    sock: socket.socket | None = None
+    buffer: bytes = b""
+    rx_bytes: int = 0
+    tx_bytes: int = 0
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
 
 OUTPUT_PROPERTIES = {"gpio_duty", "gpio_pulse_width", "gpio_state", "sysbus", "register_ratio"}
 INPUT_PROPERTIES = {"adc", "gpio", "sysbus"}
@@ -180,6 +209,7 @@ class RenodeAdapter(SimulatorAdapter):
         server_name: str = "embeddyn",
         startup_timeout: float = 120.0,
         log_path: str | None = None,
+        uarts: list[dict[str, Any]] | None = None,
     ) -> None:
         self.host, self.port, self.timeout = host, int(port), float(timeout)
         self.machine = machine
@@ -203,6 +233,15 @@ class RenodeAdapter(SimulatorAdapter):
         self._duty: dict[str, _DutyTracker] = {}
         self._pulses: dict[str, _PulseTracker] = {}
         self._window = (0, 0)
+        self.uarts: list[_Uart] = []
+        for spec in uarts or []:
+            name, peripheral = str(spec["name"]), str(spec["peripheral"])
+            if not name.isidentifier() or any(ch.isspace() or ch in ';"' for ch in peripheral):
+                raise ValueError(f"invalid UART name/peripheral: {name!r} {peripheral!r}")
+            port = int(spec.get("port") or 0) or (_free_port() if self.launch else 0)
+            if not port:
+                raise ValueError(f"UART {name}: give `port` when Renode is not launched by embeddyn")
+            self.uarts.append(_Uart(name, peripheral, str(spec.get("signal") or f"uart.{name}"), port))
 
     # ------------------------------------------------------------------ lifecycle
     def prepare(self, context: Mapping[str, Any]) -> None:
@@ -222,6 +261,9 @@ class RenodeAdapter(SimulatorAdapter):
                 raise ValueError(f"invalid Renode variable {key!r}={value!r}")
             prefix += f'${key}="{value}"; '
         monitor = f'{prefix}include @{script}; emulation CreateExternalControlServer "{self.server_name}" {self.port}'
+        for uart in self.uarts:
+            monitor += (f'; emulation CreateServerSocketTerminal {uart.port} "{uart.name}" false'
+                        f'; connector Connect {uart.peripheral} {uart.name}')
         return [self.executable, *self.renode_args, "-e", monitor]
 
     def start(self, initial_signals: Mapping[str, float]) -> None:
@@ -254,7 +296,45 @@ class RenodeAdapter(SimulatorAdapter):
                                       last_fall_us=self._now_us)
                 self._pulses[binding.signal] = pulse
                 self.client.gpio_subscribe(binding.machine, binding.peripheral, pin, pulse.on_event)
+        for uart in self.uarts:
+            uart.sock = socket.create_connection((self.host, uart.port), timeout=self.timeout)
+            uart.sock.setblocking(False)
         self._apply_inputs(initial_signals)
+
+    def _drain_uarts(self, now_seconds: float) -> list[dict[str, Any]]:
+        """Bytes the firmware sent during the step, as one event per complete line."""
+        events = []
+        for uart in self.uarts:
+            if uart.sock is None:
+                continue
+            while True:
+                try:
+                    chunk = uart.sock.recv(65536)
+                except (BlockingIOError, InterruptedError):
+                    break
+                if not chunk:
+                    break
+                uart.buffer += chunk
+                uart.rx_bytes += len(chunk)
+            *lines, uart.buffer = uart.buffer.split(b"\n")
+            for line in lines:
+                text = line.rstrip(b"\r").decode("utf-8", errors="replace")
+                events.append({"time_seconds": now_seconds, "topic": uart.signal, "payload": text})
+        return events
+
+    def uart_write(self, name_or_signal: str, text: str) -> int:
+        """Send text to a UART (by name or signal). Asynchronous: lands at Renode's next sync point."""
+        for uart in self.uarts:
+            if name_or_signal in (uart.name, uart.signal) and uart.sock is not None:
+                data = text.encode("utf-8")
+                uart.sock.setblocking(True)
+                try:
+                    uart.sock.sendall(data)
+                finally:
+                    uart.sock.setblocking(False)
+                uart.tx_bytes += len(data)
+                return len(data)
+        raise KeyError(f"no connected UART {name_or_signal!r}")
 
     def step(self, time_seconds: float, step_seconds: float, inputs: Mapping[str, float]) -> StepResult:
         if self.client is None:
@@ -274,9 +354,16 @@ class RenodeAdapter(SimulatorAdapter):
             self.client.run_for(interval)
         self._now_us = target_us
         outputs = self._read_outputs(start_us, target_us)
-        return StepResult(outputs, {"renode_time_us": target_us, "run_for_us": interval})
+        diagnostics: dict[str, Any] = {"renode_time_us": target_us, "run_for_us": interval}
+        if self.uarts:
+            diagnostics["events"] = self._drain_uarts((target_us - self._origin_us) / 1_000_000)
+        return StepResult(outputs, diagnostics)
 
     def stop(self) -> None:
+        for uart in self.uarts:
+            if uart.sock is not None:
+                uart.sock.close()
+                uart.sock = None
         if self.client is not None:
             self.client.close()
             self.client = None
@@ -295,7 +382,7 @@ class RenodeAdapter(SimulatorAdapter):
 
     def capabilities(self) -> dict[str, bool]:
         return {"deterministic_step": True, "variable_step": True, "checkpoint": False,
-                "real_time": False, "events": True, "buses": False, "firmware_in_the_loop": True}
+                "real_time": False, "events": True, "buses": bool(self.uarts), "firmware_in_the_loop": True}
 
     def health(self) -> dict[str, object]:
         return {

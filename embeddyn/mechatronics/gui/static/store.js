@@ -19,7 +19,7 @@ export const KIND_COLORS = { source: '#16a085', instrument: '#3d4b5c', scene: '#
 export const GLYPHS = {
   mcu: '▣', chip: '◧', servo: '⟲', gear: '⚙', motor: 'M', circuit: '⏚', thermo: '♨', wave: '∿', table: '☷',
   robot: '⛭', box: '▢', slider: '⊶', switch: '⏻', scope: '⌁', meter: 'Ω', logic: '⫶', xy: '⌗', gauge: '◔',
-  led: '●', pendulum: '⊥', cart: '⛟', linear: '⇿', lamp: '☀', bar: '▮', net: '⏛',
+  led: '●', terminal: '⌨', pendulum: '⊥', cart: '⛟', linear: '⇿', lamp: '☀', bar: '▮', net: '⏛',
 };
 export const TRACE_COLORS = ['#ffd60a', '#3fd0ff', '#ff6bd6', '#6bff8b', '#ff9f43', '#a29bfe', '#ff5c5c', '#e0e0e0'];
 
@@ -71,9 +71,10 @@ export const findPort = (nodeId, portName) => findNode(nodeId)?.ports.find((p) =
 // Recorded run data: column arrays per signal, time cursor for playback.
 export const data = {
   names: [], units: {}, index: {}, time: [], columns: [], cursor: -1, follow: true,
+  events: [],          // {time_seconds, topic, payload, source}: UART lines and other adapter events
 
   reset(names = [], units = {}) {
-    this.names = names; this.units = units; this.time = []; this.cursor = -1;
+    this.names = names; this.units = units; this.time = []; this.cursor = -1; this.events = [];
     this.index = Object.fromEntries(names.map((n, i) => [n, i]));
     this.columns = names.map(() => []);
   },

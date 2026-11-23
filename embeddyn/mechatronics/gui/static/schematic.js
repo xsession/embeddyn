@@ -120,7 +120,7 @@ function drawPin(g, node, port, x, y, side, width, connected) {
   label.textContent = pinLabel(node, port);
   const tip = el('title', {}, pin);
   tip.textContent = `${port.name}${port.signal ? ' → ' + port.signal : ' (unconnected)'}${port.unit ? ' [' + port.unit + ']' : ''}${port.label ? '\n' + port.label : ''}`;
-  if (port.signal && (port.direction === 'out' || node.kind === 'terminal')) {
+  if (port.signal && port.kind !== 'event' && (port.direction === 'out' || node.kind === 'terminal')) {
     const value = el('text', { class: 'value', x: x + side * 18, y: y - 6, 'text-anchor': side < 0 ? 'end' : 'start' }, g);
     valueTags.push({ el: value, signal: port.signal });
   }

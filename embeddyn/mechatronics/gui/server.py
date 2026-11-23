@@ -272,6 +272,13 @@ def make_handler(state: LabState):
                 raise ValueError(f"unknown action {action!r}")
             return session.info()
 
+        def _post_uart(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = state.session(str(body["session"]))
+            text = str(body.get("text", ""))
+            if len(text) > 4096:
+                raise ValueError("text too long")
+            return session.uart_write(str(body["signal"]), text)
+
         def _post_force(self, body: dict[str, Any]) -> dict[str, Any]:
             session = state.session(str(body["session"]))
             value = body.get("value")
@@ -286,8 +293,12 @@ def make_handler(state: LabState):
             self.send_header("Connection", "keep-alive")
             self.end_headers()
             last_status = None
+            event_cursor = 0
             try:
                 while True:
+                    events, event_cursor = session.events_since(event_cursor)
+                    if events:
+                        self._event("events", {"events": events})
                     rows, cursor_next = session.snapshot(cursor)
                     if session.status != last_status or (rows and cursor == 0):
                         last_status = session.status
@@ -296,6 +307,9 @@ def make_handler(state: LabState):
                         self._event("rows", {"from": cursor + start, "rows": rows[start:start + 2000]})
                     cursor = cursor_next
                     if session.finished and cursor >= len(session.rows):
+                        events, event_cursor = session.events_since(event_cursor)
+                        if events:
+                            self._event("events", {"events": events})
                         self._event("status", session.info())
                         self._event("end", {"rows": cursor})
                         return

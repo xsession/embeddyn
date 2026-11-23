@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from embeddyn.mechatronics.adapters.renode import _PulseTracker
+from embeddyn.mechatronics.adapters.renode import RenodeAdapter, _PulseTracker
 from embeddyn.mechatronics.adapters.renode_api import GpioEvent
 from embeddyn.mechatronics.factory import build_adapters
 from embeddyn.mechatronics.metrics import compute_metrics, parse_metric_specs
@@ -140,3 +140,59 @@ def test_rc_servo_stall_trips_fault_and_releases(tmp_path):
     last = rows[-1]
     assert last["mcu.servo_pulse"] == 0.0 and last["servo.signal_valid"] == 0.0
     assert last["servo.current"] == 0.0
+
+
+def test_uart_lines_are_drained_per_step():
+    """The adapter splits what a UART socket delivered into complete lines (no Renode needed)."""
+    adapter = RenodeAdapter(uarts=[{"name": "console", "peripheral": "sysbus.usart2", "signal": "mcu.console",
+                                    "port": 1}])
+    ours, renode_side = socket.socketpair()
+    ours.setblocking(False)
+    adapter.uarts[0].sock = ours
+    renode_side.sendall(b"ready\r\nt=100 sp=")
+    assert adapter._drain_uarts(0.1) == [{"time_seconds": 0.1, "topic": "mcu.console", "payload": "ready"}]
+    renode_side.sendall(b"2\r\n")
+    assert [e["payload"] for e in adapter._drain_uarts(0.2)] == ["t=100 sp=2"]
+    assert adapter.uart_write("console", "R") == 1 and renode_side.recv(8) == b"R"
+    with pytest.raises(KeyError):
+        adapter.uart_write("nope", "x")
+    adapter.stop()
+    renode_side.close()
+    assert "CreateServerSocketTerminal" not in " ".join(RenodeAdapter(script="x.resc").launch_command())
+
+
+def _console(rows):
+    return [(round(e["time_seconds"], 6), e["payload"]) for row in rows for e in row.get("__events__", [])
+            if e["topic"] == "mcu.console"]
+
+
+@needs_renode
+def test_console_telemetry_is_deterministic(tmp_path):
+    """USART2 prints a telemetry line every 100 ms; two runs give the same lines at the same times."""
+    profile = "0.0,1.65,0.0\n0.1,2.475,0.0\n"
+    first = _console(_run(_project(tmp_path, profile, 0.5)))
+    second = _console(_run(_project(tmp_path, profile, 0.5)))
+    assert first == second
+    assert first[0][1] == "rc-servo-l476 ready"
+    telemetry = [line for _, line in first if line.startswith("t=")]
+    assert len(telemetry) == 5 and telemetry[-1].endswith("fault=0")
+    fields = dict(item.split("=") for item in telemetry[-1].split())
+    assert int(fields["pulse"]) == pytest.approx(2000, abs=3)            # +45 deg -> 2.0 ms
+
+
+@needs_renode
+def test_console_command_clears_a_latched_fault(tmp_path):
+    """After a stall latches the fault, 'R' over the UART clears it (a logged, asynchronous input)."""
+    project = _project(tmp_path, "0.0,2.2,0.0\n0.3,2.2,1.0\n1.0,2.2,0.0\n", 1.6)
+    orchestrator = CoSimulationOrchestrator(project, build_adapters(project))
+    sent_at, rows = None, []
+    for row in orchestrator.iterate():
+        rows.append(row)
+        if sent_at is None and row["mcu.fault_led"] == 1.0 and row["time"] > 1.1:
+            orchestrator.adapters["mcu"].uart_write("console", "R")
+            sent_at = row["time"]
+    lines = _console(rows)
+    assert sent_at is not None
+    cleared = [t for t, line in lines if line == "fault cleared"]
+    assert cleared and sent_at < cleared[0] < sent_at + 0.05            # handled within the next frames
+    assert rows[-1]["mcu.fault_led"] == 0.0 and rows[-1]["servo.signal_valid"] == 1.0

@@ -26,6 +26,7 @@ pytest tests/mechatronics/test_rc_servo_l476.py
 | PC0 | ADC1_IN1 | `operator.command_voltage`, 0–3.3 V = −90…+90° |
 | PC1 | ADC1_IN2 | `servo.feedback_voltage`, the servo's feedback potentiometer |
 | PA5 | GPIO out | `mcu.fault_led` |
+| PA2 / PA3 | USART2 TX/RX (AF7), 115200 8N1 | `mcu.console` events: telemetry every 100 ms; `R` clears a fault, `?` prints the calibration |
 
 ## Firmware
 
@@ -111,6 +112,7 @@ Set the quantum with `variables: {quantum: ...}` in the `mcu` options.
 * with `RENODE_BIN` and the built firmware:
   * the full profile, checking move metrics, trimmed hold, and pulse width against the firmware telemetry;
   * trim switched off by writing `servo_cal.trim_ki = 0` over the bus, so the servo droops;
+  * the USART2 console: identical telemetry lines in two runs, and `R` over the UART clears a latched stall fault;
   * stall: fault latched, pulses stopped, motor current zero.
 
 The `renode-cosim.yml` CI workflow builds the firmware and runs these tests.
