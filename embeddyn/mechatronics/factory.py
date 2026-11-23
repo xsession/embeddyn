@@ -90,6 +90,14 @@ def _build_instance(project: MechatronicProject, cfg: SimulatorConfig, mock: boo
     if backend == "replay":
         from .adapters.replay import ReplayAdapter
         return ReplayAdapter(**replay_kwargs(project, cfg))
+    if backend == "mujoco":
+        from .adapters.mujoco_adapter import MujocoAdapter
+        if not cfg.model:
+            raise ValueError(f"{cfg.name}: mujoco backend needs `model: path/to/model.xml` (MJCF)")
+        timestep = options.get("timestep")
+        return MujocoAdapter(str(project.resolve(cfg.model)), inputs=dict(options.get("inputs", {})),
+                             outputs=dict(options.get("outputs", {})),
+                             timestep=float(timestep) if timestep is not None else None)
     if not core:
         raise ValueError(f"{cfg.name}: {domain.value} instances support backends python, fmu and replay (got {backend})")
     if domain is Domain.FIRMWARE:

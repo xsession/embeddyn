@@ -67,6 +67,9 @@ studio = [
     "capstone>=5.0",
     "psutil>=5.9",
 ]
+mujoco = [
+    "mujoco>=3.5",
+]
 mechatronics-storage = [
     "pyarrow>=15",
 ]

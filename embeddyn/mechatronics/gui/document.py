@@ -115,6 +115,8 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
         ports += [{"name": n, "direction": "out", "signal": outputs.get(n), "mappable": True,
                    "unit": _unit(signals, outputs.get(n)) or units.get(n, "")} for n in names_out]
         return ports
+    if backend == "mujoco":
+        return _mujoco_ports(spec, root, signals)
     if backend == "replay":
         columns = dict(options.get("columns") or {})
         return [{"name": column, "direction": "out", "signal": signal, "mappable": False,
@@ -130,6 +132,46 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
             continue
         ports.append({"name": name, "direction": "in" if name in targets else "out", "signal": name,
                       "unit": _unit(signals, name), "mappable": False})
+    return ports
+
+
+def mujoco_addresses(model_file: Path) -> tuple[list[str], list[str]]:
+    """Input and output addresses a MuJoCo model offers (see adapters/mujoco_adapter.py)."""
+    import mujoco
+    model = mujoco.MjModel.from_xml_path(str(model_file))
+    obj = mujoco.mjtObj
+
+    def names(kind, count):
+        return [mujoco.mj_id2name(model, kind, i) for i in range(count)]
+
+    scalar_joints = [j for i, j in enumerate(names(obj.mjOBJ_JOINT, model.njnt))
+                     if j and model.jnt_type[i] in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE)]
+    actuators = [a for a in names(obj.mjOBJ_ACTUATOR, model.nu) if a]
+    inputs = [f"ctrl:{a}" for a in actuators] + [f"qfrc:{j}" for j in scalar_joints]
+    outputs = [f"{kind}:{j}" for j in scalar_joints for kind in ("qpos", "qvel", "qfrc_act")]
+    for i, sensor in enumerate(names(obj.mjOBJ_SENSOR, model.nsensor)):
+        if sensor:
+            dim = int(model.sensor_dim[i])
+            outputs += [f"sensor:{sensor}"] if dim == 1 else [f"sensor:{sensor}[{k}]" for k in range(dim)]
+    outputs += [f"act:{a}" for a in actuators]
+    return inputs, outputs
+
+
+def _mujoco_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any]) -> list[dict[str, Any]]:
+    options = spec.get("options") or {}
+    inputs, outputs = dict(options.get("inputs") or {}), dict(options.get("outputs") or {})
+    names_in, names_out = list(inputs), list(outputs)
+    if spec.get("model"):
+        try:
+            offered_in, offered_out = mujoco_addresses((root / str(spec["model"])).resolve())
+            names_in = offered_in + [n for n in inputs if n not in offered_in]
+            names_out = offered_out + [n for n in outputs if n not in offered_out]
+        except Exception:            # noqa: BLE001 - mujoco missing or model invalid: show the mappings
+            pass
+    ports = [{"name": n, "direction": "in", "signal": inputs.get(n), "mappable": True,
+              "unit": _unit(signals, inputs.get(n))} for n in names_in]
+    ports += [{"name": n, "direction": "out", "signal": outputs.get(n), "mappable": True,
+               "unit": _unit(signals, outputs.get(n))} for n in names_out]
     return ports
 
 

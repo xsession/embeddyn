@@ -17,6 +17,8 @@ embeddyn mechatronics doctor
 
 Switch the YAML backends from `mock` to `webots`, `ngspice`, `ltspice` or `renode` as the corresponding models and executables become available.
 
+For multibody mechanics (gravity, joints, contacts) with exact checkpoints, run `examples/mechatronics/mujoco-arm.yaml` and read [MUJOCO.md](MUJOCO.md).
+
 To build and run systems interactively (schematic, instruments, 3-D view), run `embeddyn mechatronics gui examples/mechatronics/rc-servo-lab.yaml --open` and read [GUI.md](GUI.md).
 
 For firmware-in-the-loop with Renode, start from `examples/mechatronics/dc-motor-renode.yaml` and read [RENODE.md](RENODE.md). For an STM32L476 driving an RC servo, see [RC_SERVO_L476.md](RC_SERVO_L476.md).

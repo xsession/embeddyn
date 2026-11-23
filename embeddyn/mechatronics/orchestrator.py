@@ -99,7 +99,10 @@ class CoSimulationOrchestrator:
             if resume_from is not None:
                 self.restore(CheckpointManager.load(resume_from))
             macro = self.project.step_seconds
-            macro_count = max(0, int(math.ceil((self.project.duration_seconds - self.current_time) / macro)))
+            # Integer step index: the time of step k is k * macro, so it never accumulates rounding error
+            # and a run resumed from a checkpoint lands on exactly the same times as an uninterrupted one.
+            step_index = int(round(self.current_time / macro))
+            macro_count = max(0, int(math.ceil((self.project.duration_seconds - self.current_time) / macro - 1e-9)))
             next_checkpoint = (
                 self.current_time + checkpoint_interval_seconds
                 if checkpoint_manager is not None and checkpoint_interval_seconds and checkpoint_interval_seconds > 0
@@ -111,7 +114,8 @@ class CoSimulationOrchestrator:
             yield self._row(self.current_time)
             for _ in range(macro_count):
                 macro_start = self.current_time
-                macro_end = min(macro_start + macro, self.project.duration_seconds)
+                step_index += 1
+                macro_end = min(step_index * macro, self.project.duration_seconds)
                 self._apply_forced()
                 for activation in self.scheduler.activations(macro_start, macro_end):
                     self._activate(activation.instance or activation.domain.value, activation.domain,

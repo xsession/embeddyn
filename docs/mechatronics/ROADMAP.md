@@ -15,6 +15,7 @@ close the loop with bench measurements.
 | Storage, telemetry, distributed workers, HIL safety, twin analytics | ✅ baseline | good foundations, mostly exercised with mocks |
 | **Firmware: Renode** | 🟢 works end to end on real Renode | custom-cores build, reference STM32F4 motor firmware and an STM32L476 RC-servo controller, closed loop validated ([RENODE.md](RENODE.md), [RC_SERVO_L476.md](RC_SERVO_L476.md)) |
 | **Electrical: ngspice (libngspice)** | 🟢 works with carried state | `ngspice-shared` backend, switching H-bridge example, closed loop with Renode firmware ([NGSPICE.md](NGSPICE.md)); LTspice and the per-step `ngspice` backend remain batch-only |
+| Mechanical: MuJoCo | 🟢 works | `backend: mujoco`: in-process multibody physics, exact checkpoint/resume, robot-arm joint example ([MUJOCO.md](MUJOCO.md)) |
 | Mechanical: Webots | 🔴 Webots physics unused | reference controller computes the plant in Python; 0.5 ms step is rounded to 1 ms of Webots time |
 | Python plant models, thermal domain | 🟢 works | `backend: python` for any domain; geared drivetrain and winding thermal models ([TUNING.md](TUNING.md)) |
 | Named simulator instances, FMI | 🟢 works | any number of instances per domain with own rates; FMI 2.0/3.0 co-simulation FMUs ([INSTANCES_AND_FMI.md](INSTANCES_AND_FMI.md)) |
@@ -110,7 +111,8 @@ Next:
   and use Webots only where contacts or 3D matter.
 - [ ] Shared physical constants: declare `Kt`/`Ke` once instead of copying
   them into coupling gains.
-- [ ] Integer-tick time base in the orchestrator (no accumulated float time).
+- [x] Integer-tick time base in the orchestrator: step k ends at k × macro step, so resumed runs match exactly.
+- [x] MuJoCo multibody backend with native state checkpoints ([MUJOCO.md](MUJOCO.md)).
 
 ## Phase R4: fine-tuning loop
 
@@ -163,8 +165,8 @@ checked against the code.* Order is the build order: each group unblocks the nex
 | 9 | Renode sensor/bus signals: quadrature encoder, UART/SPI/I²C/CAN frames, fault injection | R1; INTEGRATION_PLAN 4 | missing |
 | 10 | Renode fork fixes upstreamed (pins, patches 0001–0003, platform files), checkpoints via Save/Load | R1 | patches local only |
 | 11 | ngspice: gate drive/dead time/MOSFET models, `.save` filtering, KiCad round trip | R2; INTEGRATION_PLAN 6 | missing |
-| 12 | Webots bridge using real physics (Supervisor motors/sensors, timestep alignment) | R3 | reference controller computes the plant itself |
-| 13 | Shared physical constants (`Kt`/`Ke` once); integer-tick time base | R3 | missing |
+| 12 | Webots bridge using real physics (Supervisor motors/sensors, timestep alignment) | R3 | MuJoCo backend now provides multibody physics ([MUJOCO.md](MUJOCO.md)); the Webots bridge still computes the plant itself |
+| 13 | Shared physical constants (`Kt`/`Ke` once); integer-tick time base | R3 | integer-tick time base done; shared constants missing |
 | 14 | Studio UI for co-simulation runs, plots, binding editor | R5; INTEGRATION_PLAN 2 | Lab GUI done (GUI.md); run comparison and binding-file editor missing |
 | 15 | `mechatronics doctor`, Docker image, HIL step with real hardware | R5; INTEGRATION_PLAN 8 | missing (HIL safety layer exists) |
 | 16 | Storage: override layers, PostgreSQL, telemetry range queries, retention/GC, bundle import/export, run recovery, backups | PHASE2 remaining | missing |

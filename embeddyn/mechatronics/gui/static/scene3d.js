@@ -90,7 +90,7 @@ function bodies(node) {
       break;
     }
     case 'pendulum': {
-      const a = angleOf(node, 'angle'), L = Number(s.length || 0.25), H = L + 0.08;
+      const a = angleOf(node, 'angle') + (Number(s.offset || 0) * Math.PI) / 180, L = Number(s.length || 0.25), H = L + 0.08;
       add(BOX, chain(T(0, 0.005, 0), S(0.12, 0.01, 0.08)), '#3d434c');
       add(BOX, chain(T(0, H / 2, -0.03), S(0.015, H, 0.015)), '#59616b');
       const rod = chain(T(0, H, 0), RZ(a));
@@ -138,7 +138,7 @@ function frame(nodes) {
   const xs = nodes.map((n) => Number(n.settings.x || 0)), zs = nodes.map((n) => Number(n.settings.z || 0));
   const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
   const big = nodes.some((n) => ['pendulum', 'cart', 'linear'].includes(n.icon));
-  camera.target = [(Math.max(...xs) + Math.min(...xs)) / 2, big ? 0.08 : 0.03, (Math.max(...zs) + Math.min(...zs)) / 2];
+  camera.target = [(Math.max(...xs) + Math.min(...xs)) / 2, big ? 0.16 : 0.03, (Math.max(...zs) + Math.min(...zs)) / 2];
   camera.dist = Math.max(big ? 0.8 : 0.35, span * 1.6);
 }
 

@@ -78,7 +78,7 @@ export function deleteNode(id) {
 // Give an unmapped python/FMU output a signal so it can be wired.
 function ensureOutputSignal(node, port) {
   if (port.signal) return port.signal;
-  const name = `${node.id}.${port.name}`;
+  const name = `${node.id}.${port.name.replace(/[^A-Za-z0-9_]+/g, '_').replace(/_+$/, '')}`;   // qpos:hinge[0] -> qpos_hinge_0
   port.signal = name;
   node.spec.options.outputs = node.spec.options.outputs || {};
   node.spec.options.outputs[port.name] = name;

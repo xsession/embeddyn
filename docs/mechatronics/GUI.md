@@ -62,7 +62,7 @@ the built-in mocks.
 |---|---|
 | Controllers | STM32L476 servo firmware (Renode), Renode MCU (generic), PI controller, servo pulse generator |
 | Electrical | DC motor armature, SPICE circuit (ngspice-shared) |
-| Mechanical | RC servo, geared drivetrain, Webots world, FMU |
+| Mechanical | RC servo, geared drivetrain, MuJoCo model (pins from the MJCF), Webots world, FMU |
 | Thermal | winding thermal RC |
 | Sources | function generator (sine, square, triangle, sawtooth, step, ramp, pulse, DC), CSV replay, slider, switch |
 | Instruments | oscilloscope, multimeter, logic analyser, X-Y plotter, gauge, LED, watch table |
