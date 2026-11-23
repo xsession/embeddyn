@@ -17,9 +17,15 @@ The FMU is unpacked to a temporary directory and its shared library loaded
 with ctypes for the current platform (`binaries/linux64` or `x86_64-linux`,
 etc.). Only real/Float64 variables are exchanged. Parameters and start values
 are set before initialisation; inputs before every `doStep`.
+
+When the FMU declares `canGetAndSetFMUstate` and `canSerializeFMUstate` (FMI 2)
+or `canGetAndSetFMUState` and `canSerializeFMUState` (FMI 3), checkpoints carry
+the serialized FMU state, and a run resumes exactly where it stopped. Without
+these flags a checkpoint records only the time, and resuming is refused.
 """
 from __future__ import annotations
 
+import base64
 import ctypes
 import platform
 import shutil
@@ -56,6 +62,8 @@ class ModelDescription:
     token: str                # FMI2 guid / FMI3 instantiationToken
     variables: dict[str, FmuVariable]
     default_step: float | None
+    can_get_set_state: bool = False
+    can_serialize_state: bool = False
 
 
 def read_model_description(root: Path) -> ModelDescription:
@@ -89,8 +97,11 @@ def read_model_description(root: Path) -> ModelDescription:
         raise FmuError(f"unsupported FMI version {version!r}")
     experiment = tree.find("DefaultExperiment")
     step = experiment.get("stepSize") if experiment is not None else None
+    suffix = "state" if version == "2.0" else "State"         # FMI 2: ...FMUstate, FMI 3: ...FMUState
+    flag = lambda name: cosim.get(name, "false").strip().lower() == "true"  # noqa: E731
     return ModelDescription(version, cosim.get("modelIdentifier"), token, variables,
-                            float(step) if step else None)
+                            float(step) if step else None,
+                            flag(f"canGetAndSetFMU{suffix}"), flag(f"canSerializeFMU{suffix}"))
 
 
 def _platform_dirs(version: str) -> list[str]:
@@ -311,14 +322,66 @@ class FmuAdapter(SimulatorAdapter):
         if self.workdir is not None and self.component is None:
             shutil.rmtree(self.workdir, ignore_errors=True)
 
+    # -- FMU state ---------------------------------------------------------------
+    @property
+    def restorable(self) -> bool:
+        d = self.description
+        return bool(d and d.can_get_set_state and d.can_serialize_state)
+
+    def _state_names(self) -> tuple[str, str, str, str, str]:
+        if self.description.version == "2.0":
+            return "GetFMUstate", "SetFMUstate", "FreeFMUstate", "SerializedFMUstateSize", "SerializeFMUstate"
+        return "GetFMUState", "SetFMUState", "FreeFMUState", "SerializedFMUStateSize", "SerializeFMUState"
+
+    def get_state_bytes(self) -> bytes:
+        """Serialized FMU state (fmi*GetFMUState + fmi*SerializeFMUState)."""
+        get, _, free, size_name, serialize = self._state_names()
+        state = ctypes.c_void_p()
+        self._check(self._fn(get, ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(
+            self.component, ctypes.byref(state)), get)
+        try:
+            size = ctypes.c_size_t()
+            self._check(self._fn(size_name, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t))(
+                self.component, state, ctypes.byref(size)), size_name)
+            buffer = (ctypes.c_ubyte * size.value)()
+            self._check(self._fn(serialize, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t)(
+                self.component, state, buffer, size.value), serialize)
+            return bytes(buffer)
+        finally:
+            self._fn(free, ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(self.component, ctypes.byref(state))
+
+    def set_state_bytes(self, data: bytes) -> None:
+        _, set_name, free, _, _ = self._state_names()
+        deserialize = "DeSerializeFMUstate" if self.description.version == "2.0" else "DeserializeFMUState"
+        state = ctypes.c_void_p()
+        buffer = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
+        self._check(self._fn(deserialize, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+                             ctypes.POINTER(ctypes.c_void_p))(self.component, buffer, len(data), ctypes.byref(state)),
+                    deserialize)
+        try:
+            self._check(self._fn(set_name, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)(self.component, state), set_name)
+        finally:
+            self._fn(free, ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(self.component, ctypes.byref(state))
+
     def checkpoint(self) -> object:
-        # FMU state save/restore (fmi*GetFMUState) is not implemented; record
-        # enough to refuse a resume instead of silently restarting at t = 0.
-        return {"fmu": self.fmu.name, "time": self.time, "restorable": False}
+        record: dict[str, Any] = {"fmu": self.fmu.name, "time": self.time, "restorable": self.restorable}
+        if self.restorable and self.component is not None:
+            record["state"] = base64.b64encode(self.get_state_bytes()).decode("ascii")
+        return record
 
     def restore(self, checkpoint: object) -> None:
-        if checkpoint is not None:
-            raise FmuError(f"{self.fmu.name}: resuming from a checkpoint is not supported for FMUs yet")
+        if checkpoint is None:
+            return
+        data = dict(checkpoint)
+        if not data.get("restorable"):
+            raise FmuError(f"{self.fmu.name}: this FMU cannot save its state (canGetAndSetFMUstate / "
+                           "canSerializeFMUstate), so the run cannot resume from a checkpoint")
+        if "state" not in data:
+            raise FmuError(f"{self.fmu.name}: the checkpoint holds no FMU state (taken before the FMU started)")
+        if self.component is None:
+            raise FmuError(f"{self.fmu.name}: start the FMU before restoring a checkpoint")
+        self.set_state_bytes(base64.b64decode(data["state"]))
+        self.time = float(data["time"])
 
     def capabilities(self) -> dict[str, bool]:
-        return {**super().capabilities(), "checkpoint": False}
+        return {**super().capabilities(), "checkpoint": self.restorable}

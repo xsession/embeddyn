@@ -101,8 +101,10 @@ Next:
   backend and optional own step; legacy `simulators:` still works.
 - [x] `FmuAdapter`: FMI 2.0 and 3.0 co-simulation via ctypes (no `fmpy`);
   example FMU built from C; two-wheel-drive example with six instances.
-- [ ] FMU state in checkpoints (`fmi*GetFMUState`/`SetFMUState`); FMU export
-  of Embeddyn models.
+- [x] FMU state in checkpoints (`fmi*GetFMUState`/`SerializeFMUState`), exact resume.
+- [x] FMU export of python plants (FMI 3.0 via PythonFMU3) and FMPy checks
+  (`mechatronics fmu-export` / `fmu-check`, [INSTANCES_AND_FMI.md](INSTANCES_AND_FMI.md)).
+- [ ] Reference-FMUs as importer oracle in CI; SSP import/export; export of whole systems.
 - [x] Python model adapter (`backend: python`, RK4 sub-stepping, checkpoints) with
   built-in `GearedDrivetrain` (backlash, compliance, Stribeck friction,
   encoder) and `ThermalRC`; `thermal`/`environment` domains built by the factory.
@@ -158,7 +160,7 @@ checked against the code.* Order is the build order: each group unblocks the nex
 | 2 | ✅ Optimiser over parameters (firmware gains, design values) against weighted metrics and constraints | R4 | done: `mechatronics tune` (serial evaluations) |
 | 3 | ✅ Python plant models with sub-stepping; a drivetrain library (rotor, gearbox with backlash and compliance, Coulomb/Stribeck friction, load, encoder) | R3; ARCHITECTURE "mechanical domain" | done: `backend: python`, `plants.py` |
 | 4 | ✅ Named simulator instances (several per domain; thermal/environment domains, which the enum already has but the factory ignores) | R3; spec §3.5, §4.3 | done: `instances:` with per-instance rates |
-| 5 | ✅ FMI 2/3 co-simulation import (export still open) | R3; INTEGRATION_PLAN 5 | done: `backend: fmu` (ctypes) |
+| 5 | ✅ FMI 2/3 co-simulation import, FMU state checkpoints, plant export | R3; INTEGRATION_PLAN 5 | done: `backend: fmu` (ctypes), `fmu-export`/`fmu-check` |
 | 6 | ✅ Verification checks: energy balance, step-size convergence, golden waveforms, scenario matrices | INTEGRATION_PLAN 7 | done: `mechatronics verify` ([VERIFICATION.md](VERIFICATION.md)), CI workflow |
 | 7 | ✅ Physical parameter estimation from bench traces (R, L, Kt, J, friction) with confidence intervals | R4; PHASE6 next steps | done: `mechatronics estimate` ([ESTIMATION.md](ESTIMATION.md)) |
 | 8 | ✅ Monte Carlo tolerance runs with yield; Sobol sensitivity | R4; PHASE6 | done: `mechatronics tolerance` ([TOLERANCE.md](TOLERANCE.md)), local process pool; experiment-queue execution still open |

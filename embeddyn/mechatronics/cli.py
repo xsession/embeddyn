@@ -360,6 +360,53 @@ def gui_command(
         server.server_close()
 
 
+def _key_values(items: list[str] | None) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for item in items or []:
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"expected name=value, got {item!r}")
+        try:
+            result[key] = float(value)
+        except ValueError:
+            result[key] = value
+    return result
+
+
+@mechatronics_app.command("fmu-export")
+def fmu_export(
+    plant: str = typer.Argument(..., help="Plant class: package.module:Class or file.py:Class."),
+    output: Path = typer.Option(Path("."), "--output", "-o", help="Directory for <name>.fmu."),
+    name: Optional[str] = typer.Option(None, "--name", help="Model name (default: the class name)."),
+    param: Optional[list[str]] = typer.Option(None, "--param", "-p", help="Parameter default, name=value (repeat)."),
+    input_start: Optional[list[str]] = typer.Option(None, "--input-start", help="Input start value, name=value."),
+    max_step: float = typer.Option(1e-4, "--max-step", help="RK4 sub-step inside each doStep [s]."),
+    check: bool = typer.Option(True, "--check/--no-check", help="Validate and simulate the result with FMPy."),
+) -> None:
+    """Export a python plant as an FMI 3.0 co-simulation FMU (PythonFMU3), with state save/restore."""
+    from .fmi_export import check_fmu, export_plant
+    path = export_plant(plant, output, name=name, parameters=_key_values(param),
+                        input_start={k: float(v) for k, v in _key_values(input_start).items()},
+                        max_step=max_step, root=Path.cwd())
+    typer.echo(f"wrote {path}")
+    if check:
+        report = check_fmu(path)
+        typer.echo(json.dumps({k: v for k, v in report.items() if k != "variables"}, indent=2))
+        if not report["valid"]:
+            raise typer.Exit(1)
+
+
+@mechatronics_app.command("fmu-check")
+def fmu_check(fmu: Path = typer.Argument(..., exists=True, dir_okay=False),
+              stop_time: float = typer.Option(0.01, "--stop-time")) -> None:
+    """Validate an FMU (FMPy model-description checks) and run a short co-simulation."""
+    from .fmi_export import check_fmu
+    report = check_fmu(fmu, stop_time=stop_time)
+    typer.echo(json.dumps(report, indent=2, default=str))
+    if not report["valid"]:
+        raise typer.Exit(1)
+
+
 @mechatronics_app.command("bindings-from-pinplan")
 def bindings_from_pinplan(
     plan_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Forge pin plan (.pinplan.json)."),

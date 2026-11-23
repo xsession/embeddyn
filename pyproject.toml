@@ -70,6 +70,10 @@ studio = [
 mujoco = [
     "mujoco>=3.5",
 ]
+fmi = [
+    "fmpy>=0.3.30",
+    "pythonfmu3>=1.3",
+]
 mechatronics-storage = [
     "pyarrow>=15",
 ]
