@@ -104,7 +104,8 @@ Next:
 - [x] FMU state in checkpoints (`fmi*GetFMUState`/`SerializeFMUState`), exact resume.
 - [x] FMU export of python plants (FMI 3.0 via PythonFMU3) and FMPy checks
   (`mechatronics fmu-export` / `fmu-check`, [INSTANCES_AND_FMI.md](INSTANCES_AND_FMI.md)).
-- [ ] Reference-FMUs as importer oracle in CI; SSP import/export; export of whole systems.
+- [x] Reference-FMUs as importer oracle (exact match with FMPy, state round trip), in CI.
+- [ ] SSP import/export; export of whole systems.
 - [x] Python model adapter (`backend: python`, RK4 sub-stepping, checkpoints) with
   built-in `GearedDrivetrain` (backlash, compliance, Stribeck friction,
   encoder) and `ThermalRC`; `thermal`/`environment` domains built by the factory.

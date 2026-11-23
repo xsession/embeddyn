@@ -135,31 +135,18 @@ Tests (`tests/mechatronics/test_fmi_export.py`):
   project checkpoint;
 * FMPy validates both the exported and the C FMUs.
 
-The Modelica Association
-[Reference-FMUs](https://github.com/modelica/Reference-FMUs) are the next
-oracle for the importer. They are not run yet: they ship native binaries from a
-downloaded archive, so running them needs an explicit decision.
+### Reference-FMUs
 
-## Example: two-wheel drive
+The importer is checked against the Modelica Association
+[Reference-FMUs](https://github.com/modelica/Reference-FMUs) v0.0.42, with FMPy
+as the oracle (`tests/mechatronics/test_reference_fmus.py`, opt-in):
 
-[`examples/mechatronics/two-wheel-drive.yaml`](../../examples/mechatronics/two-wheel-drive.yaml)
-is a differential drive with six instances:
+```bash
+python tools/fmi/fetch_reference_fmus.py .cache/reference-fmus     # pinned, SHA-256 checked
+EMBEDDYN_REFERENCE_FMUS=.cache/reference-fmus pytest tests/mechatronics/test_reference_fmus.py
+```
 
-| Instance | Domain | Backend | Rate |
-|----------|--------|---------|------|
-| `ctrl_left`, `ctrl_right` | firmware | python `PIController` | 1 kHz |
-| `drive_left`, `drive_right` | electrical | python `DCMotorRL` | 2 kHz |
-| `wheel_left` | mechanical | FMU `rotational_load.fmu` | 2 kHz |
-| `wheel_right` | mechanical | python `GearedDrivetrain` (backlash, encoder) | 2 kHz |
-
-One second runs in about 2 s, and the same with `--isolate-adapters` (each
-instance in its own process, identical results). With the example gains the
-left wheel reaches 10.0 rad/s (12 % overshoot, settles in 0.43 s) and the right
-wheel 6.07 rad/s (6 % overshoot, settles in 0.91 s). The right controller
-measures motor speed ÷ gear ratio, so the shaft compliance and backlash
-between motor and wheel stay outside its loop. Gains are per-axis project
-parameters (`left.kp`, `right.ki`, …), so both axes tune together:
-`examples/mechatronics/tuning/two-wheel.yaml` (4 gains, ITAE of both wheels,
-≤ 5 % overshoot each) starts at 12 % / 6 % overshoot and reaches a feasible
-result in 40 runs (54 s): 0 % overshoot on both wheels, settling in 0.19 s
-(left) and 0.45 s (right).
+Dahlquist, VanDerPol and BouncingBall, in FMI 2.0 and 3.0, give **exactly**
+FMPy's values at every one of 100 steps. Their FMU state round-trips bit for
+bit, and Feedthrough passes inputs through unchanged. CI fetches the archive and
+runs these tests.
