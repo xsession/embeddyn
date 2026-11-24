@@ -153,8 +153,9 @@ class ProjectCompiler:
                     "delay_steps": c.delay_steps,
                     "interpolation": c.interpolation,
                     "extrapolation": c.extrapolation,
+                    **({"parameters": dict(c.references)} if c.references else {}),
                 }
-                for c in project.couplings
+                for c in project.resolved_couplings()
             ],
         }
 

@@ -16,6 +16,8 @@ parameters:
   firmware.kp: 26.7         # duty per rad
   firmware.ki: 3.33         # duty per rad*s
   firmware.kd: 0.53         # duty per rad/s
+  motor.k: {value: 0.08, unit: N*m/A}   # torque constant Kt = back-EMF constant Ke (V*s/rad), declared once
+  gear.ratio: 20.0
 instances:
   mcu:
     domain: firmware
@@ -55,7 +57,7 @@ instances:
     options:
       backend: python
       max_step: 1.0e-5
-      parameters: {resistance: 2.0, inductance: 0.003, ke: 0.08, kt: 0.08}
+      parameters: {resistance: 2.0, inductance: 0.003, ke: "@motor.k", kt: "@motor.k"}
       inputs: {duty: bridge.duty, speed: motor.shaft_speed}
       outputs: {current: motor.current, torque: motor.torque, power: motor.power}
   winding:
@@ -101,7 +103,7 @@ signals:
   arm.joint_torque: {domain: mechanical, unit: N*m, initial: 0.0}
   arm.encoder_counts: {domain: firmware, initial: 0.0}
 couplings:
-  - {source: arm.speed, target: motor.shaft_speed, transform: {type: affine, gain: 20.0}}             # gear ratio
+  - {source: arm.speed, target: motor.shaft_speed, transform: {type: affine, gain: "@gear.ratio"}}   # motor speed = gear ratio x joint speed
   - {source: arm.angle, target: arm.encoder_counts, transform: {type: affine, gain: 13037.97}}       # 4096 cpr x 20 / 2 pi
 metrics:
   lift: {type: step_response, signal: arm.angle, target: 1.2, start: 2.0, end: 3.0, settling_band: 0.05}

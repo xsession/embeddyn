@@ -81,14 +81,14 @@ The FMU is an FMI 2.0 co-simulation binary built from C. Nothing changes for the
     options:
       backend: python
       max_step: 2.0e-5
-      parameters: {gear_ratio: 5, backlash: 0.003, shaft_stiffness: 2000, load_inertia: 0.2, coulomb_friction: 0.05, encoder_cpr: 2048}
+      parameters: {gear_ratio: "@right.gear_ratio", backlash: 0.003, shaft_stiffness: 2000, load_inertia: 0.2, coulomb_friction: 0.05, encoder_cpr: 2048}
 ```
 
-The right controller measures the *motor* speed, scaled by the gear ratio:
+The right controller measures the *motor* speed, divided by the gear ratio. The ratio is the parameter `right.gear_ratio: 5`, used both by the drivetrain (`gear_ratio: "@right.gear_ratio"`) and by the coupling:
 
 ```yaml
 couplings:
-  - {source: right.motor_speed, target: right.motor_speed_scaled, gain: 0.2, delay_steps: 1}
+  - {source: right.motor_speed, target: right.motor_speed_scaled, gain: "1/@right.gear_ratio", delay_steps: 1}
 ```
 
 ## Step 5 — run

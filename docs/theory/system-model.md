@@ -39,7 +39,9 @@ s^{(i)} \leftarrow \operatorname{clamp}_i\Big(f\big(s^{(j)}_{k-d}\big)\Big)
 | `quantize` | \(q\,\operatorname{round}(x/q) + o\) |
 | `clamp` | \(x\) limited to `min`/`max` |
 
-Every transform also takes its own `min`/`max`. Arbitrary expressions are deliberately not supported: a project file must not be able to execute code. Anything more complex than a transform belongs in a plant model.
+Every transform also takes its own `min`/`max`.
+
+**Parameter references.** `gain`, `offset`, `min`, `max` and `deadband` may be `"@name"`, `"-@name"` or `"1/@name"` instead of a number. The project resolves them against its parameters when a run starts (`MechatronicProject.resolved_couplings()`), after every override, so a motor constant declared once as `motor.k` feeds both the back-EMF and the torque coupling, stays consistent (\(K_t = K_e\), which the [energy balance](verification.md#energy-balance) relies on), and can be tuned or toleranced like any other parameter. The compiled run snapshot records both the resolved value and the reference. Arbitrary expressions are deliberately not supported: a project file must not be able to execute code. Anything more complex than a transform belongs in a plant model.
 
 With \(d = 0\) the target sees the source's value **as it is at that moment of the step**, which depends on execution order (see [master algorithm](master-algorithm.md)). With \(d \geq 1\) it sees the value committed at the end of step \(k-d\). The orchestrator keeps a ring buffer of \(\max d + 2\) values per continuous or discrete signal.
 
@@ -74,8 +76,22 @@ Parameters are `name → Quantity(value, unit)` with a provenance list (`project
 
 Adapters receive parameters alongside signal values. Python plants reference them as `"@name"`, Renode bindings write them into RAM, FMUs set them before initialisation. The run manifest records the resolved set with provenance.
 
-!!! note "Units are recorded, not converted"
-    `Quantity.parse("2 kohm")` gives `value=2.0, unit="kohm"`. The number is used as written, so write SI base values.
+### Units
+
+A value with a unit is converted to the unit expected where it is used (`quantities.py`):
+
+| Written | Expected | Result |
+|---|---|---|
+| `"0.5 ms"` | step (s) | 0.0005 s |
+| `"60 rpm"` | signal in `rad/s` | 6.2832 rad/s |
+| `"300 K"` | signal in `degC` | 26.85 °C (offsets handled) |
+| `"5 mN*m"` | signal in `N*m` | 0.005 N·m |
+| `"2 kohm"` | parameter (no expected unit) | 2000 ohm: prefixes are normalised away |
+| `"10 deg"` | parameter | 10 deg: units chosen on purpose (deg, rpm, degC, rev, bar) are kept |
+| `"3 V"` | step (s) | error: different dimensions |
+| `"12 counts"` | anything | 12, unit kept: units embeddyn cannot parse are not converted |
+
+Unit expressions are products and quotients of symbols with integer powers (`kg*m^2`, `N*m*s/rad`), each symbol with an optional SI prefix (p n u µ m c k M G). Angle is treated as a dimension of its own, so deg ↔ rad and rpm ↔ rad/s convert, while rad/s ↔ Hz is rejected rather than silently off by 2π.
 
 ## Scheduler configuration
 

@@ -1,6 +1,6 @@
 # Project file
 
-A project is one YAML file. Paths inside it are relative to the file. Values may carry a unit string (`0.001 s`, `25 degC`), which is recorded but **not converted**, so write SI values.
+A project is one YAML file. Paths inside it are relative to the file. Values may carry a unit string (`"0.5 ms"`, `"60 rpm"`, `"25 degC"`); it is converted to the unit expected where the value is used, and incompatible units are an error ([units](../theory/system-model.md#units)).
 
 ```yaml
 schema_version: 1                     # 1 or 2
@@ -27,7 +27,7 @@ parameters:
   motor.resistance_20c: {value: 2.0, unit: ohm, provenance: [{source: datasheet}]}
 ```
 
-Referenced as `"@name"` from Python plant/FMU parameters, by Renode input bindings, and by tuning/tolerance/estimation specs.
+Referenced as `"@name"` from Python plant/FMU parameters and coupling transforms, by Renode input bindings, and by tuning/tolerance/estimation specs.
 
 ## `instances`
 
@@ -95,6 +95,9 @@ couplings:
   - source: sensor.raw
     target: mcu.adc
     transform: {type: quantize, gain: 0.0008, min: 0, max: 3.3}   # identity | affine | clamp | deadband | quantize
+  - source: arm.speed
+    target: motor.shaft_speed
+    gain: "@gear.ratio"               # a parameter: "@name", "-@name" or "1/@name" (gain, offset, min, max, deadband)
 ```
 
 `expression:` is rejected (no code in project files).

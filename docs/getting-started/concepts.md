@@ -29,11 +29,7 @@ signals:
   mcu.duty:      {domain: firmware, initial: 0.0, min: -1.0, max: 1.0}   # clamped when written
 ```
 
-Besides `continuous` (the default) signals can be `discrete`, `event` (published with a time stamp, e.g. CAN frames or UART lines) or `bus` (structured payloads). A value may carry its unit (`initial: 25 degC`, `step: 0.0005 s`); the unit is recorded with the value.
-
-!!! warning "Write values in SI base units"
-    Units are recorded, **not converted**: `0.5 ms` is read as the number 0.5 with unit `ms`. Write times in seconds,
-    lengths in metres and so on (`step: 0.0005`, `step: 5.0e-4 s`).
+Besides `continuous` (the default) signals can be `discrete`, `event` (published with a time stamp, e.g. CAN frames or UART lines) or `bus` (structured payloads). A value may carry its unit, and it is **converted** to the unit expected where it is used: `step: "0.5 ms"` is 0.0005 s, `initial: "60 rpm"` on a signal declared in `rad/s` is 6.283, `"3 V"` where seconds are expected is an error. See [units](../theory/system-model.md#units).
 
 ## Instances and adapters
 
@@ -58,12 +54,12 @@ A **coupling** copies one signal into another every step, through an optional tr
 
 ```yaml
 couplings:
-  - {source: motor.current, target: motor.torque, gain: 0.08}             # Kt
+  - {source: motor.current, target: motor.torque, gain: "@motor.k"}       # Kt, a project parameter
   - {source: arm.angle, target: mcu.encoder_counts, gain: 1303.8, delay_steps: 1}
   - {source: sensor.raw, target: mcu.adc, transform: {type: quantize, gain: 0.0008}}
 ```
 
-Transforms are `affine` (gain, offset), `deadband`, `quantize` and `clamp`, each with optional `min`/`max`. `delay_steps: 1` reads the value committed at the end of the previous step. That is how feedback loops are closed without an algebraic loop (see [the master algorithm](../theory/master-algorithm.md)).
+Transforms are `affine` (gain, offset), `deadband`, `quantize` and `clamp`, each with optional `min`/`max`. A gain, offset or limit can name a parameter (`"@motor.k"`, `"-@name"`, `"1/@gear.ratio"`), so a physical constant is declared once and tuning or tolerance analysis can vary it. `delay_steps: 1` reads the value committed at the end of the previous step. That is how feedback loops are closed without an algebraic loop (see [the master algorithm](../theory/master-algorithm.md)).
 
 ## The macro step
 

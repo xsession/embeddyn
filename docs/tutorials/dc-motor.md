@@ -52,10 +52,19 @@ Note `min`/`max` on the duty: whatever the controller computes, the bus clamps i
 ```yaml
 couplings:
   - {source: firmware.pwm_duty, target: electrical.pwm_duty}
-  - {source: mechanical.velocity, target: electrical.back_emf, gain: 0.08, delay_steps: 1}   # Ke
-  - {source: electrical.motor_current, target: mechanical.motor_torque, gain: 0.08}          # Kt
+  - {source: mechanical.velocity, target: electrical.back_emf, gain: "@motor.k", delay_steps: 1}   # Ke
+  - {source: electrical.motor_current, target: mechanical.motor_torque, gain: "@motor.k"}          # Kt
   - {source: mechanical.velocity, target: firmware.measured_velocity, delay_steps: 1}
 ```
+
+Both electromechanical couplings use the parameter `motor.k`, declared once at the top of the file:
+
+```yaml
+parameters:
+  motor.k: {value: 0.08, unit: N*m/A}   # torque constant Kt = back-EMF constant Ke (V*s/rad)
+```
+
+In SI units \(K_t\) [N·m/A] and \(K_e\) [V·s/rad] are the same number for a DC motor; one parameter keeps them so, and lets [tuning](tuning.md) or [tolerance analysis](tolerance.md) vary the motor constant.
 
 The forward path (duty → current → torque) follows the execution order firmware → electrical → mechanical, so it needs no delay. The two feedback paths go *against* the order and carry `delay_steps: 1`: within step \(k\) they use the velocity committed at the end of step \(k-1\). See [why feedback needs a delay](../theory/master-algorithm.md#why-feedback-needs-delay_steps-1).
 

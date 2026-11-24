@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 import math
 import re
@@ -88,6 +88,9 @@ class Coupling:
     delay_steps: int = 0
     interpolation: str = "zero_order_hold"
     extrapolation: str = "hold"
+    # Transform fields taken from project parameters: (field, reference) with field one of
+    # gain, offset, minimum, maximum, deadband and reference "@name", "-@name" or "1/@name".
+    references: tuple[tuple[str, str], ...] = ()
 
     @property
     def gain(self) -> float:
@@ -365,6 +368,12 @@ class MechatronicProject:
             if definition and definition not in self.component_definitions:
                 raise ValueError(f"component instance {name} references unknown definition {definition}")
         for coupling in self.couplings:
+            for label, reference in coupling.references:
+                name = _REFERENCE.match(reference).group("name")
+                if name not in self.parameters:
+                    raise ValueError(f"coupling {coupling.source} -> {coupling.target}: {label} refers to "
+                                     f"unknown parameter {name}")
+        for coupling in self.resolved_couplings():
             if coupling.source not in self.signals:
                 raise ValueError(f"unknown coupling source: {coupling.source}")
             if coupling.target not in self.signals:
@@ -394,6 +403,33 @@ class MechatronicProject:
             if coupling.transform.type in {"identity", "clamp", "deadband"} and source_unit and target_unit and source_unit != target_unit:
                 raise ValueError(f"unit mismatch for {coupling.source} -> {coupling.target}: {source_unit} != {target_unit}")
 
+    def resolved_couplings(self) -> list[Coupling]:
+        """Couplings with parameter references replaced by the parameters' current values, so
+        overrides (tuning, tolerance, estimation, the CLI) reach every coupling that uses them."""
+        resolved = []
+        for coupling in self.couplings:
+            if not coupling.references:
+                resolved.append(coupling)
+                continue
+            values = {label: self.parameter_reference(reference) for label, reference in coupling.references}
+            resolved.append(replace(coupling, transform=replace(coupling.transform, **values)))
+        return resolved
+
+    def parameter_reference(self, reference: str) -> float:
+        """Value of "@name", "-@name" or "1/@name"."""
+        match = _REFERENCE.match(reference)
+        if match is None:
+            raise ValueError(f"invalid parameter reference {reference!r} (use @name, -@name or 1/@name)")
+        name = match.group("name")
+        if name not in self.parameters:
+            raise ValueError(f"unknown parameter {name}")
+        value = float(self.parameters[name].value)
+        if match.group("inverse"):
+            if value == 0:
+                raise ValueError(f"1/@{name}: parameter is zero")
+            value = 1.0 / value
+        return -value if match.group("sign") else value
+
     def apply_parameter_overrides(self, overrides: dict[str, Any], *, source: str = "runtime-override") -> None:
         for name, raw_value in overrides.items():
             if not isinstance(name, str) or not name.strip():
@@ -415,6 +451,12 @@ class MechatronicProject:
         return path if path.is_absolute() else (self.root / path).resolve()
 
 
+_REFERENCE = re.compile(r"^\s*(?P<sign>-)?\s*(?P<inverse>1\s*/\s*)?@(?P<name>[A-Za-z_][A-Za-z0-9_.\-]*)\s*$")
+_TRANSFORM_FIELDS = (("gain", ("gain", "quantum"), 1.0), ("offset", ("offset",), 0.0),
+                     ("minimum", ("min", "minimum"), None), ("maximum", ("max", "maximum"), None),
+                     ("deadband", ("deadband",), 0.0))
+
+
 def _parse_coupling(item: dict[str, Any]) -> Coupling:
     if item.get("expression"):
         raise ValueError("unsafe coupling expressions are no longer supported; use a typed transform")
@@ -422,20 +464,27 @@ def _parse_coupling(item: dict[str, Any]) -> Coupling:
     if not transform_raw:
         transform_raw = {"type": "affine", "gain": item.get("gain", 1.0), "offset": item.get("offset", 0.0)}
     timing = item.get("timing") or {}
+    values: dict[str, float | None] = {}
+    references: list[tuple[str, str]] = []
+    for label, keys, default in _TRANSFORM_FIELDS:
+        raw = next((transform_raw[key] for key in keys if transform_raw.get(key) is not None), default)
+        if isinstance(raw, str) and "@" in raw:
+            if not _REFERENCE.match(raw):
+                raise ValueError(f"coupling {item.get('source')} -> {item.get('target')}: invalid {label} "
+                                 f"{raw!r} (use @name, -@name or 1/@name)")
+            references.append((label, raw.strip()))
+            values[label] = 1.0 if default is None else default        # placeholder until resolved
+        else:
+            # Numbers, or numbers with units ("0.08 N*m/A"), normalised to SI.
+            values[label] = None if raw is None else Quantity.parse(raw).value
     return Coupling(
         source=item["source"],
         target=item["target"],
-        transform=Transform(
-            type=str(transform_raw.get("type", "affine")),
-            gain=float(transform_raw.get("gain", transform_raw.get("quantum", 1.0))),
-            offset=float(transform_raw.get("offset", 0.0)),
-            minimum=_optional_float(transform_raw.get("min", transform_raw.get("minimum"))),
-            maximum=_optional_float(transform_raw.get("max", transform_raw.get("maximum"))),
-            deadband=float(transform_raw.get("deadband", 0.0)),
-        ),
+        transform=Transform(type=str(transform_raw.get("type", "affine")), **values),
         delay_steps=int(item.get("delay_steps", timing.get("delay_steps", 0))),
         interpolation=str(timing.get("interpolation", "zero_order_hold")),
         extrapolation=str(timing.get("extrapolation", "hold")),
+        references=tuple(references),
     )
 
 
@@ -468,7 +517,3 @@ def _parse_scheduler(raw: dict[str, Any], default_step: float) -> SchedulerConfi
 
 def _optional_quantity(value: Any, unit: str) -> float | None:
     return None if value is None else Quantity.parse(value, unit).value
-
-
-def _optional_float(value: Any) -> float | None:
-    return None if value is None else float(value)

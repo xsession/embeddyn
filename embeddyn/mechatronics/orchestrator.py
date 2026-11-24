@@ -35,7 +35,8 @@ class CoSimulationOrchestrator:
             if signal.kind in {SignalKind.CONTINUOUS, SignalKind.DISCRETE}
         }
         self.by_target_domain: dict[Domain, list[Coupling]] = defaultdict(list)
-        for coupling in project.couplings:
+        # Parameter references (gain: "@motor.kt") are resolved once per run, after any overrides.
+        for coupling in project.resolved_couplings():
             self.by_target_domain[project.signals[coupling.target].domain].append(coupling)
         self.current_time = 0.0
         self.activation_count: InstanceCounter = InstanceCounter()

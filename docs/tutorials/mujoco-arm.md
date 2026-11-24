@@ -63,11 +63,11 @@ instances:
 
 Addresses name MJCF elements: `ctrl:<actuator>`, `qfrc:<joint>` in; `qpos`, `qvel`, `qfrc_act`, `sensor:<name>[i]`, `xpos:<body>[i]` out. The MJCF file holds a 0.25 m link with a payload, a hinge with a 20:1 `<motor>` gear and the rotor inertia in the joint's `armature`.
 
-The gear also couples the speed back to the motor's back-EMF:
+The gear also couples the speed back to the motor's back-EMF. The ratio and the motor constant are project parameters (`gear.ratio: 20.0`, `motor.k: 0.08`), used by the coupling and by the motor plant (`ke: "@motor.k", kt: "@motor.k"`):
 
 ```yaml
 couplings:
-  - {source: arm.speed, target: motor.shaft_speed, transform: {type: affine, gain: 20.0}}
+  - {source: arm.speed, target: motor.shaft_speed, transform: {type: affine, gain: "@gear.ratio"}}
 ```
 
 ## Step 3 — run

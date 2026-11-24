@@ -14,6 +14,7 @@ parameters:
   left.ki: 1.5
   right.kp: 0.4
   right.ki: 2.0
+  right.gear_ratio: 5
 
 instances:
   ctrl_left:
@@ -67,7 +68,7 @@ instances:
     options:
       backend: python
       max_step: 2.0e-5
-      parameters: {motor_inertia: 0.002, gear_ratio: 5, backlash: 0.003, shaft_stiffness: 2000,
+      parameters: {motor_inertia: 0.002, gear_ratio: "@right.gear_ratio", backlash: 0.003, shaft_stiffness: 2000,
                    shaft_damping: 2, load_inertia: 0.2, coulomb_friction: 0.05, encoder_cpr: 2048}
       inputs: {motor_torque: right.torque, load_torque: right.load_torque}
       outputs: {motor_speed: right.motor_speed, load_speed: right.wheel_speed, encoder_count: right.encoder}
@@ -97,7 +98,7 @@ signals:
 
 couplings:
   # The right controller regulates wheel speed from the motor side: motor speed / gear ratio.
-  - {source: right.motor_speed, target: right.motor_speed_scaled, gain: 0.2, delay_steps: 1}
+  - {source: right.motor_speed, target: right.motor_speed_scaled, gain: "1/@right.gear_ratio", delay_steps: 1}
 
 metrics:
   left_speed: {type: step_response, signal: left.wheel_speed, target: left.target_speed}

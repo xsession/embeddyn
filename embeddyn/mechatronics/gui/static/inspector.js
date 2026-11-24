@@ -217,7 +217,15 @@ function wirePanel(wire) {
         s.onchange = () => { t.type = s.value; markDirty(); };
         return s;
       })()),
-      ...['gain', 'offset', 'min', 'max', 'deadband'].map((k) => field(k, input(t[k], (v) => { if (v === null) delete t[k]; else t[k] = v; markDirty(); }, 'number', { step: 'any', placeholder: k === 'gain' ? '1' : k === 'offset' ? '0' : '' }))),
+      // A number, or a project parameter: @name, -@name, 1/@name (e.g. gain @motor.kt).
+      ...['gain', 'offset', 'min', 'max', 'deadband'].map((k) => field(k, input(t[k], (v) => {
+        const text = String(v ?? '').trim();
+        if (text === '') delete t[k];
+        else if (Number.isFinite(Number(text))) t[k] = Number(text);
+        else if (/^-?\s*(1\s*\/\s*)?@[A-Za-z_][\w.\-]*$/.test(text)) t[k] = text;
+        else { toast(`${k}: a number or @parameter`, true); return; }
+        markDirty();
+      }, 'text', { placeholder: k === 'gain' ? '1 or @param' : k === 'offset' ? '0 or @param' : '' }))),
       field('delay steps', input(spec.delay_steps ?? 0, (v) => { spec.delay_steps = v || 0; markDirty(); }, 'number', { min: 0, step: 1 })));
   } else if (wire.kind === 'net') {
     body.append(h('div', { class: 'note' }, 'The input reads this signal directly. To scale it, map the input to its own signal in the options and add a coupling.'));
