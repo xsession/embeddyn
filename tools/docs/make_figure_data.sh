@@ -13,6 +13,8 @@ run() { echo "== $*"; "$PY" -m embeddyn mechatronics "$@" > "$DATA/last.log" 2>&
 for example in dc-motor servo-drivetrain mujoco-arm two-wheel-drive dc-motor-ngspice rc-servo-l476 mujoco-arm-firmware; do
   run run "examples/mechatronics/$example.yaml" -o "$DATA/$example.csv" --output-root "$DATA/runs"
 done
+run run examples/mechatronics/rc-servo-l476.yaml -o "$DATA/rc-servo-fault.csv" --output-root "$DATA/runs" \
+  --fault '{name: feedback-pot-stuck, signal: servo.feedback_voltage, type: stuck, start: 1.2 s}'
 for method in nelder-mead cmaes; do
   run tune examples/mechatronics/tuning/servo-pi.yaml --method "$method" --workers 4 --max-evaluations 60 -o "$DATA/tune-$method.json"
 done

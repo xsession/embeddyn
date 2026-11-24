@@ -130,6 +130,9 @@ arrives at Renode's next sync point and is a logged boundary input. In
 `rc-servo-l476-can.yaml` the firmware sends status frame `0x101` every
 100 ms, and frame `0x200` with `[1]` clears a latched fault (tested).
 
+Frame faults on `mcu.can` or a UART's signal lose or corrupt CAN frames and
+UART bytes in either direction ([bus frames](faults.md#bus-frames)).
+
 ## Quadrature encoders
 
 On Renode ≥ 1.17 the STM32 timer models encoder mode, which stops internal

@@ -85,10 +85,11 @@ the first ten violations.
       signals: {electrical.supply_voltage: 18.0}     # initial-value overrides
       parameters: {controller.kp: 0.2}               # parameter overrides
       duration: 1.0
+      faults: [{signal: firmware.measured_velocity, type: stuck, start: 0.5}]   # added for this scenario
       expect: [{metric: speed.final_value, min: 4.5}, {metric: current.peak, max: 15.0}]
 ```
 
-Every scenario is a full run with its overrides; `expect` entries check the
+Every scenario is a full run with its overrides and [faults](faults.md); `expect` entries check the
 project's metrics ([TUNING.md](tuning.md)) against `min`/`max`. A metric that
 can't be computed (e.g. a response that never settles) counts as a failure,
 and a scenario that crashes is reported with its error instead of aborting
@@ -106,6 +107,7 @@ servo example's `hot-start` scenario sets both.
 | `dc-motor.yaml` (mock firmware, RL motor, rotor) | 0.05 % of 66.7 J | speed 0.12 % / p ≈ 0.99; current 0.19 % / p ≈ 1.12 | 4/4 pass |
 | `servo-drivetrain.yaml` (4 domains, backlash, thermal) | 0.08 % of 34.4 J | 4 signals ≤ 0.31 %, p ≈ 1.0–1.55 | 3/3 pass |
 | `two-wheel-drive.yaml` (6 instances, FMU) | – (FMU has no loss outputs) | 4 signals ≤ 0.55 %, p ≈ 0.97–1.4 | 2/2 pass |
+| `rc-servo-l476.yaml` (STM32 firmware in Renode) | – | – | 3/3 pass: stuck feedback pot trips the stall monitor at 1.70 s, noisy pot does not |
 
 The scenario matrix already caught a real design issue: with aggressive gains
 (kp 2, ki 5) the mock controller overshoots by 20 % through integrator windup.

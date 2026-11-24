@@ -58,6 +58,16 @@ scenarios:
 
 A metric that cannot be computed counts as a failure; a scenario that crashes is reported with its error and does not abort the matrix. This is the natural home for requirements ("at 18 V supply the joint still reaches 4.5 rad/s").
 
+## Fault injection
+
+Requirements about failures ("a stuck feedback pot stops the servo within 1 s"; "sensor noise never trips the monitor") need the failure in the model. A scenario's `faults:` list corrupts signals during a time window: stuck, offset, gain, noise, drift, dropout, optionally intermittent ([reference](../reference/faults.md)).
+
+Faults act **between** the simulators. For a faulted signal the master keeps two values: the true value \(x\), as last produced by its writer (an adapter output or a coupling), and the seen value \(\tilde x = f(x, \tilde x^{-}, t)\), which every consumer reads and which is recorded. Here \(\tilde x^{-}\) is the previous seen value, which `stuck` and `dropout` hold on to. \(f\) is re-evaluated whenever the signal is written and at every macro-step boundary, so a fault also reaches signals nothing writes, and it switches on and off on the macro-step grid. Because the fault sits on the signal and not inside a simulator, the same declaration reaches a Python plant, an FMU, an ngspice netlist or an ADC channel of the real firmware. Random faults draw from a seeded stream that checkpoints save, so faulted runs stay deterministic and resumable.
+
+Bus traffic has no value to corrupt, so faults on a UART's or CAN bus's event signal act on frames instead: the Renode adapter passes every UART byte and CAN frame, in both directions, through the same fault list at the frame's own time, and a frame is lost (`dropout`) or arrives with flipped bits (`corrupt`).
+
+The `threshold` metric measures the reaction: when a signal (a fault LED, a status flag, a current) first crosses a level, and how often.
+
 ## In CI
 
 `verify` exits non-zero when a check fails and writes a JSON report (`-o`), so it can gate merges. With `--mock` it needs no external simulators; with Renode and ngspice available it verifies the real thing.

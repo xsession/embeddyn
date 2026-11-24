@@ -130,6 +130,36 @@ def rc_servo(data: Path) -> None:
     save(fig, "tutorial-rc-servo.png")
 
 
+def rc_servo_fault(data: Path) -> None:
+    if not need(data, "rc-servo-fault.csv"):
+        return
+    d = read_csv(data / "rc-servo-fault.csv")
+    t = d["time"]
+    start = 1.2
+    pot_deg = [(v - 1.65) * 180 / 2.7 for v in d["servo.feedback_voltage"]]      # feedback pot: 2.7 V per 180 deg
+    trip = next((ti for ti, led in zip(t, d["mcu.fault_led"]) if led > 0.5), None)
+    fig, axes = plt.subplots(2, 1, figsize=(8, 5.2), sharex=True, gridspec_kw={"height_ratios": [3, 1.3]})
+    for ax in axes:
+        ax.axvspan(start, t[-1], color=C["red"], alpha=0.06, lw=0)
+    axes[0].plot(t, d["mcu.setpoint_deg"], color=C["grey"], ls="--", label="firmware set-point")
+    axes[0].plot(t, pot_deg, color=C["orange"], label="feedback pot as the firmware reads it")
+    axes[0].plot(t, d["servo.angle_deg"], color=C["blue"], label="true horn angle")
+    axes[0].set_ylabel("angle [deg]")
+    axes[0].set_title("Injected fault: the feedback pot sticks at 1.2 s")
+    axes[0].annotate("pot stuck", (start, pot_deg[t.index(min(t, key=lambda x: abs(x - start - 0.05)))]),
+                     xytext=(start - 0.5, -75), color=C["red"], arrowprops={"arrowstyle": "->", "color": C["red"]})
+    if trip is not None:
+        axes[0].annotate(f"stall monitor trips\nat {trip:.2f} s: pulses stop,\nthe load back-drives\nthe horn",
+                         (trip, 28), xytext=(trip + 0.27, -88), color=C["red"], fontsize=9,
+                         arrowprops={"arrowstyle": "->", "color": C["red"]})
+    axes[0].legend(loc="lower left")
+    axes[1].plot(t, [v * 1e3 for v in d["mcu.servo_pulse"]], color=C["purple"], label="pulse width [ms]")
+    axes[1].plot(t, d["mcu.fault_led"], color=C["red"], drawstyle="steps-post", label="fault LED (PA5)")
+    axes[1].set_xlabel("time [s]")
+    axes[1].legend(loc="center left")
+    save(fig, "tutorial-rc-servo-fault.png")
+
+
 def arm_firmware(data: Path) -> None:
     if not need(data, "mujoco-arm-firmware.csv"):
         return
@@ -401,7 +431,7 @@ def coupling_delay() -> None:
 
 def main(argv: list[str]) -> int:
     data = Path(argv[1]) if len(argv) > 1 else ROOT / ".embeddyn" / "doc-figures"
-    for figure in (dc_motor, ngspice, rc_servo, arm_firmware, mujoco_arm, two_wheel, tuning, tolerance, estimation):
+    for figure in (dc_motor, ngspice, rc_servo, rc_servo_fault, arm_firmware, mujoco_arm, two_wheel, tuning, tolerance, estimation):
         figure(data)
     timing_diagram()
     coupling_delay()

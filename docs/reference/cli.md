@@ -73,6 +73,7 @@ embeddyn mechatronics run PROJECT_FILE [OPTIONS]
 | `--checkpoint-interval` |  | Checkpoint interval in seconds. |
 | `--resume-from` |  |  |
 | `--parameter-overrides` |  | JSON object of resolved parameter overrides. |
+| `--fault` |  | Inject a fault, as in the project's faults: list, written as a YAML/JSON mapping, e.g. '{signal: servo.feedback_voltage, type: stuck, start: 1.2 s}'. Repeatable. |
 
 ## metrics
 

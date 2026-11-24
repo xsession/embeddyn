@@ -22,6 +22,7 @@ verification:
     - name: heavy-load
       signals: {mechanical.load_torque: 0.3}     # initial-value overrides
       parameters: {controller.kp: 0.2}          # parameter overrides
+      faults: [{signal: sensor.speed, type: stuck, start: 0.5}]   # added to the project's faults
       duration: 1.0
       expect: [{metric: speed.overshoot, max: 10}, {metric: current.peak, max: 15}]
 ```
@@ -38,6 +39,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from .factory import build_adapters
+from .faults import parse_faults
 from .metrics import compute_metrics, parse_metric_specs, select_metrics
 from .model import MechatronicProject
 from .orchestrator import CoSimulationOrchestrator
@@ -220,6 +222,8 @@ def scenarios(project_file: Path, items: Sequence[Mapping[str, Any]], mock: bool
             project.signals[signal] = replace(project.signals[signal], initial=float(value))
         if item.get("parameters"):
             project.apply_parameter_overrides(dict(item["parameters"]), source=f"scenario:{name}")
+        if item.get("faults"):
+            project.faults = project.faults + parse_faults(item["faults"], project.signals, start_index=len(project.faults))
         record: dict[str, Any] = {"name": name, "checks": []}
         try:
             metrics = compute_metrics(run(project, mock), parse_metric_specs(project.metrics))

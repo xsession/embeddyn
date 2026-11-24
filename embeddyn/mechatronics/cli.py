@@ -37,6 +37,25 @@ def compile_project(
                            "manifest": str(compiled.manifest_path), "lock": str(compiled.lock_path)}, indent=2))
 
 
+def add_faults(project: MechatronicProject, specs: list[str]) -> None:
+    """Append faults given on the command line (YAML/JSON mappings) to the project's faults."""
+    from .faults import parse_faults
+
+    items = []
+    for spec in specs:
+        try:
+            item = yaml.safe_load(spec)
+        except yaml.YAMLError as error:
+            raise typer.BadParameter(f"invalid --fault {spec!r}: {error}") from error
+        if not isinstance(item, dict):
+            raise typer.BadParameter(f"--fault must be a mapping such as '{{signal: x, type: stuck}}', got {spec!r}")
+        items.append(item)
+    try:
+        project.faults = project.faults + parse_faults(items, project.signals, start_index=len(project.faults))
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+
+
 @mechatronics_app.command("run")
 def run_project(
     project_file: Path = typer.Argument(..., exists=True, dir_okay=False),
@@ -47,8 +66,11 @@ def run_project(
     checkpoint_interval: Optional[float] = typer.Option(None, "--checkpoint-interval", help="Checkpoint interval in seconds."),
     resume_from: Optional[Path] = typer.Option(None, "--resume-from", exists=True, dir_okay=False),
     parameter_overrides: Optional[str] = typer.Option(None, "--parameter-overrides", help="JSON object of resolved parameter overrides."),
+    fault: Optional[list[str]] = typer.Option(None, "--fault", help="Inject a fault, as in the project's faults: list, written as a YAML/JSON mapping, e.g. '{signal: servo.feedback_voltage, type: stuck, start: 1.2 s}'. Repeatable."),
 ) -> None:
     project = MechatronicProject.load(project_file)
+    if fault:
+        add_faults(project, fault)
     if parameter_overrides:
         try:
             overrides = json.loads(parameter_overrides)

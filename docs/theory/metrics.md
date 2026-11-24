@@ -7,6 +7,7 @@ metrics:
   lift:    {type: step_response, signal: arm.angle, target: mcu.target, start: 2.0, end: 3.0, settling_band: 0.02}
   current: {type: stats, signal: motor.current}
   energy:  {type: integral, signal: motor.power}
+  trip:    {type: threshold, signal: mcu.fault_led, threshold: 0.5}
 ```
 
 Each metric `name` yields several figures named `name.figure` (`lift.overshoot`, `current.peak`, `energy.integral`). An optional `[start, end]` window restricts the samples.
@@ -40,6 +41,10 @@ Integrals use the trapezoidal rule on the macro-step samples.
 ## Integral
 
 `integral` = \(\int x\,dt\). With a power signal it is energy in joules.
+
+## Threshold
+
+`time` is the first crossing of the `threshold` in the chosen `direction` (rising, falling or either), linearly interpolated between samples. `delay` is `time` minus the window start, so with `start:` at a fault's onset it is the detection time. `crossings` is the number of crossings. A signal that never crosses has `time: null`.
 
 ## Using metrics
 

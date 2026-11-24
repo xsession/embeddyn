@@ -157,6 +157,7 @@ class ProjectCompiler:
                 }
                 for c in project.resolved_couplings()
             ],
+            **({"faults": [fault.to_dict() for fault in project.faults]} if project.faults else {}),
         }
 
     @staticmethod

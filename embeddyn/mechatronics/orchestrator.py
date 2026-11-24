@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
 from .adapters import SimulatorAdapter
+from .faults import FaultInjector
 from .model import Coupling, Domain, MechatronicProject, SignalKind
 from .runtime import AdapterManager, CheckpointManager, EventQueue, InstanceCounter, InstanceMap, ScheduleEntry, build_scheduler
 from .storage.telemetry import StructuredRecordWriter, TelemetryWriter
@@ -42,6 +43,15 @@ class CoSimulationOrchestrator:
         self.activation_count: InstanceCounter = InstanceCounter()
         # Signals held at a fixed value (live operator controls in the GUI).
         self.forced: dict[str, float] = {}
+        # Injected faults: `values` holds what consumers see, `true_values` what was produced.
+        self.faults = FaultInjector(project.faults)
+        self.true_values: dict[str, float] = {name: float(self.values[name]) for name in self.faults.signals()}
+        self._now = 0.0
+        if self.faults.frame_signals():               # bus traffic is faulted where it crosses an adapter
+            for adapter in self.adapters.values():
+                attach = getattr(adapter, "attach_faults", None)
+                if attach is not None:
+                    attach(self.faults)
 
     def _schedule_entries(self) -> list[ScheduleEntry]:
         """Configured instances, adapters given without configuration (named
@@ -109,6 +119,8 @@ class CoSimulationOrchestrator:
                 if checkpoint_manager is not None and checkpoint_interval_seconds and checkpoint_interval_seconds > 0
                 else None
             )
+            if resume_from is None:                    # a checkpoint already holds the faulted values
+                self._apply_faults(self.current_time)
             self._apply_forced()
             if telemetry_writer is not None:
                 telemetry_writer.append(self._telemetry_row(self.current_time))
@@ -122,6 +134,7 @@ class CoSimulationOrchestrator:
                     self._activate(activation.instance or activation.domain.value, activation.domain,
                                    activation.time_seconds, activation.step_seconds)
                 self.current_time = macro_end
+                self._apply_faults(macro_end)          # also the start of the next step
                 self._commit_history()
                 if telemetry_writer is not None:
                     telemetry_writer.append(self._telemetry_row(self.current_time))
@@ -146,7 +159,31 @@ class CoSimulationOrchestrator:
             if signal is not None:
                 self.values[name] = signal.clamp(float(value))
 
+    def _apply_faults(self, now: float) -> None:
+        """Switch faults on and off at a macro-step boundary and re-apply them to the true values,
+        so faults also reach signals that nothing writes (and what is recorded at `now` is faulted at `now`)."""
+        if not self.faults:
+            return
+        self._now = now
+        for fault, state in self.faults.transitions(now):
+            event = self.events.publish(now, f"fault.{fault.name}", {"state": state, **fault.to_dict()}, "faults")
+            writer = getattr(self, "_event_writer", None)
+            if writer is not None:
+                writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload, "source": event.source})
+        for name, true_value in self.true_values.items():
+            self._store(name, true_value)
+        if self.forced:                                # live operator controls win over faults
+            self._apply_forced()
+
+    def _store(self, name: str, value: float) -> None:
+        """Set a continuous or discrete signal (already clamped) as produced; faults, if any, apply."""
+        if name in self.true_values:
+            self.true_values[name] = value
+            value = self.project.signals[name].clamp(self.faults.apply(name, value, float(self.values[name]), self._now))
+        self.values[name] = value
+
     def _activate(self, instance: str, domain: Domain, now: float, step_seconds: float) -> None:
+        self._now = now
         self._apply_couplings_iterative(domain)
         if self.forced:
             self._apply_forced()
@@ -172,7 +209,7 @@ class CoSimulationOrchestrator:
                 if writer is not None:
                     writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload, "source": event.source})
             else:
-                self.values[name] = signal.clamp(float(value))
+                self._store(name, signal.clamp(float(value)))
         if self.forced:
             self._apply_forced()
         diagnostics = result.diagnostics or {}
@@ -216,10 +253,10 @@ class CoSimulationOrchestrator:
         for iteration in range(1, config.max_iterations + 1):
             max_delta = 0.0
             for coupling in couplings:
-                before = float(self.values[coupling.target])
+                before = float(self.true_values.get(coupling.target, self.values[coupling.target]))
                 source = self._delayed(coupling.source, coupling.delay_steps)
                 after = self.project.signals[coupling.target].clamp(coupling.transform.apply(source))
-                self.values[coupling.target] = after
+                self._store(coupling.target, after)
                 max_delta = max(max_delta, abs(after - before))
             if max_delta <= config.tolerance:
                 converged = True
@@ -234,7 +271,7 @@ class CoSimulationOrchestrator:
             source = self._delayed(coupling.source, coupling.delay_steps)
             value = coupling.transform.apply(source)
             signal = self.project.signals[coupling.target]
-            self.values[coupling.target] = signal.clamp(value)
+            self._store(coupling.target, signal.clamp(value))
 
     def _delayed(self, signal: str, delay: int) -> float:
         if delay <= 0:
@@ -259,6 +296,7 @@ class CoSimulationOrchestrator:
             "events": self.events.snapshot(),
             "adapters": self.manager.checkpoint(),
             "activation_count": dict(self.activation_count),
+            "faults": {"state": self.faults.snapshot(), "true_values": dict(self.true_values)},
         }
 
     def restore(self, state: Mapping[str, Any]) -> None:
@@ -277,6 +315,12 @@ class CoSimulationOrchestrator:
                 self.history[name].clear()
                 self.history[name].extend(float(item) for item in items)
         self.events.restore(list(state.get("events", [])))
+        self.true_values = {name: float(self.values[name]) for name in self.true_values}
+        faults = dict(state.get("faults") or {})
+        self.faults.restore(dict(faults.get("state") or {}))
+        for name, value in dict(faults.get("true_values") or {}).items():
+            if name in self.true_values:
+                self.true_values[name] = float(value)
         self.manager.restore(dict(state.get("adapters", {})))
         self.activation_count = InstanceCounter({
             name: int(count) for name, count in dict(state.get("activation_count", {})).items()

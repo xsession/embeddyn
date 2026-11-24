@@ -35,7 +35,7 @@ The root [`CONTRIBUTING.md`](CONTRIBUTING.md) is a short discoverable entry poin
 
 ## Mechatronic co-simulation
 
-embeddyn couples real firmware in Renode, circuits in ngspice, multibody mechanics in MuJoCo, Python plants and FMI 2.0/3.0 FMUs in one deterministic co-simulation, then measures, tunes (Nelder–Mead, CMA-ES), analyses tolerances (Monte Carlo, Sobol), estimates parameters from bench data and verifies models. Start with:
+embeddyn couples real firmware in Renode, circuits in ngspice, multibody mechanics in MuJoCo, Python plants and FMI 2.0/3.0 FMUs in one deterministic co-simulation, then measures, tunes (Nelder–Mead, CMA-ES), analyses tolerances (Monte Carlo, Sobol), estimates parameters from bench data, verifies models and injects faults into any signal or UART/CAN traffic (the real firmware sees them). Start with:
 
 ```bash
 embeddyn mechatronics run examples/mechatronics/dc-motor.yaml --mock

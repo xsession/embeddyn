@@ -48,6 +48,10 @@ machine's CAN hub carries frames to and from embeddyn::
 ``can_write(frame_id, data)`` sends a frame. Like UART input it is a logged
 boundary input that takes effect at Renode's next sync point.
 
+Frame faults (``dropout``, ``corrupt`` on a UART's or the CAN bus's signal,
+see ``faults.py``) are applied here, to every UART byte and CAN frame in
+both directions; the orchestrator hands them over with ``attach_faults``.
+
 SPI sensors (message protocol only): devices modelled in Python
 (``options.spi``, see ``spi_devices.py``) answer an
 ``SPI.ExternalControlSPIPeripheral`` byte by byte, with their inputs taken
@@ -65,7 +69,7 @@ import struct
 import subprocess
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -343,6 +347,7 @@ class RenodeAdapter(SimulatorAdapter):
         self.can = dict(can or {})
         self._can_frames: list[CanFrame] = []
         self._can_last: dict[int, bytes] = {}
+        self._faults: Any = None                     # a FaultInjector with frame faults, if any
         self.spi = [_parse_spi(spec) for spec in spi or []]
         self._spi_devices: list[SpiDevice] = []
         self.uarts: list[_Uart] = []
@@ -427,6 +432,24 @@ class RenodeAdapter(SimulatorAdapter):
                                      device.transmit, device.finish)
         self._apply_inputs(initial_signals)
 
+    def attach_faults(self, injector: Any) -> None:
+        """Frame faults for the UARTs' and the CAN bus's signals (called by the orchestrator)."""
+        self._faults = injector
+
+    def _seconds(self, time_us: int) -> float:
+        return (time_us - self._origin_us) / 1_000_000
+
+    def _fault_bytes(self, signal: str, data: bytes, time_seconds: float, direction: str) -> bytes:
+        """UART traffic through the frame faults: every byte is a frame."""
+        if self._faults is None or signal not in self._faults.frames_by_signal:
+            return data
+        out = bytearray()
+        for byte in data:
+            kept = self._faults.frame(signal, bytes([byte]), time_seconds, direction=direction)
+            if kept is not None:
+                out += kept
+        return bytes(out)
+
     def _drain_uarts(self, now_seconds: float) -> list[dict[str, Any]]:
         """Bytes the firmware sent during the step, as one event per complete line."""
         events = []
@@ -440,8 +463,8 @@ class RenodeAdapter(SimulatorAdapter):
                     break
                 if not chunk:
                     break
-                uart.buffer += chunk
                 uart.rx_bytes += len(chunk)
+                uart.buffer += self._fault_bytes(uart.signal, chunk, now_seconds, "output")
             *lines, uart.buffer = uart.buffer.split(b"\n")
             for line in lines:
                 text = line.rstrip(b"\r").decode("utf-8", errors="replace")
@@ -452,7 +475,7 @@ class RenodeAdapter(SimulatorAdapter):
         """Send text to a UART (by name or signal). Asynchronous: lands at Renode's next sync point."""
         for uart in self.uarts:
             if name_or_signal in (uart.name, uart.signal) and uart.sock is not None:
-                data = text.encode("utf-8")
+                data = self._fault_bytes(uart.signal, text.encode("utf-8"), self._seconds(self._now_us), "input")
                 uart.sock.setblocking(True)
                 try:
                     uart.sock.sendall(data)
@@ -618,6 +641,13 @@ class RenodeAdapter(SimulatorAdapter):
         return "message" if version and version >= (1, 17, 0) else "legacy"
 
     def _on_can_frame(self, frame: CanFrame) -> None:
+        signal = str(self.can.get("signal", "can"))
+        if self._faults is not None and signal in self._faults.frames_by_signal:
+            data = self._faults.frame(signal, frame.data, frame.time_ns / 1e9 - self._origin_us / 1e6,
+                                      direction="output", frame_id=frame.frame_id)
+            if data is None:
+                return                                 # lost: neither an event nor decoded
+            frame = replace(frame, data=data)
         self._can_frames.append(frame)
         self._can_last[frame.frame_id] = frame.data
 
@@ -635,11 +665,20 @@ class RenodeAdapter(SimulatorAdapter):
             outputs[str(field_spec["signal"])] = float(raw) * float(field_spec.get("scale", 1.0)) + float(field_spec.get("offset_value", 0.0))
         return outputs
 
-    def can_write(self, frame_id: int, data: bytes) -> None:
-        """Send a CAN frame from the host (asynchronous boundary input)."""
+    def can_write(self, frame_id: int, data: bytes) -> bool:
+        """Send a CAN frame from the host (asynchronous boundary input). False if a fault lost it."""
         if not self.can or not isinstance(self.client, RenodeMessageClient):
             raise KeyError("CAN needs `can:` options and Renode >= 1.17 (message protocol)")
-        self.client.can_send(self.machine or "", str(self.can["bus"]), int(frame_id), bytes(data))
+        signal = str(self.can.get("signal", "can"))
+        data = bytes(data)
+        if self._faults is not None and signal in self._faults.frames_by_signal:
+            faulted = self._faults.frame(signal, data, self._seconds(self._now_us), direction="input",
+                                         frame_id=int(frame_id))
+            if faulted is None:
+                return False
+            data = faulted
+        self.client.can_send(self.machine or "", str(self.can["bus"]), int(frame_id), data)
+        return True
 
     def _read_outputs(self, start_us: int, end_us: int) -> dict[str, float]:
         assert self.client is not None

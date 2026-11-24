@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .faults import Fault, parse_faults
 from .quantities import Quantity
 
 
@@ -178,6 +179,7 @@ class MechatronicProject:
     instances: dict[str, SimulatorConfig] = field(default_factory=dict)
     declares_instances: bool = False
     verification: dict[str, Any] = field(default_factory=dict)
+    faults: list[Fault] = field(default_factory=list)
 
     def declared_instances(self) -> dict[str, SimulatorConfig]:
         """Instances written in the project file (legacy domains included), no defaults."""
@@ -299,6 +301,7 @@ class MechatronicProject:
             instances=simulator_instances,
             declares_instances=bool(raw.get("instances")),
             verification=dict(raw.get("verification") or {}),
+            faults=parse_faults(raw.get("faults"), signals),
         )
         project.validate()
         return project

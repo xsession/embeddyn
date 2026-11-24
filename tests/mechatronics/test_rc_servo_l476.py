@@ -15,6 +15,7 @@ import pytest
 from embeddyn.mechatronics.adapters.renode import RenodeAdapter, _PulseTracker, renode_version
 from embeddyn.mechatronics.adapters.renode_api import GpioEvent
 from embeddyn.mechatronics.factory import build_adapters
+from embeddyn.mechatronics.faults import parse_faults
 from embeddyn.mechatronics.metrics import compute_metrics, parse_metric_specs
 from embeddyn.mechatronics.model import MechatronicProject
 from embeddyn.mechatronics.orchestrator import CoSimulationOrchestrator
@@ -239,3 +240,51 @@ def test_can_command_clears_a_latched_fault(tmp_path):
     cleared = [t for t, line in _console(rows) if line == "fault cleared (CAN)"]
     assert cleared and sent_at < cleared[0] < sent_at + 0.05
     assert rows[-1]["mcu.fault_led"] == 0.0 and rows[-1]["mcu.can_fault"] == 0.0
+
+
+@needs_renode
+def test_stuck_feedback_pot_is_caught_by_the_firmware(tmp_path):
+    """Fault injection: the feedback pot sticks at +30 deg, then the command moves to -45 deg.
+    The firmware sees a set-point it never reaches and its stall monitor latches."""
+    project = _project(tmp_path, "0.0,2.2,0.0\n0.6,0.825,0.0\n", 1.5)
+    project.faults = parse_faults([{"name": "pot", "signal": "servo.feedback_voltage", "type": "stuck", "start": 0.4}],
+                                  project.signals)
+    rows = _run(project)
+    held = [row["servo.feedback_voltage"] for row in rows if row["time"] >= 0.4]
+    assert len(set(held)) == 1 and held[0] == pytest.approx(1.65 + 2.7 / 180 * 30, abs=0.03)
+    metrics = compute_metrics(rows, parse_metric_specs({"fault_trip": project.metrics["fault_trip"]}))
+    # Error > 25 deg for 25 frames (0.5 s) after the set-point starts to slew at 0.6 s.
+    assert 1.05 < metrics["fault_trip.time"] < 1.3 and metrics["fault_trip.crossings"] == 1.0
+    assert rows[-1]["mcu.servo_pulse"] == 0.0
+
+
+@needs_renode_117
+def test_lost_can_status_frames_freeze_the_decoded_signals(tmp_path):
+    """Frame faults: status frames 0x101 are lost on the bus for 0.15-0.35 s (two of five)."""
+    project = _can_project(tmp_path, "0.0,1.65,0.0\n0.1,2.475,0.0\n", 0.5)
+    project.faults = parse_faults([{"name": "can-loss", "signal": "mcu.can", "type": "dropout", "id": 0x101,
+                                    "direction": "output", "start": 0.15, "end": 0.35}], project.signals)
+    orchestrator = CoSimulationOrchestrator(project, build_adapters(project))
+    rows = list(orchestrator.iterate())
+    frames = [e["time_seconds"] for row in rows for e in row.get("__events__", []) if e["topic"] == "mcu.can"]
+    assert len(frames) == 3 and not any(0.15 <= t < 0.35 for t in frames)
+    assert orchestrator.faults.frame_counts == {"can-loss": {"dropped": 2, "corrupted": 0}}
+    gap = {row["mcu.can_setpoint_deg"] for row in rows if 0.15 < row["time"] < 0.35}
+    assert len(gap) == 1                                             # frozen at the last frame received
+    assert rows[-1]["mcu.can_setpoint_deg"] == pytest.approx(rows[-1]["mcu.setpoint_deg"], abs=0.01)
+
+
+@needs_renode_117
+def test_lost_can_clear_command_leaves_the_fault_latched(tmp_path):
+    project = _can_project(tmp_path, "0.0,2.2,0.0\n0.3,2.2,1.0\n1.0,2.2,0.0\n", 1.4)
+    project.faults = parse_faults([{"signal": "mcu.can", "type": "dropout", "id": 0x200, "direction": "input"}],
+                                  project.signals)
+    orchestrator = CoSimulationOrchestrator(project, build_adapters(project))
+    sent, rows = None, []
+    for row in orchestrator.iterate():
+        rows.append(row)
+        if sent is None and row["mcu.fault_led"] == 1.0 and row["time"] > 1.1:
+            sent = orchestrator.adapters["mcu"].can_write(0x200, b"\x01")
+    assert sent is False
+    assert "fault cleared (CAN)" not in [line for _, line in _console(rows)]
+    assert rows[-1]["mcu.fault_led"] == 1.0 and rows[-1]["mcu.can_fault"] == 1.0

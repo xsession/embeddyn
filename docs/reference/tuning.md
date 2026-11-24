@@ -23,6 +23,7 @@ metrics:
 | `step_response` | `rise_time` (10–90 %), `overshoot` (%), `peak_time`, `settling_time` (last exit from the band), `final_value`, `steady_state_error`, `iae`, `ise`, `itae` |
 | `stats` | `peak` (max \|x\|), `rms`, `mean` (time-weighted), `min`, `max` |
 | `integral` | `integral` (trapezoidal; power gives energy in J) |
+| `threshold` | `time` (first crossing of `threshold`, `direction` rising/falling/either), `delay` (from the window start), `crossings` |
 
 `target` is a signal name or a number. `start`/`end` restrict the time
 window. A response that never rises or settles reports `null`, never a made-up

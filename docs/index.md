@@ -28,7 +28,7 @@ embeddyn runs each part of a product in the simulator best suited to it and keep
 | **Mechanics** | MuJoCo multibody, Python ODE plants, FMUs, Webots | gears with backlash, friction, joints, gravity, contacts |
 | **Thermal / environment** | Python plants, FMUs, recorded data | winding heating, derating, ambient profiles |
 
-On top of a run it can **measure** (step-response, statistics and energy metrics), **tune** parameters with Nelder–Mead or CMA-ES, compute **yield and Sobol sensitivity** under component tolerances, **estimate** physical parameters from bench recordings, and **verify** a model (energy balance, step-size convergence, golden waveforms, scenario matrices). The **Lab** is a browser GUI with a schematic editor, virtual instruments and a 3-D view on the same project files.
+On top of a run it can **measure** (step-response, statistics and energy metrics), **tune** parameters with Nelder–Mead or CMA-ES, compute **yield and Sobol sensitivity** under component tolerances, **estimate** physical parameters from bench recordings, **verify** a model (energy balance, step-size convergence, golden waveforms, scenario matrices), and **inject faults** (stuck, noisy, drifting or dropped-out signals, lost or corrupted UART and CAN frames) to check that the firmware reacts. The **Lab** is a browser GUI with a schematic editor, virtual instruments and a 3-D view on the same project files.
 
 ```mermaid
 flowchart LR

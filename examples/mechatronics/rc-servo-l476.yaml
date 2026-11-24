@@ -93,3 +93,18 @@ metrics:
   loaded_hold: {type: stats, signal: servo.angle_deg, start: 2.3, end: 2.5}
   current: {type: stats, signal: servo.current}
   energy: {type: integral, signal: servo.power}
+  fault_trip: {type: threshold, signal: mcu.fault_led, threshold: 0.5}   # when the stall monitor latches
+
+# `embeddyn mechatronics verify examples/mechatronics/rc-servo-l476.yaml --check scenarios`
+# runs the firmware with injected faults: does it catch a stuck feedback pot, and
+# does it stay quiet with a noisy one?
+verification:
+  scenarios:
+    - name: nominal
+      expect: [{metric: fault_trip.crossings, max: 0}]
+    - name: feedback-pot-stuck
+      faults: [{name: feedback-pot-stuck, signal: servo.feedback_voltage, type: stuck, start: 1.2 s}]
+      expect: [{metric: fault_trip.time, min: 1.2, max: 2.0}]
+    - name: feedback-pot-noisy
+      faults: [{name: wiper-noise, signal: servo.feedback_voltage, type: noise, std: 20 mV, seed: 1}]
+      expect: [{metric: fault_trip.crossings, max: 0}, {metric: loaded_hold.mean, min: 25, max: 35}]

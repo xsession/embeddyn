@@ -118,6 +118,43 @@ What to look for:
 
 The USART2 console is an **event signal** (`mcu.console`): every telemetry line the firmware prints arrives with its virtual time stamp. In the Lab, the serial monitor shows it live and can send `R` to clear a latched fault.
 
+## Step 7 — inject a fault
+
+The firmware has a stall monitor: if the set-point and the feedback pot disagree
+by more than 25° for 25 frames (0.5 s), it stops the pulses, lights the LED on
+PA5 and latches. Does it work? Make the feedback pot stick and see:
+
+```bash
+embeddyn mechatronics run examples/mechatronics/rc-servo-l476.yaml -o stuck.csv \
+  --fault '{name: feedback-pot-stuck, signal: servo.feedback_voltage, type: stuck, start: 1.2 s}'
+```
+
+![The feedback pot sticks at 1.2 s; the firmware trips 0.5 s later](../images/tutorial-rc-servo-fault.png)
+
+From 1.2 s the firmware reads the pot frozen at −30° while the horn moves
+to +30°. The firmware cannot tell anything is wrong until the error stays
+above 25°. It trips at 1.70 s: the pulses stop, the LED comes on, and the
+load back-drives the limp horn. `servo.feedback_voltage` shows what the
+firmware saw; `servo.angle_deg` shows the truth.
+
+The project file turns this into a requirement. Its `verification:` section
+runs a nominal case, the stuck pot and a noisy pot (20 mV wiper noise, which
+must *not* trip the monitor). The `fault_trip` metric (`type: threshold` on
+the LED) gives the trip time:
+
+```bash
+embeddyn mechatronics verify examples/mechatronics/rc-servo-l476.yaml --check scenarios
+```
+
+```text
+  scenario nominal: PASS (fault_trip.crossings=0.0)
+  scenario feedback-pot-stuck: PASS (fault_trip.time=1.7005)
+  scenario feedback-pot-noisy: PASS (fault_trip.crossings=0.0, loaded_hold.mean=28.6068)
+```
+
+Fault types (stuck, offset, gain, noise, drift, dropout, intermittent) are
+listed in the [fault injection reference](../reference/faults.md).
+
 ## Why it is slow, and when it matters
 
 This 2.5 s run takes a few minutes, because Renode emulates every instruction and every 10 µs sync point. Use firmware-in-the-loop for what only the real firmware can show (timing, quantisation, slew limits, fault handling), and a Python controller for wide parameter sweeps. [Tuning](tuning.md) supports both, with parallel workers.

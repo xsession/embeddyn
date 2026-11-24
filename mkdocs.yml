@@ -135,6 +135,7 @@ nav:
       - Tolerance analysis: reference/tolerance.md
       - Parameter estimation: reference/estimation.md
       - Verification: reference/verification.md
+      - Fault injection: reference/faults.md
       - The Lab: reference/lab.md
       - "Example: STM32L476 RC servo": reference/rc-servo-l476.md
       - Examples catalogue: reference/examples.md
