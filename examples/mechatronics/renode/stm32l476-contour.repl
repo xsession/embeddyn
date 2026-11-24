@@ -1,0 +1,87 @@
+// STM32L476 platform for the SPECT body-contour example
+// (examples/mechatronics/spect-body-contour.yaml): the RC-servo platform
+// (stm32l476-servo.repl) plus GPIOB for the light curtain's beam address.
+
+flash: Memory.MappedMemory @ sysbus 0x08000000
+    size: 0x100000
+
+sram1: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x18000
+
+sram2: Memory.MappedMemory @ sysbus 0x10000000
+    size: 0x8000
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xF0
+    systickFrequency: 80000000
+    IRQ -> cpu@0
+
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m4f"
+    nvic: nvic
+
+// RCC: oscillator/PLL ready flags follow their enable bits and SWS follows
+// SW, so the firmware's real clock bring-up (HSI16 -> PLL 80 MHz) completes.
+rcc: Python.PythonPeripheral @ sysbus 0x40021000
+    size: 0x400
+    initable: true
+    script: '''
+if request.IsInit:
+    regs = {0x00: 0x00000063, 0x08: 0x0, 0x0C: 0x00001000}
+elif request.IsWrite:
+    value = request.Value
+    if request.Offset == 0x00:            # CR: MSIRDY, HSIRDY, HSERDY, PLLRDY, PLLSAIxRDY
+        value &= ~((1 << 1) | (1 << 10) | (1 << 17) | (1 << 25) | (1 << 27) | (1 << 29))
+        if value & (1 << 0):
+            value |= 1 << 1
+        if value & (1 << 8):
+            value |= 1 << 10
+        if value & (1 << 16):
+            value |= 1 << 17
+        if value & (1 << 24):
+            value |= 1 << 25
+        if value & (1 << 26):
+            value |= 1 << 27
+        if value & (1 << 28):
+            value |= 1 << 29
+    elif request.Offset == 0x08:          # CFGR: SWS = SW
+        value = (value & ~0xC) | ((value & 0x3) << 2)
+    regs[request.Offset] = value
+elif request.IsRead:
+    request.Value = regs.get(request.Offset, 0)
+'''
+
+// FLASH_ACR (latency) and the rest of the flash interface: plain read/write.
+flash_ctrl: Memory.MappedMemory @ sysbus 0x40022000
+    size: 0x400
+
+gpioPortA: GPIOPort.STM32_GPIOPort @ sysbus <0x48000000, +0x400>
+    modeResetValue: 0xABFFFFFF
+    numberOfAFs: 16
+
+gpioPortB: GPIOPort.STM32_GPIOPort @ sysbus <0x48000400, +0x400>
+    modeResetValue: 0xFFFFFEBF
+    numberOfAFs: 16
+
+gpioPortC: GPIOPort.STM32_GPIOPort @ sysbus <0x48000800, +0x400>
+    modeResetValue: 0xFFFFFFFF
+    numberOfAFs: 16
+
+// TIM2 on APB1 at 80 MHz: the 5 kHz beam-scan interrupt.
+timer2: Timers.STM32_Timer @ sysbus 0x40000000
+    -> nvic@28
+    frequency: 80000000
+    initialLimit: 0xFFFFFFFF
+
+// ADC1 with its common registers (+0x300). The L4 ADC is the same IP as the
+// F3 one Renode models; needs the STM32_ADC_Common IADC patch (0002) so
+// External Control can set channel voltages (microvolts).
+adc1: Analog.STM32F3_ADC @ sysbus 0x50040000
+    referenceVoltage: 3.3
+    externalEventFrequency: 80000000
+    -> nvic@18
+
+// USART2 (PA2 TX / PA3 RX, AF7): same register layout as the F7 USART model.
+usart2: UART.STM32F7_USART @ sysbus 0x40004400
+    frequency: 80000000
+    IRQ -> nvic@38

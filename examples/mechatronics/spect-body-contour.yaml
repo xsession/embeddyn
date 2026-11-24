@@ -1,0 +1,108 @@
+# SPECT body contouring with infrared light curtains.
+#
+# A dual-head gamma camera orbits a patient phantom (MuJoCo). Each detector
+# head slides radially and carries a light curtain 12 mm below its face: 16
+# IR emitters on one rail, 16 receivers on the other. Real STM32L476
+# firmware in Renode scans the 32 beams one at a time (beam address on PB0..PB4,
+# receiver comparator on PC2, analog level on ADC1 IN1) and drives each head
+# in until one of its beams breaks, so the faces follow the body contour.
+# A touch pad on each face is the last line of defence: a hit makes the
+# firmware retract both heads and latch a fault.
+#
+# The optics (embeddyn/mechatronics/optics.py) cast every selected beam
+# against the scene: partial blocking, inverse-square power, emitter and
+# receiver angular profiles, ambient IR with synchronous rejection, shot noise,
+# receiver settling and a comparator with hysteresis.
+#   make -C examples/mechatronics/firmware/body-contour-l476
+#   embeddyn mechatronics run examples/mechatronics/spect-body-contour.yaml -o contour.csv
+name: spect-body-contour
+step_seconds: 1.0e-4            # 100 us: two co-simulation steps per 200 us beam slot
+duration_seconds: 10.5          # half an orbit at 0.3 rad/s: the two heads cover 360 deg
+metadata:
+  description: >
+    Dual-head SPECT camera with IR light-curtain body contouring: real
+    STM32L476 firmware (Renode) scans the curtains and drives the detector
+    heads, MuJoCo moves the gantry and casts the beams against the patient.
+instances:
+  mcu:
+    domain: firmware
+    options:
+      backend: renode
+      launch: true
+      api: message
+      script: renode/stm32l476-contour.resc
+      firmware: firmware/body-contour-l476.elf
+      machine: l476
+      port: 21270
+      bindings: bindings/renode-body-contour.yaml
+      log: ../../.embeddyn/renode-body-contour.log
+      uarts:                     # status line every 16 scans (~100 ms); 'R' clears a fault
+        - {name: console, peripheral: sysbus.usart2, signal: mcu.console}
+  gantry:
+    domain: mechanical
+    model: mujoco/spect-body-contour.xml
+    options:
+      backend: mujoco
+      inputs:
+        ctrl:orbit: gantry.orbit_speed
+        ctrl:a_drive: mcu.head_a_speed
+        ctrl:b_drive: mcu.head_b_speed
+      outputs:
+        qpos:orbit: gantry.angle
+        qpos:a_radius: gantry.head_a_radius
+        qpos:b_radius: gantry.head_b_radius
+        sensor:a_touch: gantry.touch_a
+        sensor:b_touch: gantry.touch_b
+      initial: {"qpos:a_radius": 0.35, "qpos:b_radius": 0.35}
+      light_curtain:
+        heads:
+          - {emitters: a_em, receivers: a_rx, count: 16, body: head_a}
+          - {emitters: b_em, receivers: b_rx, count: 16, body: head_b}
+        address: {signal: mcu.curtain_port, shift: 0, bits: 5}
+        enable: {signal: mcu.curtain_port, bit: 5}
+        voltage: curtain.rx_voltage
+        detect: curtain.rx_detect
+        blocked: [curtain.blocked_a, curtain.blocked_b]
+        geomgroup: [1, 1, 1, 0, 0, 0]          # the gantry ring (group 3) is not in the light path
+        ray_refresh: 200 us                    # a beam is lit for one 200 us slot: cast it once per slot
+        optics:
+          intensity: 10 mW/sr                  # 940 nm IRED, narrow beam
+          emitter_half_angle: 10 deg
+          receiver_half_angle: 20 deg
+          receiver_area: 7 mm^2
+          gain: 1.0e7                          # V/A
+          tau: 20 us                           # receiver settling after the multiplexer switches
+          ambient: 1 W/m^2                     # room lighting, 100 Hz flicker, 80 dB rejection
+          threshold_on: 0.6 V
+          threshold_off: 0.4 V
+          seed: 1
+      clearance:                               # ground truth: head (face and rails) to the patient
+        - {signal: gantry.gap_a, geoms: [a_face, a_rail_e, a_rail_r], to: [torso, arm_l, arm_r, couch], max: 0.5}
+        - {signal: gantry.gap_b, geoms: [b_face, b_rail_e, b_rail_r], to: [torso, arm_l, arm_r, couch], max: 0.5}
+
+signals:
+  gantry.orbit_speed: {domain: mechanical, unit: rad/s, initial: 0.3}
+  gantry.angle: {domain: mechanical, unit: rad, initial: 0.0}
+  gantry.head_a_radius: {domain: mechanical, unit: m, initial: 0.35}
+  gantry.head_b_radius: {domain: mechanical, unit: m, initial: 0.35}
+  gantry.touch_a: {domain: mechanical, unit: N, initial: 0.0}
+  gantry.touch_b: {domain: mechanical, unit: N, initial: 0.0}
+  gantry.gap_a: {domain: mechanical, unit: m, initial: 0.2}
+  gantry.gap_b: {domain: mechanical, unit: m, initial: 0.2}
+  curtain.rx_voltage: {domain: mechanical, unit: V, initial: 0.05}
+  curtain.rx_detect: {domain: mechanical, initial: 0.0}
+  curtain.blocked_a: {domain: mechanical, initial: 0.0}
+  curtain.blocked_b: {domain: mechanical, initial: 0.0}
+  mcu.curtain_port: {domain: firmware, kind: discrete, initial: 0.0}
+  mcu.head_a_speed: {domain: firmware, unit: m/s, initial: 0.0}
+  mcu.head_b_speed: {domain: firmware, unit: m/s, initial: 0.0}
+  mcu.dark_beams: {domain: firmware, kind: discrete, initial: 0.0}
+  mcu.fault: {domain: firmware, initial: 0.0}
+  mcu.console: {domain: firmware, kind: event}
+
+metrics:
+  gap_a: {type: stats, signal: gantry.gap_a, start: 2.0}       # after the heads first close in
+  gap_b: {type: stats, signal: gantry.gap_b, start: 2.0}
+  touch_a: {type: threshold, signal: gantry.touch_a, threshold: 1.0}
+  touch_b: {type: threshold, signal: gantry.touch_b, threshold: 1.0}
+  fault_trip: {type: threshold, signal: mcu.fault, threshold: 0.5}

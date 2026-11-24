@@ -20,6 +20,11 @@ Binding manifest (``options.bindings``)::
 Output properties: ``gpio_duty``, ``gpio_pulse_width``, ``gpio_state``, ``sysbus``,
 ``register_ratio``.
 Input properties: ``adc``, ``gpio``, ``sysbus``.  See docs/reference/renode.md.
+``adc`` and ``gpio`` inputs are sent only when their value changes (the
+peripheral keeps it); ``sysbus`` writes go out every step, because firmware
+may overwrite RAM. An output binding with ``interval: <seconds>`` (not
+``gpio_duty``/``gpio_pulse_width``) is read at most that often and holds its
+value in between: for slow status registers in a fast co-simulation.
 
 UARTs (``options.uarts``) are exposed by Renode as TCP socket terminals
 (``CreateServerSocketTerminal`` + ``connector Connect``). After every step the
@@ -341,6 +346,8 @@ class RenodeAdapter(SimulatorAdapter):
         self._duty: dict[str, _DutyTracker] = {}
         self._pulses: dict[str, _PulseTracker] = {}
         self._window = (0, 0)
+        self._sent: dict[tuple[str, str, int], Any] = {}         # adc/gpio inputs as last sent
+        self._held: dict[str, tuple[int, float]] = {}            # interval outputs: (read at us, value)
         if api not in {"auto", "legacy", "message"}:
             raise ValueError("api must be auto, legacy or message")
         self.api = api
@@ -397,6 +404,8 @@ class RenodeAdapter(SimulatorAdapter):
             self._launch()
         self.client = self._connect()
         self._origin_us = self._now_us = self.client.get_time_us()
+        self._sent.clear()
+        self._held.clear()
         self._duty.clear()
         self._pulses.clear()
         for binding in self.bindings:
@@ -613,12 +622,20 @@ class RenodeAdapter(SimulatorAdapter):
                     # The binding is in conversion counts (patched pre-1.17 STM32_ADC); Renode >= 1.17
                     # ADCs take microvolts, so convert with the ADC's reference and full scale.
                     raw = raw / float(binding.opt("counts_full_scale", 4095)) * float(vref) * 1e6
-                self.client.adc_set(binding.machine, binding.peripheral, _int(binding.opt("channel")), round(raw))
+                channel = _int(binding.opt("channel"))
+                key, value = (f"{binding.machine}:{binding.peripheral}", "adc", channel), round(raw)
+                if self._sent.get(key) != value:
+                    self.client.adc_set(binding.machine, binding.peripheral, channel, value)
+                    self._sent[key] = value
             elif binding.property == "gpio":
                 level = raw >= float(binding.opt("threshold", 0.5))
                 if binding.opt("invert", False):
                     level = not level
-                self.client.gpio_set(binding.machine, binding.peripheral, _int(binding.opt("pin")), level)
+                pin = _int(binding.opt("pin"))
+                key = (f"{binding.machine}:{binding.peripheral}", "gpio", pin)
+                if self._sent.get(key) != level:
+                    self.client.gpio_set(binding.machine, binding.peripheral, pin, level)
+                    self._sent[key] = level
             elif binding.property == "sysbus":
                 value = _float32_bits(raw) if binding.opt("float32", False) else round(raw)
                 width = 4 if binding.opt("float32", False) else int(binding.opt("width", 4))
@@ -687,6 +704,12 @@ class RenodeAdapter(SimulatorAdapter):
             if binding.direction != "output":
                 continue
             scale, offset = float(binding.opt("scale", 1.0)), float(binding.opt("offset", 0.0))
+            interval = binding.opt("interval")
+            if interval is not None and binding.property not in ("gpio_duty", "gpio_pulse_width"):
+                held = self._held.get(binding.signal)
+                if held is not None and end_us - held[0] < float(interval) * 1e6 - 0.5:
+                    outputs[binding.signal] = held[1]
+                    continue
             if binding.property == "gpio_duty":
                 tracker = self._duty[binding.signal]
                 if tracker.state:
@@ -719,6 +742,8 @@ class RenodeAdapter(SimulatorAdapter):
                 denominator += float(binding.opt("denominator_offset", 0))
                 value = numerator / denominator if denominator else 0.0
             outputs[binding.signal] = value * scale + offset
+            if interval is not None:
+                self._held[binding.signal] = (end_us, outputs[binding.signal])
         return outputs
 
     def _read_register(self, binding: RenodeBinding, address: Any, width: int) -> int:

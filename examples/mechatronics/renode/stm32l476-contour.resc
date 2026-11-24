@@ -1,0 +1,17 @@
+# Renode script for the SPECT body-contour co-simulation (STM32L476).
+# Embeddyn runs Renode with:
+#   -e '$bin=@<firmware>; include @<this file>; emulation CreateExternalControlServer "embeddyn" <port>'
+# and advances virtual time with RunFor. Do NOT call `start` here.
+
+mach create "l476"
+machine LoadPlatformDescription $ORIGIN/stm32l476-contour.repl
+
+$bin?=$ORIGIN/../firmware/body-contour-l476.elf
+sysbus LoadELF $bin
+
+logLevel 3 sysbus
+
+# Inputs (comparator, touch pads, ADC) change at co-simulation steps (100 us);
+# a 10 us quantum keeps the scan interrupt and the ADC handshake responsive.
+$quantum?="0.00001"
+emulation SetGlobalQuantum $quantum

@@ -61,6 +61,7 @@ _SYMBOLS: dict[str, tuple[float, _Dims, str, bool]] = {
     "deg": (math.pi / 180, _d(rad=1), "deg", False),
     "rev": (2 * math.pi, _d(rad=1), "rev", False),
     "rpm": (2 * math.pi / 60, _d(s=-1, rad=1), "rpm", False),
+    "sr": (1.0, _NONE, "sr", False),             # steradian (radiant intensity W/sr)
 }
 _PREFIXES = {"p": 1e-12, "n": 1e-9, "u": 1e-6, "µ": 1e-6, "μ": 1e-6, "m": 1e-3, "c": 1e-2,
              "k": 1e3, "M": 1e6, "G": 1e9}

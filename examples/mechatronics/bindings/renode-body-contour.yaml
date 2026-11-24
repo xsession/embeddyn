@@ -1,0 +1,31 @@
+# Renode External Control bindings for the SPECT body-contour firmware
+# (firmware/body-contour-l476, platform renode/stm32l476-contour.repl).
+adapter: renode
+machine: l476
+bindings:
+  # Beam address PB0..PB4 and emitter enable PB5: GPIOB's output register,
+  # decoded by the light curtain (MuJoCo instance, light_curtain.address).
+  - signal: mcu.curtain_port
+    endpoint: {object: sysbus, property: sysbus, address: 0x48000414, width: 4, direction: output}
+  # Head drive set-points (m/s, + = away from the patient): telemetry block
+  # `struct contour_telemetry tm` at 0x20000018 (after contour_cal). They
+  # change once per 6.4 ms scan, so they are read every 1 ms (`interval`),
+  # not every 100 us step like the beam address.
+  - signal: mcu.head_a_speed
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000002C, float32: true, interval: 0.001, direction: output, unit: m/s}
+  - signal: mcu.head_b_speed
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000030, float32: true, interval: 0.001, direction: output, unit: m/s}
+  - signal: mcu.dark_beams
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000020, width: 4, interval: 0.001, direction: output}
+  - signal: mcu.fault
+    endpoint: {object: sysbus.gpioPortA, property: gpio_state, pin: 5, interval: 0.001, direction: output}
+  # Receiver multiplexer output on ADC1 IN1 (microvolts), comparator on PC2,
+  # touch pads on PC3 / PC4 (MuJoCo touch sensors in newtons, 1 N threshold).
+  - signal: curtain.rx_voltage
+    endpoint: {object: sysbus.adc1, property: adc, channel: 1, scale: 1.0e6, min: 0, max: 3300000, direction: input, unit: V}
+  - signal: curtain.rx_detect
+    endpoint: {object: sysbus.gpioPortC, property: gpio, pin: 2, direction: input}
+  - signal: gantry.touch_a
+    endpoint: {object: sysbus.gpioPortC, property: gpio, pin: 3, threshold: 1.0, direction: input, unit: N}
+  - signal: gantry.touch_b
+    endpoint: {object: sysbus.gpioPortC, property: gpio, pin: 4, threshold: 1.0, direction: input, unit: N}

@@ -103,7 +103,8 @@ def _build_instance(project: MechatronicProject, cfg: SimulatorConfig, mock: boo
         return MujocoAdapter(str(project.resolve(cfg.model)), inputs=dict(options.get("inputs", {})),
                              outputs=dict(options.get("outputs", {})),
                              timestep=float(timestep) if timestep is not None else None,
-                             initial=dict(options.get("initial") or {}))
+                             initial=dict(options.get("initial") or {}),
+                             light_curtain=options.get("light_curtain"), clearance=options.get("clearance"))
     if not core:
         raise ValueError(f"{cfg.name}: {domain.value} instances support backends python, fmu and replay (got {backend})")
     if domain is Domain.FIRMWARE:

@@ -1,0 +1,120 @@
+<!--
+  SPECT body contouring: a dual-head gamma camera orbits a patient phantom on
+  the couch. Each detector head slides radially and carries an infrared light
+  curtain 12 mm below its face: 16 emitters on one rail, 16 receivers on the
+  other (sites a_em0..15 / a_rx0..15, b_em.. / b_rx..). The firmware moves the
+  heads in until a beam breaks, so the faces track the body contour.
+  Used by examples/mechatronics/spect-body-contour.yaml (backend: mujoco,
+  light_curtain). Generated geometry, all in metres; x = patient axis.
+-->
+<mujoco model="spect-body-contour">
+  <option timestep="1e-4" gravity="0 0 0" integrator="implicitfast"/>
+  <visual><global offwidth="1280" offheight="960"/></visual>
+  <default>
+    <geom contype="1" conaffinity="1" friction="0.4" solref="0.004 1"/>
+  </default>
+  <worldbody>
+    <light pos="0 0 2" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <!-- Patient phantom (static): torso, arms at the sides, couch below. -->
+    <geom name="torso" type="ellipsoid" size="0.45 0.17 0.11" rgba="0.93 0.76 0.62 1"/>
+    <geom name="arm_l" type="capsule" fromto="-0.30 0.235 0.0  0.30 0.235 0.0" size="0.045" rgba="0.93 0.76 0.62 1"/>
+    <geom name="arm_r" type="capsule" fromto="-0.30 -0.235 0.0  0.30 -0.235 0.0" size="0.045" rgba="0.93 0.76 0.62 1"/>
+    <geom name="couch" type="box" size="1.0 0.25 0.015" pos="0 0 -0.125" rgba="0.35 0.38 0.42 1"/>
+    <!-- Gantry: rotates about the patient axis; the ring is visual only (group 3). -->
+    <body name="gantry">
+      <joint name="orbit" type="hinge" axis="1 0 0" damping="20"/>
+      <geom name="ring" type="cylinder" size="0.62 0.02" pos="0.32 0 0" zaxis="1 0 0" group="3"
+            contype="0" conaffinity="0" mass="200" rgba="0.6 0.62 0.66 0.25"/>
+      <body name="head_a">
+        <joint name="a_radius" type="slide" axis="0 0 1" range="0.10 0.50" limited="true" damping="5"/>
+        <geom name="a_face" type="box" size="0.20 0.27 0.06" pos="0 0 0.06" rgba="0.75 0.78 0.82 1"/>
+        <geom name="a_rail_e" type="box" size="0.20 0.015 0.008" pos="0 -0.29 -0.008" rgba="0.2 0.2 0.2 1"/>
+        <geom name="a_rail_r" type="box" size="0.20 0.015 0.008" pos="0 0.29 -0.008" rgba="0.2 0.2 0.2 1"/>
+        <site name="a_touch" type="box" size="0.21 0.31 0.012" pos="0 0 -0.006" rgba="0 0 0 0"/>
+        <site name="a_em0" pos="-0.180 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em1" pos="-0.156 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em2" pos="-0.132 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em3" pos="-0.108 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em4" pos="-0.084 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em5" pos="-0.060 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em6" pos="-0.036 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em7" pos="-0.012 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em8" pos="0.012 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em9" pos="0.036 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em10" pos="0.060 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em11" pos="0.084 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em12" pos="0.108 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em13" pos="0.132 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em14" pos="0.156 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_em15" pos="0.180 -0.29 -0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="a_rx0" pos="-0.180 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx1" pos="-0.156 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx2" pos="-0.132 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx3" pos="-0.108 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx4" pos="-0.084 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx5" pos="-0.060 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx6" pos="-0.036 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx7" pos="-0.012 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx8" pos="0.012 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx9" pos="0.036 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx10" pos="0.060 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx11" pos="0.084 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx12" pos="0.108 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx13" pos="0.132 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx14" pos="0.156 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="a_rx15" pos="0.180 0.29 -0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+      </body>
+      <body name="head_b">
+        <joint name="b_radius" type="slide" axis="0 0 -1" range="0.10 0.50" limited="true" damping="5"/>
+        <geom name="b_face" type="box" size="0.20 0.27 0.06" pos="0 0 -0.06" rgba="0.75 0.78 0.82 1"/>
+        <geom name="b_rail_e" type="box" size="0.20 0.015 0.008" pos="0 -0.29 0.008" rgba="0.2 0.2 0.2 1"/>
+        <geom name="b_rail_r" type="box" size="0.20 0.015 0.008" pos="0 0.29 0.008" rgba="0.2 0.2 0.2 1"/>
+        <site name="b_touch" type="box" size="0.21 0.31 0.012" pos="0 0 0.006" rgba="0 0 0 0"/>
+        <site name="b_em0" pos="-0.180 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em1" pos="-0.156 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em2" pos="-0.132 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em3" pos="-0.108 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em4" pos="-0.084 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em5" pos="-0.060 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em6" pos="-0.036 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em7" pos="-0.012 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em8" pos="0.012 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em9" pos="0.036 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em10" pos="0.060 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em11" pos="0.084 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em12" pos="0.108 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em13" pos="0.132 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em14" pos="0.156 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_em15" pos="0.180 -0.29 0.012" zaxis="0 1 0" size="0.0025" rgba="1 0.3 0.3 1"/>
+        <site name="b_rx0" pos="-0.180 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx1" pos="-0.156 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx2" pos="-0.132 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx3" pos="-0.108 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx4" pos="-0.084 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx5" pos="-0.060 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx6" pos="-0.036 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx7" pos="-0.012 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx8" pos="0.012 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx9" pos="0.036 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx10" pos="0.060 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx11" pos="0.084 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx12" pos="0.108 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx13" pos="0.132 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx14" pos="0.156 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+        <site name="b_rx15" pos="0.180 0.29 0.012" zaxis="0 -1 0" size="0.0025" rgba="0.3 0.3 1 1"/>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="head_a" body2="head_b"/>
+  </contact>
+  <actuator>
+    <velocity name="orbit" joint="orbit" kv="2000" ctrlrange="-1 1"/>
+    <velocity name="a_drive" joint="a_radius" kv="4000" ctrlrange="-0.15 0.15"/>
+    <velocity name="b_drive" joint="b_radius" kv="4000" ctrlrange="-0.15 0.15"/>
+  </actuator>
+  <sensor>
+    <touch name="a_touch" site="a_touch"/>
+    <touch name="b_touch" site="b_touch"/>
+  </sensor>
+</mujoco>
