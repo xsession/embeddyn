@@ -192,3 +192,117 @@ class DCMotorRL:
         voltage = self._voltage(u)
         return {"current": x[0], "voltage": voltage, "power": voltage * x[0], "torque": self.kt * x[0],
                 "back_emf": self.ke * u.get("speed", 0.0)}
+
+
+class RCServo:
+    """Hobby RC servo: pulse decoder, servo amplifier, DC motor, gearbox, horn.
+
+    The input is the width (seconds) of the last servo pulse, as measured from
+    the controller's PWM output. `pulse_center` maps to 0 rad and each
+    `pulse_per_rad` seconds of deviation to one radian (1.5 ms +- 1 ms ->
+    +-90 deg by default). A width outside `pulse_valid` means no signal: the
+    amplifier switches off and the output coasts.
+
+    Inside the servo a proportional amplifier with a dead band (`deadband`,
+    rad) and speed feedback (`amp_damping`) drives the motor, saturating at
+    the supply. The armature inductance is neglected (its time constant is
+    well below the mechanical one), so the current is algebraic. The gearbox
+    has a ratio and efficiency; the output carries the horn/arm inertia,
+    viscous and Coulomb friction (tanh-regularised), an external load torque
+    and soft end stops at +-`travel_limit`.
+
+    The feedback potentiometer gives `pot_volts_at_zero` + `pot_volts_per_rad`
+    * angle, as on analog-feedback servos.
+    """
+
+    inputs = ("pulse_width", "load_torque", "supply")
+    outputs = ("angle", "angle_deg", "speed", "target_angle", "current", "motor_voltage", "power",
+               "feedback_voltage", "output_torque", "signal_valid")
+    states = ("angle", "speed")
+
+    def __init__(self, supply: float = 6.0, resistance: float = 4.0, kt: float = 0.0023, gear_ratio: float = 200.0,
+                 gear_efficiency: float = 0.7, motor_inertia: float = 1e-7, load_inertia: float = 2e-4,
+                 viscous_friction: float = 1e-3, coulomb_friction: float = 0.01, friction_speed: float = 0.05,
+                 amp_gain: float = 150.0, amp_damping: float = 3.5, deadband: float = 0.008,
+                 pulse_center: float = 1.5e-3, pulse_per_rad: float = 1.0e-3 / (math.pi / 2),
+                 pulse_valid: Sequence[float] = (4.0e-4, 2.7e-3), travel_limit: float = math.radians(100),
+                 stop_stiffness: float = 50.0, stop_damping: float = 0.5,
+                 pot_volts_at_zero: float = 1.65, pot_volts_per_rad: float = 2.7 / math.pi,
+                 angle: float = 0.0, speed: float = 0.0) -> None:
+        if resistance <= 0 or gear_ratio <= 0 or pulse_per_rad <= 0:
+            raise ValueError("resistance, gear_ratio and pulse_per_rad must be positive")
+        self.supply, self.r, self.kt, self.n, self.eta = supply, resistance, kt, gear_ratio, gear_efficiency
+        self.inertia = motor_inertia * gear_ratio ** 2 + load_inertia
+        if self.inertia <= 0:
+            raise ValueError("inertia must be positive")
+        self.viscous, self.coulomb, self.friction_speed = viscous_friction, coulomb_friction, friction_speed
+        self.kp, self.kd, self.deadband = amp_gain, amp_damping, deadband
+        self.center, self.per_rad = pulse_center, pulse_per_rad
+        self.valid = (float(pulse_valid[0]), float(pulse_valid[1]))
+        self.limit, self.k_stop, self.d_stop = travel_limit, stop_stiffness, stop_damping
+        self.pot0, self.pot_slope = pot_volts_at_zero, pot_volts_per_rad
+        self.x0 = [angle, speed]
+
+    def initial_state(self) -> list[float]:
+        return list(self.x0)
+
+    def _drive(self, x: Sequence[float], u: Mapping[str, float]) -> tuple[float, float, float, bool]:
+        """Target angle, motor voltage, current and whether the pulse is valid."""
+        width = u.get("pulse_width", 0.0)
+        supply = u.get("supply", self.supply)
+        if not self.valid[0] <= width <= self.valid[1]:
+            return 0.0, 0.0, 0.0, False
+        target = (width - self.center) / self.per_rad
+        error = target - x[0]
+        error = math.copysign(max(abs(error) - self.deadband, 0.0), error)
+        voltage = max(-supply, min(supply, self.kp * error - self.kd * x[1]))
+        current = (voltage - self.kt * self.n * x[1]) / self.r
+        return target, voltage, current, True
+
+    def _torques(self, x: Sequence[float], current: float, u: Mapping[str, float]) -> tuple[float, float]:
+        angle, speed = x
+        drive = self.eta * self.n * self.kt * current
+        friction = self.viscous * speed + self.coulomb * math.tanh(speed / self.friction_speed)
+        overshoot = abs(angle) - self.limit
+        stop = 0.0
+        if overshoot > 0:
+            stop = -math.copysign(self.k_stop * overshoot, angle) - self.d_stop * speed
+        return drive, drive - friction + stop - u.get("load_torque", 0.0)
+
+    def derivatives(self, t: float, x: Sequence[float], u: Mapping[str, float]) -> list[float]:
+        _, _, current, _ = self._drive(x, u)
+        return [x[1], self._torques(x, current, u)[1] / self.inertia]
+
+    def output(self, t: float, x: Sequence[float], u: Mapping[str, float]) -> dict[str, float]:
+        target, voltage, current, valid = self._drive(x, u)
+        drive, _ = self._torques(x, current, u)
+        return {"angle": x[0], "angle_deg": math.degrees(x[0]), "speed": x[1], "target_angle": target,
+                "current": current, "motor_voltage": voltage, "power": voltage * current,
+                "feedback_voltage": self.pot0 + self.pot_slope * x[0], "output_torque": drive,
+                "signal_valid": float(valid)}
+
+
+class HBridgePWM:
+    """Sign-magnitude H-bridge seen from its two PWM inputs: duty = in1 - in2.
+
+    Algebraic (no states). Feeds `DCMotorRL.duty` when a controller drives the
+    bridge's IN1/IN2 with two PWM channels, as on a real board.
+    """
+
+    inputs = ("in1", "in2")
+    outputs = ("duty",)
+    states = ()
+
+    def __init__(self, shoot_through_is_brake: bool = True) -> None:
+        self.brake = bool(shoot_through_is_brake)
+
+    def initial_state(self) -> list[float]:
+        return []
+
+    def derivatives(self, t, x, u):
+        return []
+
+    def output(self, t, x, u):
+        in1 = min(1.0, max(0.0, u.get("in1", 0.0)))
+        in2 = min(1.0, max(0.0, u.get("in2", 0.0)))
+        return {"duty": in1 - in2}

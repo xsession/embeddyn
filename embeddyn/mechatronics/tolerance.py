@@ -5,7 +5,7 @@ project: ../servo-drivetrain.yaml
 duration: 1.0
 mock: false
 seed: 1
-workers: 4                    # parallel processes (1 for projects that launch Renode on a fixed port)
+workers: 4                    # parallel processes (launched Renodes get their own ports)
 parameters:                   # project parameters or constant signals
   electrical.motor_resistance: {nominal: 2.0, tolerance: 0.05, distribution: normal}   # +-5 % = 3 sigma
   drivetrain.backlash: {distribution: uniform, minimum: 0.002, maximum: 0.008}
@@ -164,14 +164,18 @@ def load_tolerance_spec(path: Path) -> ToleranceSpec:
 
 # -- evaluation (runs in worker processes) ----------------------------------------
 
-def evaluate(task: tuple[str, dict[str, float], float | None, bool, list[str]]) -> dict[str, Any]:
-    """One co-simulation with the given values; returns the selected metrics or an error."""
-    project_file, values, duration, mock, outputs = task
-    from .factory import build_adapters
+def evaluate(task: tuple) -> dict[str, Any]:
+    """One co-simulation with the given values; returns the selected metrics or an error.
+    task = (project file, values, duration, mock, outputs[, private endpoints])."""
+    project_file, values, duration, mock, outputs = task[:5]
+    private = bool(task[5]) if len(task) > 5 else False
+    from .factory import build_adapters, use_private_endpoints
     from .model import MechatronicProject
     from .orchestrator import CoSimulationOrchestrator
     try:
         project = MechatronicProject.load(Path(project_file))
+        if private:
+            use_private_endpoints(project)
         if duration is not None:
             project.duration_seconds = duration
         overrides = {}
@@ -191,7 +195,8 @@ def evaluate(task: tuple[str, dict[str, float], float | None, bool, list[str]]) 
 
 def _run_all(spec: ToleranceSpec, samples: list[dict[str, float]],
              progress: Callable[[int, int], None] | None = None) -> list[dict[str, Any]]:
-    tasks = [(str(spec.project), {**spec.fixed, **s}, spec.duration, spec.mock, spec.outputs) for s in samples]
+    private = spec.workers > 1
+    tasks = [(str(spec.project), {**spec.fixed, **s}, spec.duration, spec.mock, spec.outputs, private) for s in samples]
     results: list[dict[str, Any]] = []
     if spec.workers <= 1:
         for index, task in enumerate(tasks):

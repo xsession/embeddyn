@@ -52,6 +52,7 @@ embeddyn = [
     "spec_mods/*.json",
     "local/static/*",
     "local/assets/*",
+    "mechatronics/gui/static/*",
 ]
 
 [project.optional-dependencies]
@@ -66,11 +67,23 @@ studio = [
     "capstone>=5.0",
     "psutil>=5.9",
 ]
+mujoco = [
+    "mujoco>=3.5",
+]
+fmi = [
+    "fmpy>=0.3.30",
+    "pythonfmu3>=1.3",
+]
 mechatronics-storage = [
     "pyarrow>=15",
 ]
 rf = [
     "scikit-rf>=1.9,<3",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "matplotlib>=3.8",
+    "selenium>=4.20",
 ]
 test = [
     "pytest>=8",

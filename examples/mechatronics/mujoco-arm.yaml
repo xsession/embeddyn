@@ -1,0 +1,115 @@
+# One robot-arm joint with MuJoCo multibody physics:
+# square-wave angle target -> PI position controller -> DC motor armature (python)
+# -> 20:1 gear -> MuJoCo arm with gravity and a payload. The arm's joint speed
+# feeds back into the motor's back-EMF. A Lab slider applies a disturbance torque.
+#   embeddyn mechatronics run examples/mechatronics/mujoco-arm.yaml -o arm.csv
+#   embeddyn mechatronics gui examples/mechatronics/mujoco-arm.yaml
+name: mujoco-arm-joint
+step_seconds: 0.001
+duration_seconds: 4.0
+parameters:
+  motor.k: {value: 0.08, unit: N*m/A}   # torque constant Kt = back-EMF constant Ke (V*s/rad), declared once
+  gear.ratio: 20.0
+
+instances:
+  target:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: square, amplitude: 0.6, offset: 0.6, frequency: 0.5}
+      outputs: {value: target.angle}
+  controller:
+    domain: firmware
+    model: embeddyn.mechatronics.plants:PIController
+    options:
+      backend: python
+      parameters: {kp: 6.0, ki: 3.0, minimum: -1.0, maximum: 1.0}
+      inputs: {target: target.angle, measured: arm.angle}
+      outputs: {command: controller.duty, error: controller.error}
+  motor:
+    domain: electrical
+    model: embeddyn.mechatronics.plants:DCMotorRL
+    options:
+      backend: python
+      max_step: 1.0e-5
+      parameters: {resistance: 2.0, inductance: 0.003, ke: "@motor.k", kt: "@motor.k"}
+      inputs: {duty: controller.duty, speed: motor.shaft_speed}
+      outputs: {current: motor.current, torque: motor.torque, power: motor.power}
+  arm:
+    domain: mechanical
+    model: mujoco/arm-joint.xml
+    options:
+      backend: mujoco
+      inputs: {"ctrl:shoulder_motor": motor.torque, "qfrc:shoulder": load.value}
+      outputs: {"qpos:shoulder": arm.angle, "qvel:shoulder": arm.speed, "qfrc_act:shoulder": arm.joint_torque,
+                "xpos:tip[2]": arm.tip_height, "sensor:tip_acc[2]": arm.tip_acc_z}
+signals:
+  target.angle: {domain: environment, unit: rad, initial: 0.0}
+  load.value: {domain: environment, unit: N*m, initial: 0.0}
+  controller.duty: {domain: firmware, initial: 0.0, min: -1.0, max: 1.0}
+  controller.error: {domain: firmware, unit: rad, initial: 0.0}
+  motor.shaft_speed: {domain: electrical, unit: rad/s, initial: 0.0}
+  motor.current: {domain: electrical, unit: A, initial: 0.0}
+  motor.torque: {domain: electrical, unit: N*m, initial: 0.0}
+  motor.power: {domain: electrical, unit: W, initial: 0.0}
+  arm.angle: {domain: mechanical, unit: rad, initial: 0.0}
+  arm.speed: {domain: mechanical, unit: rad/s, initial: 0.0}
+  arm.joint_torque: {domain: mechanical, unit: N*m, initial: 0.0}
+  arm.tip_height: {domain: mechanical, unit: m, initial: 0.0}
+  arm.tip_acc_z: {domain: mechanical, unit: m/s^2, initial: 0.0}
+couplings:
+  - {source: arm.speed, target: motor.shaft_speed, transform: {type: affine, gain: "@gear.ratio"}}   # motor speed = gear ratio x joint speed
+metrics:
+  lift: {type: step_response, signal: arm.angle, target: 1.2, start: 2.0, end: 3.0, settling_band: 0.05}
+  current: {type: stats, signal: motor.current}
+  energy: {type: integral, signal: motor.power}
+metadata:
+  description: >
+    One robot-arm joint with MuJoCo physics: PI position control, DC motor
+    armature in python, 20:1 gear, a 0.25 m link with a payload under gravity.
+    Drag the disturbance slider while it runs.
+  gui:
+    layout:
+      target: [60, 60]
+      load: [60, 330]
+      controller: [360, 60]
+      motor: [660, 60]
+      arm: [960, 60]
+      scope: [1300, 40]
+      dmm: [1300, 250]
+      arm3d: [1300, 360]
+    nodes:
+      - id: load
+        kind: source
+        part: slider
+        label: disturbance torque
+        icon: slider
+        settings: {minimum: -2.0, maximum: 2.0, value: 0.0, unit: N*m, step: 0.0}
+        ports: [{name: value, direction: out, unit: N*m}]
+        channels: {value: load.value}
+      - id: scope
+        kind: instrument
+        part: oscilloscope
+        label: scope
+        icon: scope
+        settings: {timebase: 4, mode: roll, layout: stack}
+        ports: [{name: A, direction: in, unit: ''}, {name: B, direction: in, unit: ''}, {name: C, direction: in, unit: ''},
+                {name: D, direction: in, unit: ''}]
+        channels: {A: target.angle, B: arm.angle, C: motor.current, D: arm.joint_torque}
+      - id: dmm
+        kind: instrument
+        part: multimeter
+        label: motor current
+        icon: meter
+        settings: {mode: rms, window: 0.5}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: motor.current}
+      - id: arm3d
+        kind: scene
+        part: scene_pendulum
+        label: arm
+        icon: pendulum
+        settings: {x: 0.0, z: 0.0, yaw: 0.0, length: 0.25, unit: rad, color: '#3d7fe0', offset: 90.0}
+        ports: [{name: angle, direction: in, unit: ''}]
+        channels: {angle: arm.angle}

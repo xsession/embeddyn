@@ -1,0 +1,22 @@
+# Tune the PID gains of the real STM32L476 arm-joint firmware (Renode >= 1.17)
+# against the MuJoCo arm. Every evaluation is a full firmware-in-the-loop run;
+# the gains reach the MCU through the bindings to firmware.kp/ki/kd.
+#   make -C examples/mechatronics/firmware/arm-joint-l476
+#   embeddyn mechatronics tune examples/mechatronics/tuning/arm-firmware.yaml -o arm-tuning.json
+project: ../mujoco-arm-firmware.yaml
+duration: 3.0                     # the `lift` step is 2.0-3.0 s
+parameters:
+  firmware.kp: {initial: 6.0, min: 1.0, max: 40.0, scale: log}
+  firmware.ki: {initial: 3.0, min: 0.1, max: 30.0, scale: log}
+  firmware.kd: {initial: 0.15, min: 0.01, max: 1.0, scale: log}
+objective:
+  - {metric: lift.itae, weight: 100.0}
+  - {metric: energy.integral, weight: 0.01}  # electrical energy over the run, J
+constraints:
+  - {metric: lift.overshoot, max: 2.0}
+  - {metric: lift.settling_time, max: 0.65}
+# 0.63 s is the floor: the step is drive-limited (duty saturated), so no gains
+# settle faster with this motor and gear.
+# No peak-current constraint: the duty saturates during the step for any useful
+# gains, so the peak sits at 11.5-11.7 A (stall 12 A) whatever the tuning.
+max_evaluations: 30

@@ -17,26 +17,102 @@ Binding manifest (``options.bindings``)::
       - signal: firmware.measured_velocity
         endpoint: {object: sysbus.adc1, property: adc, channel: 0, scale: 100.0, direction: input}
 
-Output properties: ``gpio_duty``, ``gpio_state``, ``sysbus``, ``register_ratio``.
-Input properties: ``adc``, ``gpio``, ``sysbus``.  See docs/mechatronics/RENODE.md.
+Output properties: ``gpio_duty``, ``gpio_pulse_width``, ``gpio_state``, ``sysbus``,
+``register_ratio``.
+Input properties: ``adc``, ``gpio``, ``sysbus``.  See docs/reference/renode.md.
+
+UARTs (``options.uarts``) are exposed by Renode as TCP socket terminals
+(``CreateServerSocketTerminal`` + ``connector Connect``). After every step the
+adapter drains what the firmware transmitted during that step and publishes
+each complete line as an event on the UART's signal (topic). ``uart_write``
+sends text to the firmware. That input crosses into the emulation
+asynchronously, so it is a logged, non-deterministic boundary, unlike the
+lock-step pin bindings::
+
+    uarts:
+      - {name: console, peripheral: sysbus.usart2, signal: mcu.console}   # port: 0 = pick a free one
+
+Protocol (``options.api``): Renode >= 1.17 speaks the framed message protocol
+(``renode_api_v2``); older builds, such as the original custom-cores fork, the
+handshake protocol (``renode_api``). ``auto`` (default) reads ``renode --version``.
+
+CAN (message protocol only): a ``CAN.CANExternalControlBus`` peripheral on the
+machine's CAN hub carries frames to and from embeddyn::
+
+    can:
+      bus: extcan                     # the CANExternalControlBus peripheral
+      signal: mcu.can                 # received frames -> events {id, data}
+      fields:                         # decode received frames into signals
+        - {signal: mcu.can_setpoint, id: 0x101, offset: 0, format: "<h", scale: 0.01}
+
+``can_write(frame_id, data)`` sends a frame. Like UART input it is a logged
+boundary input that takes effect at Renode's next sync point.
+
+Frame faults (``dropout``, ``corrupt`` on a UART's or the CAN bus's signal,
+see ``faults.py``) are applied here, to every UART byte and CAN frame in
+both directions; the orchestrator hands them over with ``attach_faults``.
+
+SPI sensors (message protocol only): devices modelled in Python
+(``options.spi``, see ``spi_devices.py``) answer an
+``SPI.ExternalControlSPIPeripheral`` byte by byte, with their inputs taken
+from signals at the start of each step. Renode's own sensor models (I2C
+temperature, IMU, ...) are fed through a sysbus bridge peripheral and a plain
+``sysbus`` binding; see docs/reference/renode.md.
 """
 from __future__ import annotations
 
 import os
 import shutil
+import signal
 import socket
 import struct
 import subprocess
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping
 
 from .base import SimulatorAdapter, StepResult
 from .renode_api import GpioEvent, RenodeExternalControl
+from ..spi_devices import SpiDevice, create_device
+from .renode_api_v2 import CanFrame, RenodeMessageClient
 
-OUTPUT_PROPERTIES = {"gpio_duty", "gpio_state", "sysbus", "register_ratio"}
+
+@dataclass
+class _Uart:
+    name: str
+    peripheral: str
+    signal: str
+    port: int
+    sock: socket.socket | None = None
+    buffer: bytes = b""
+    rx_bytes: int = 0
+    tx_bytes: int = 0
+
+
+_VERSION_CACHE: dict[str, tuple[int, ...] | None] = {}
+
+
+def renode_version(executable: str) -> tuple[int, ...] | None:
+    """(major, minor, patch) from `renode --version`, or None if it can't be read."""
+    if executable not in _VERSION_CACHE:
+        import re
+        try:
+            text = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=120).stdout
+            match = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
+            _VERSION_CACHE[executable] = tuple(int(x) for x in match.groups()) if match else None
+        except (OSError, subprocess.SubprocessError):
+            _VERSION_CACHE[executable] = None
+    return _VERSION_CACHE[executable]
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+OUTPUT_PROPERTIES = {"gpio_duty", "gpio_pulse_width", "gpio_state", "sysbus", "register_ratio"}
 INPUT_PROPERTIES = {"adc", "gpio", "sysbus"}
 DEFAULT_RENODE_ARGS = ("--disable-gui", "--console", "--plain")
 # Monitor messages that mean the startup script failed and the server will never open.
@@ -45,6 +121,65 @@ STARTUP_ERROR_MARKERS = ("There was an error executing command", "Could not find
 
 def _int(value: Any) -> int:
     return int(value, 0) if isinstance(value, str) else int(value)
+
+
+def _parse_spi(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate one `spi:` entry (and that its device can be built) before any Renode starts."""
+    peripheral, device = str(spec.get("peripheral", "")), str(spec.get("device", ""))
+    if not peripheral or any(ch.isspace() or ch in ';"' for ch in peripheral) or not device:
+        raise ValueError(f"spi entries need 'peripheral' (an ExternalControlSPIPeripheral path) and 'device': {dict(spec)}")
+    parameters = dict(spec.get("parameters") or {})
+    probe = create_device(device, parameters)
+    inputs = {}
+    for field, source in dict(spec.get("inputs") or {}).items():
+        source = {"signal": source} if isinstance(source, str) else dict(source)
+        if field not in getattr(probe, "inputs", ()):
+            raise ValueError(f"SPI device {device} has no input {field!r} (inputs: {', '.join(probe.inputs)})")
+        inputs[str(field)] = {"signal": str(source["signal"]), "scale": float(source.get("scale", 1.0)),
+                              "offset": float(source.get("offset", 0.0))}
+    outputs = {str(field): str(signal) for field, signal in dict(spec.get("outputs") or {}).items()}
+    unknown = set(outputs) - set(getattr(probe, "outputs", ()))
+    if unknown:
+        raise ValueError(f"SPI device {device} has no output {', '.join(sorted(unknown))} (outputs: {', '.join(probe.outputs)})")
+    return {"peripheral": peripheral, "device": device, "parameters": parameters, "machine": spec.get("machine"),
+            "inputs": inputs, "outputs": outputs}
+
+
+def _stop_process_tree(process: subprocess.Popen, timeout: float = 10.0) -> None:
+    """Terminate a launched Renode and everything it started, and wait until all of it is gone,
+    so the next run can bind the same External Control port."""
+    if os.name != "posix":
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        return
+    group = process.pid                       # start_new_session: the group id is the leader's pid
+
+    def signal_group(number: int) -> bool:
+        try:
+            os.killpg(group, number)
+            return True
+        except ProcessLookupError:
+            return False                      # the whole group has exited
+        except PermissionError:
+            return True                       # a member is still there (zombie or other owner)
+
+    signal_group(signal.SIGTERM)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        process.poll()                        # reap the leader so it does not linger as a zombie
+        if not signal_group(0):
+            return
+        time.sleep(0.05)
+    signal_group(signal.SIGKILL)
+    process.wait(timeout=5)
+    deadline = time.monotonic() + 5.0
+    while signal_group(0) and time.monotonic() < deadline:
+        time.sleep(0.05)
 
 
 def _float32_bits(value: float) -> int:
@@ -76,6 +211,32 @@ class _DutyTracker:
             self.high_us += max(0, stamp - self.last_us)
         self.last_us = max(self.last_us, stamp)
         self.state = event.state
+
+
+@dataclass
+class _PulseTracker:
+    """Width of the last complete high pulse, held until the next one ends,
+    which is what an RC-servo or ESC input decoder sees."""
+    state: bool = False
+    rise_us: int | None = None
+    last_fall_us: int = 0
+    width_us: float = 0.0
+    pulses: int = 0
+
+    def on_event(self, event: GpioEvent) -> None:
+        if event.state and not self.state:
+            self.rise_us = event.timestamp_us
+        elif self.state and not event.state:
+            if self.rise_us is not None:
+                self.width_us = float(event.timestamp_us - self.rise_us)
+                self.pulses += 1
+            self.last_fall_us = event.timestamp_us
+        self.state = event.state
+
+    def value_us(self, now_us: int, timeout_us: float | None) -> float:
+        if timeout_us is not None and now_us - self.last_fall_us > timeout_us:
+            return 0.0      # signal lost
+        return self.width_us
 
 
 def load_renode_bindings(path: Path | str | None, default_machine: str | None,
@@ -116,7 +277,7 @@ def load_renode_bindings(path: Path | str | None, default_machine: str | None,
             errors.append(f"{signal}: unsupported {direction} property {prop!r} (allowed: {', '.join(sorted(allowed))})")
         elif not machine:
             errors.append(f"{signal}: no Renode machine name (set 'machine' in the manifest or simulator options)")
-        elif prop in {"gpio_duty", "gpio_state", "gpio"} and ("pin" not in options or not peripheral):
+        elif prop in {"gpio_duty", "gpio_pulse_width", "gpio_state", "gpio"} and ("pin" not in options or not peripheral):
             errors.append(f"{signal}: {prop} requires 'object' (GPIO peripheral) and 'pin'")
         elif prop == "adc" and ("channel" not in options or not peripheral):
             errors.append(f"{signal}: adc requires 'object' (ADC peripheral) and 'channel'")
@@ -153,6 +314,10 @@ class RenodeAdapter(SimulatorAdapter):
         server_name: str = "embeddyn",
         startup_timeout: float = 120.0,
         log_path: str | None = None,
+        uarts: list[dict[str, Any]] | None = None,
+        api: str = "auto",
+        can: dict[str, Any] | None = None,
+        spi: list[dict[str, Any]] | None = None,
     ) -> None:
         self.host, self.port, self.timeout = host, int(port), float(timeout)
         self.machine = machine
@@ -174,7 +339,26 @@ class RenodeAdapter(SimulatorAdapter):
         self._origin_us = 0
         self._now_us = 0
         self._duty: dict[str, _DutyTracker] = {}
+        self._pulses: dict[str, _PulseTracker] = {}
         self._window = (0, 0)
+        if api not in {"auto", "legacy", "message"}:
+            raise ValueError("api must be auto, legacy or message")
+        self.api = api
+        self.can = dict(can or {})
+        self._can_frames: list[CanFrame] = []
+        self._can_last: dict[int, bytes] = {}
+        self._faults: Any = None                     # a FaultInjector with frame faults, if any
+        self.spi = [_parse_spi(spec) for spec in spi or []]
+        self._spi_devices: list[SpiDevice] = []
+        self.uarts: list[_Uart] = []
+        for spec in uarts or []:
+            name, peripheral = str(spec["name"]), str(spec["peripheral"])
+            if not name.isidentifier() or any(ch.isspace() or ch in ';"' for ch in peripheral):
+                raise ValueError(f"invalid UART name/peripheral: {name!r} {peripheral!r}")
+            port = int(spec.get("port") or 0) or (_free_port() if self.launch else 0)
+            if not port:
+                raise ValueError(f"UART {name}: give `port` when Renode is not launched by embeddyn")
+            self.uarts.append(_Uart(name, peripheral, str(spec.get("signal") or f"uart.{name}"), port))
 
     # ------------------------------------------------------------------ lifecycle
     def prepare(self, context: Mapping[str, Any]) -> None:
@@ -194,6 +378,9 @@ class RenodeAdapter(SimulatorAdapter):
                 raise ValueError(f"invalid Renode variable {key!r}={value!r}")
             prefix += f'${key}="{value}"; '
         monitor = f'{prefix}include @{script}; emulation CreateExternalControlServer "{self.server_name}" {self.port}'
+        for uart in self.uarts:
+            monitor += (f'; emulation CreateServerSocketTerminal {uart.port} "{uart.name}" false'
+                        f'; connector Connect {uart.peripheral} {uart.name}')
         return [self.executable, *self.renode_args, "-e", monitor]
 
     def start(self, initial_signals: Mapping[str, float]) -> None:
@@ -211,6 +398,7 @@ class RenodeAdapter(SimulatorAdapter):
         self.client = self._connect()
         self._origin_us = self._now_us = self.client.get_time_us()
         self._duty.clear()
+        self._pulses.clear()
         for binding in self.bindings:
             if binding.property == "gpio_duty":
                 pin = _int(binding.opt("pin"))
@@ -219,7 +407,83 @@ class RenodeAdapter(SimulatorAdapter):
                 self._duty[binding.signal] = tracker
                 self.client.gpio_subscribe(binding.machine, binding.peripheral, pin,
                                            lambda event, t=tracker: t.on_event(event, *self._window))
+            elif binding.property == "gpio_pulse_width":
+                pin = _int(binding.opt("pin"))
+                pulse = _PulseTracker(state=self.client.gpio_get(binding.machine, binding.peripheral, pin),
+                                      last_fall_us=self._now_us)
+                self._pulses[binding.signal] = pulse
+                self.client.gpio_subscribe(binding.machine, binding.peripheral, pin, pulse.on_event)
+        for uart in self.uarts:
+            uart.sock = socket.create_connection((self.host, uart.port), timeout=self.timeout)
+            uart.sock.setblocking(False)
+        self._can_frames.clear()
+        self._can_last.clear()
+        if self.can:
+            if not isinstance(self.client, RenodeMessageClient):
+                raise RuntimeError("CAN bindings need Renode >= 1.17 (External Control message protocol)")
+            self.client.can_subscribe(self.machine or "", str(self.can["bus"]), self._on_can_frame)
+        self._spi_devices = []
+        if self.spi and not isinstance(self.client, RenodeMessageClient):
+            raise RuntimeError("SPI devices need Renode >= 1.17 (External Control message protocol)")
+        for spec in self.spi:          # a fresh device per run, so every run starts from power-up
+            device = create_device(spec["device"], spec["parameters"])
+            self._spi_devices.append(device)
+            self.client.spi_register(spec["machine"] or self.machine or "", spec["peripheral"],
+                                     device.transmit, device.finish)
         self._apply_inputs(initial_signals)
+
+    def attach_faults(self, injector: Any) -> None:
+        """Frame faults for the UARTs' and the CAN bus's signals (called by the orchestrator)."""
+        self._faults = injector
+
+    def _seconds(self, time_us: int) -> float:
+        return (time_us - self._origin_us) / 1_000_000
+
+    def _fault_bytes(self, signal: str, data: bytes, time_seconds: float, direction: str) -> bytes:
+        """UART traffic through the frame faults: every byte is a frame."""
+        if self._faults is None or signal not in self._faults.frames_by_signal:
+            return data
+        out = bytearray()
+        for byte in data:
+            kept = self._faults.frame(signal, bytes([byte]), time_seconds, direction=direction)
+            if kept is not None:
+                out += kept
+        return bytes(out)
+
+    def _drain_uarts(self, now_seconds: float) -> list[dict[str, Any]]:
+        """Bytes the firmware sent during the step, as one event per complete line."""
+        events = []
+        for uart in self.uarts:
+            if uart.sock is None:
+                continue
+            while True:
+                try:
+                    chunk = uart.sock.recv(65536)
+                except (BlockingIOError, InterruptedError):
+                    break
+                if not chunk:
+                    break
+                uart.rx_bytes += len(chunk)
+                uart.buffer += self._fault_bytes(uart.signal, chunk, now_seconds, "output")
+            *lines, uart.buffer = uart.buffer.split(b"\n")
+            for line in lines:
+                text = line.rstrip(b"\r").decode("utf-8", errors="replace")
+                events.append({"time_seconds": now_seconds, "topic": uart.signal, "payload": text})
+        return events
+
+    def uart_write(self, name_or_signal: str, text: str) -> int:
+        """Send text to a UART (by name or signal). Asynchronous: lands at Renode's next sync point."""
+        for uart in self.uarts:
+            if name_or_signal in (uart.name, uart.signal) and uart.sock is not None:
+                data = self._fault_bytes(uart.signal, text.encode("utf-8"), self._seconds(self._now_us), "input")
+                uart.sock.setblocking(True)
+                try:
+                    uart.sock.sendall(data)
+                finally:
+                    uart.sock.setblocking(False)
+                uart.tx_bytes += len(data)
+                return len(data)
+        raise KeyError(f"no connected UART {name_or_signal!r}")
 
     def step(self, time_seconds: float, step_seconds: float, inputs: Mapping[str, float]) -> StepResult:
         if self.client is None:
@@ -239,20 +503,32 @@ class RenodeAdapter(SimulatorAdapter):
             self.client.run_for(interval)
         self._now_us = target_us
         outputs = self._read_outputs(start_us, target_us)
-        return StepResult(outputs, {"renode_time_us": target_us, "run_for_us": interval})
+        diagnostics: dict[str, Any] = {"renode_time_us": target_us, "run_for_us": interval}
+        if self.uarts:
+            diagnostics["events"] = self._drain_uarts((target_us - self._origin_us) / 1_000_000)
+        for spec, device in zip(self.spi, self._spi_devices):
+            values = device.output_values()
+            outputs.update({signal: values[field] for field, signal in spec["outputs"].items()})
+        if self.can:
+            outputs.update(self._can_outputs())
+            topic = str(self.can.get("signal", "can"))
+            events = diagnostics.setdefault("events", [])
+            for frame in self._can_frames:
+                events.append({"time_seconds": frame.time_ns / 1e9 - self._origin_us / 1e6, "topic": topic,
+                               "payload": {"id": frame.frame_id, "data": frame.data.hex()}})
+            self._can_frames.clear()
+        return StepResult(outputs, diagnostics)
 
     def stop(self) -> None:
+        for uart in self.uarts:
+            if uart.sock is not None:
+                uart.sock.close()
+                uart.sock = None
         if self.client is not None:
             self.client.close()
             self.client = None
         if self.process is not None:
-            if self.process.poll() is None:
-                self.process.terminate()
-                try:
-                    self.process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self.process.kill()
-                    self.process.wait(timeout=5)
+            _stop_process_tree(self.process)
             self.process = None
         if self._log_handle is not None:
             self._log_handle.close()
@@ -260,7 +536,7 @@ class RenodeAdapter(SimulatorAdapter):
 
     def capabilities(self) -> dict[str, bool]:
         return {"deterministic_step": True, "variable_step": True, "checkpoint": False,
-                "real_time": False, "events": True, "buses": False, "firmware_in_the_loop": True}
+                "real_time": False, "events": True, "buses": bool(self.uarts), "firmware_in_the_loop": True}
 
     def health(self) -> dict[str, object]:
         return {
@@ -285,8 +561,10 @@ class RenodeAdapter(SimulatorAdapter):
         Path(self.log_path).parent.mkdir(parents=True, exist_ok=True)
         self._log_handle = open(self.log_path, "wb")
         # stdin stays open: with --console Renode would quit on EOF.
+        # Own process group: the `renode` launcher script runs dotnet as a child (no exec), so
+        # stopping only the script would leave Renode alive and still listening on the port.
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self._log_handle,
-                                        stderr=subprocess.STDOUT)
+                                        stderr=subprocess.STDOUT, start_new_session=os.name == "posix")
 
     def _startup_error(self) -> str | None:
         """Return the first Monitor error Renode logged while running the script."""
@@ -312,6 +590,8 @@ class RenodeAdapter(SimulatorAdapter):
                 if error:
                     raise RuntimeError(f"Renode script failed: {error} (see {self.log_path})")
             try:
+                if self.protocol() == "message":
+                    return RenodeMessageClient.connect(self.host, self.port, timeout=self.timeout)
                 return RenodeExternalControl.connect(self.host, self.port, timeout=self.timeout)
             except (ConnectionRefusedError, socket.timeout, OSError) as exc:
                 last_error = exc
@@ -321,12 +601,18 @@ class RenodeAdapter(SimulatorAdapter):
 
     def _apply_inputs(self, inputs: Mapping[str, Any]) -> None:
         assert self.client is not None
+        self._apply_spi_inputs(inputs)
         for binding in self.bindings:
             if binding.direction != "input" or binding.signal not in inputs:
                 continue
             raw = float(inputs[binding.signal]) * float(binding.opt("scale", 1.0)) + float(binding.opt("offset", 0.0))
             if binding.property == "adc":
                 raw = min(max(raw, float(binding.opt("min", 0))), float(binding.opt("max", 0xFFFFFFFF)))
+                vref = binding.opt("counts_vref")
+                if vref is not None and isinstance(self.client, RenodeMessageClient):
+                    # The binding is in conversion counts (patched pre-1.17 STM32_ADC); Renode >= 1.17
+                    # ADCs take microvolts, so convert with the ADC's reference and full scale.
+                    raw = raw / float(binding.opt("counts_full_scale", 4095)) * float(vref) * 1e6
                 self.client.adc_set(binding.machine, binding.peripheral, _int(binding.opt("channel")), round(raw))
             elif binding.property == "gpio":
                 level = raw >= float(binding.opt("threshold", 0.5))
@@ -338,6 +624,61 @@ class RenodeAdapter(SimulatorAdapter):
                 width = 4 if binding.opt("float32", False) else int(binding.opt("width", 4))
                 self.client.bus_write(binding.machine, _int(binding.opt("address")), value,
                                       width=width, context=binding.peripheral)
+
+    def _apply_spi_inputs(self, inputs: Mapping[str, Any]) -> None:
+        for spec, device in zip(self.spi, self._spi_devices):
+            values = {}
+            for field, source in spec["inputs"].items():
+                if source["signal"] in inputs:
+                    values[field] = float(inputs[source["signal"]]) * source["scale"] + source["offset"]
+            if values:
+                device.set_inputs(values)
+
+    def protocol(self) -> str:
+        if self.api != "auto":
+            return self.api
+        version = renode_version(self.executable) if self.launch else None
+        return "message" if version and version >= (1, 17, 0) else "legacy"
+
+    def _on_can_frame(self, frame: CanFrame) -> None:
+        signal = str(self.can.get("signal", "can"))
+        if self._faults is not None and signal in self._faults.frames_by_signal:
+            data = self._faults.frame(signal, frame.data, frame.time_ns / 1e9 - self._origin_us / 1e6,
+                                      direction="output", frame_id=frame.frame_id)
+            if data is None:
+                return                                 # lost: neither an event nor decoded
+            frame = replace(frame, data=data)
+        self._can_frames.append(frame)
+        self._can_last[frame.frame_id] = frame.data
+
+    def _can_outputs(self) -> dict[str, float]:
+        outputs = {}
+        for field_spec in self.can.get("fields", []):
+            data = self._can_last.get(int(field_spec["id"]))
+            if data is None:
+                continue
+            fmt = str(field_spec.get("format", "<h"))
+            offset = int(field_spec.get("offset", 0))
+            if offset + struct.calcsize(fmt) > len(data):
+                continue
+            (raw,) = struct.unpack_from(fmt, data, offset)
+            outputs[str(field_spec["signal"])] = float(raw) * float(field_spec.get("scale", 1.0)) + float(field_spec.get("offset_value", 0.0))
+        return outputs
+
+    def can_write(self, frame_id: int, data: bytes) -> bool:
+        """Send a CAN frame from the host (asynchronous boundary input). False if a fault lost it."""
+        if not self.can or not isinstance(self.client, RenodeMessageClient):
+            raise KeyError("CAN needs `can:` options and Renode >= 1.17 (message protocol)")
+        signal = str(self.can.get("signal", "can"))
+        data = bytes(data)
+        if self._faults is not None and signal in self._faults.frames_by_signal:
+            faulted = self._faults.frame(signal, data, self._seconds(self._now_us), direction="input",
+                                         frame_id=int(frame_id))
+            if faulted is None:
+                return False
+            data = faulted
+        self.client.can_send(self.machine or "", str(self.can["bus"]), int(frame_id), data)
+        return True
 
     def _read_outputs(self, start_us: int, end_us: int) -> dict[str, float]:
         assert self.client is not None
@@ -355,6 +696,11 @@ class RenodeAdapter(SimulatorAdapter):
                 value = (tracker.high_us / span) if span else float(tracker.state)
                 if binding.opt("invert", False):
                     value = 1.0 - value
+            elif binding.property == "gpio_pulse_width":
+                # seconds (scale 1e6 for microseconds); `timeout` seconds without a pulse -> 0
+                timeout = binding.opt("timeout")
+                value = self._pulses[binding.signal].value_us(
+                    end_us, None if timeout is None else float(timeout) * 1e6) * 1e-6
             elif binding.property == "gpio_state":
                 value = float(self.client.gpio_get(binding.machine, binding.peripheral, _int(binding.opt("pin"))))
                 if binding.opt("invert", False):

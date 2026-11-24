@@ -123,7 +123,7 @@ def test_fmu_errors(fmus, tmp_path):
     with pytest.raises(FmuError, match="instantiation failed"):
         FmuAdapter(str(tampered)).start({})
     adapter = FmuAdapter(str(fmus["3.0"]))
-    with pytest.raises(FmuError, match="resuming"):
+    with pytest.raises(FmuError, match="no FMU state"):        # checkpoint taken before start()
         adapter.restore(adapter.checkpoint())
 
 

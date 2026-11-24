@@ -37,6 +37,25 @@ def compile_project(
                            "manifest": str(compiled.manifest_path), "lock": str(compiled.lock_path)}, indent=2))
 
 
+def add_faults(project: MechatronicProject, specs: list[str]) -> None:
+    """Append faults given on the command line (YAML/JSON mappings) to the project's faults."""
+    from .faults import parse_faults
+
+    items = []
+    for spec in specs:
+        try:
+            item = yaml.safe_load(spec)
+        except yaml.YAMLError as error:
+            raise typer.BadParameter(f"invalid --fault {spec!r}: {error}") from error
+        if not isinstance(item, dict):
+            raise typer.BadParameter(f"--fault must be a mapping such as '{{signal: x, type: stuck}}', got {spec!r}")
+        items.append(item)
+    try:
+        project.faults = project.faults + parse_faults(items, project.signals, start_index=len(project.faults))
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+
+
 @mechatronics_app.command("run")
 def run_project(
     project_file: Path = typer.Argument(..., exists=True, dir_okay=False),
@@ -47,8 +66,11 @@ def run_project(
     checkpoint_interval: Optional[float] = typer.Option(None, "--checkpoint-interval", help="Checkpoint interval in seconds."),
     resume_from: Optional[Path] = typer.Option(None, "--resume-from", exists=True, dir_okay=False),
     parameter_overrides: Optional[str] = typer.Option(None, "--parameter-overrides", help="JSON object of resolved parameter overrides."),
+    fault: Optional[list[str]] = typer.Option(None, "--fault", help="Inject a fault, as in the project's faults: list, written as a YAML/JSON mapping, e.g. '{signal: servo.feedback_voltage, type: stuck, start: 1.2 s}'. Repeatable."),
 ) -> None:
     project = MechatronicProject.load(project_file)
+    if fault:
+        add_faults(project, fault)
     if parameter_overrides:
         try:
             overrides = json.loads(parameter_overrides)
@@ -163,12 +185,19 @@ def tune_command(
     spec_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Tuning spec (YAML)."),
     output: Path = typer.Option(Path(".embeddyn/tuning/result.json"), "--output", "-o"),
     max_evaluations: Optional[int] = typer.Option(None, "--max-evaluations"),
+    workers: Optional[int] = typer.Option(None, "--workers", help="Parallel evaluations (overrides the spec)."),
+    method: Optional[str] = typer.Option(None, "--method", help="nelder-mead or cmaes (overrides the spec)."),
 ) -> None:
-    """Tune project parameters by repeated co-simulation (bounded Nelder-Mead)."""
+    """Tune project parameters by repeated co-simulation (bounded Nelder-Mead or CMA-ES)."""
     from .tuning import load_tuning_spec, tune, write_result
     spec = load_tuning_spec(spec_file)
     if max_evaluations is not None:
         spec.max_evaluations = max_evaluations
+    if workers is not None:
+        spec.workers = max(1, workers)
+    if method is not None:
+        from .tuning import _method
+        spec.method = _method(method)
 
     def progress(record):
         values = ", ".join(f"{name}={value:.5g}" for name, value in record["parameters"].items())
@@ -177,7 +206,8 @@ def tune_command(
 
     result = tune(spec, progress)
     write_result(result, output)
-    typer.echo(json.dumps({"output": str(output), "evaluations": result["evaluations"], "feasible": result["feasible"],
+    typer.echo(json.dumps({"output": str(output), "evaluations": result["evaluations"], "runs": result["runs"],
+                           "wall_seconds": result["wall_seconds"], "feasible": result["feasible"],
                            "initial": {"parameters": result["initial"]["parameters"], "objective": result["initial"]["objective"]},
                            "best": {key: result["best"][key] for key in ("parameters", "objective", "violations")}},
                           indent=2, default=lambda value: None))
@@ -332,6 +362,104 @@ def replay(
     typer.echo(json.dumps(result, indent=2))
     if not result["monotonic_time"]:
         raise typer.Exit(2)
+
+
+@mechatronics_app.command("gui")
+def gui_command(
+    project_file: Optional[Path] = typer.Argument(None, dir_okay=False, help="Project to open at start."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Interface to bind (keep it local: the API runs simulators)."),
+    port: int = typer.Option(8710, "--port"),
+    open_browser: bool = typer.Option(False, "--open", help="Open the Lab in the default browser."),
+) -> None:
+    """Embeddyn Lab: schematic editor, virtual instruments and 3-D view in the browser."""
+    from .gui.server import serve
+    server = serve(project_file.resolve() if project_file else None, host, port)
+    url = f"http://{host}:{server.server_address[1]}/"
+    if project_file:
+        url += f"#open={project_file.resolve()}"
+    typer.echo(f"embeddyn Lab on {url}  (Ctrl+C to stop)")
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.lab_state.stop_all()
+        server.server_close()
+
+
+def _key_values(items: list[str] | None) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for item in items or []:
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"expected name=value, got {item!r}")
+        try:
+            result[key] = float(value)
+        except ValueError:
+            result[key] = value
+    return result
+
+
+@mechatronics_app.command("fmu-export")
+def fmu_export(
+    plant: str = typer.Argument(..., help="Plant class: package.module:Class or file.py:Class."),
+    output: Path = typer.Option(Path("."), "--output", "-o", help="Directory for <name>.fmu."),
+    name: Optional[str] = typer.Option(None, "--name", help="Model name (default: the class name)."),
+    param: Optional[list[str]] = typer.Option(None, "--param", "-p", help="Parameter default, name=value (repeat)."),
+    input_start: Optional[list[str]] = typer.Option(None, "--input-start", help="Input start value, name=value."),
+    max_step: float = typer.Option(1e-4, "--max-step", help="RK4 sub-step inside each doStep [s]."),
+    check: bool = typer.Option(True, "--check/--no-check", help="Validate and simulate the result with FMPy."),
+) -> None:
+    """Export a python plant as an FMI 3.0 co-simulation FMU (PythonFMU3), with state save/restore."""
+    from .fmi_export import check_fmu, export_plant
+    path = export_plant(plant, output, name=name, parameters=_key_values(param),
+                        input_start={k: float(v) for k, v in _key_values(input_start).items()},
+                        max_step=max_step, root=Path.cwd())
+    typer.echo(f"wrote {path}")
+    if check:
+        report = check_fmu(path)
+        typer.echo(json.dumps({k: v for k, v in report.items() if k != "variables"}, indent=2))
+        if not report["valid"]:
+            raise typer.Exit(1)
+
+
+@mechatronics_app.command("fmu-check")
+def fmu_check(fmu: Path = typer.Argument(..., exists=True, dir_okay=False),
+              stop_time: float = typer.Option(0.01, "--stop-time")) -> None:
+    """Validate an FMU (FMPy model-description checks) and run a short co-simulation."""
+    from .fmi_export import check_fmu
+    report = check_fmu(fmu, stop_time=stop_time)
+    typer.echo(json.dumps(report, indent=2, default=str))
+    if not report["valid"]:
+        raise typer.Exit(1)
+
+
+@mechatronics_app.command("bindings-from-pinplan")
+def bindings_from_pinplan(
+    plan_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Forge pin plan (.pinplan.json)."),
+    device_file: Path = typer.Option(..., "--device", exists=True, dir_okay=False, help="Device with renode pin data."),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Bindings YAML to write (default: stdout)."),
+    merge: Optional[Path] = typer.Option(None, "--merge", exists=True, dir_okay=False,
+                                         help="Existing bindings whose non-pin entries (sysbus...) are kept."),
+    machine: Optional[str] = typer.Option(None, "--machine"),
+) -> None:
+    """Generate Renode GPIO/PWM/ADC bindings from a CodeLayer Forge pin plan."""
+    from .pinplan import load_json_or_yaml, merge_bindings, renode_bindings, to_yaml
+    generated = renode_bindings(load_json_or_yaml(plan_file), load_json_or_yaml(device_file), machine)
+    for item in generated["diagnostics"]:
+        typer.echo(f"{item['severity']}: {item['message']}", err=True)
+    manifest = merge_bindings(generated, load_json_or_yaml(merge) if merge else None) if merge else generated
+    text = to_yaml(manifest, plan_file.name)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {output} ({len(generated['bindings'])} pin bindings)")
+    else:
+        typer.echo(text)
+    if any(item["severity"] == "error" for item in generated["diagnostics"]):
+        raise typer.Exit(1)
 
 
 @mechatronics_app.command("doctor")

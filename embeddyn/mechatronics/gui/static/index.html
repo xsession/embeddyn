@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>embeddyn Lab</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header id="toolbar">
+  <div class="brand"><span class="logo">◈</span> embeddyn <b>Lab</b></div>
+  <div class="group">
+    <button id="btn-new" title="New project">New</button>
+    <div class="dropdown">
+      <button id="btn-open" title="Open an example or a project file">Open ▾</button>
+      <div class="menu" id="open-menu">
+        <div class="menu-title">Examples</div>
+        <div id="example-list"></div>
+        <div class="menu-title">Project file</div>
+        <div class="menu-row"><input id="open-path" placeholder="/path/to/project.yaml"><button id="btn-open-path">Open</button></div>
+      </div>
+    </div>
+    <button id="btn-save" title="Save (Ctrl+S)">Save</button>
+    <button id="btn-saveas" title="Save as another file">Save as…</button>
+    <button id="btn-yaml" title="Show the project file">YAML</button>
+    <button id="btn-validate" title="Check the project">Check</button>
+  </div>
+  <div class="group run">
+    <button id="btn-run" class="primary" title="Run (F5)">▶ Run</button>
+    <button id="btn-pause" title="Pause / resume" disabled>❚❚</button>
+    <button id="btn-stop" title="Stop" disabled>■</button>
+    <label title="Replace firmware/electrical/mechanical backends with built-in mocks"><input type="checkbox" id="opt-mock"> mock hardware</label>
+    <label title="Pace the run to wall-clock time"><input type="checkbox" id="opt-realtime"> real-time ×</label>
+    <input id="opt-speed" type="number" value="1" min="0.01" step="0.1" title="Speed factor for real-time runs">
+  </div>
+  <div class="group status">
+    <span id="sim-time">t = 0.000 s</span>
+    <span id="sim-status" class="pill idle">idle</span>
+  </div>
+  <div class="group right">
+    <span id="project-name" class="project-name">untitled</span>
+  </div>
+</header>
+
+<main id="layout">
+  <aside id="library">
+    <input id="part-search" type="search" placeholder="Search parts…">
+    <div id="part-list"></div>
+    <div class="hint">Drag a part onto the schematic. Wire an output pin (right) to an input pin (left).
+      Instruments and 3-D bodies only observe signals.</div>
+  </aside>
+
+  <section id="center">
+    <nav class="tabs" id="view-tabs">
+      <button data-view="schematic" class="active">Schematic</button>
+      <button data-view="scene">3-D view</button>
+      <button data-view="split">Split</button>
+      <span class="spacer"></span>
+      <label class="small"><input type="checkbox" id="opt-values" checked> live values on pins</label>
+      <button id="btn-fit" title="Fit the drawing (F)">Fit</button>
+    </nav>
+    <div id="views" class="view-schematic">
+      <div id="schematic-wrap"><svg id="schematic" tabindex="0"></svg></div>
+      <div id="scene-wrap"><canvas id="scene"></canvas>
+        <div class="scene-help">drag: orbit · shift/right-drag: pan · wheel: zoom · double-click: reset</div></div>
+    </div>
+  </section>
+
+  <aside id="inspector"><div id="inspector-body"></div></aside>
+</main>
+
+<section id="dock">
+  <div class="dock-bar">
+    <nav class="tabs" id="dock-tabs">
+      <button data-dock="instruments" class="active">Instruments</button>
+      <button data-dock="console">Console <span id="console-badge" class="badge hidden">0</span></button>
+      <button data-dock="metrics">Metrics</button>
+    </nav>
+    <div class="timeline">
+      <button id="btn-replay" title="Replay the recorded run">⟲ replay</button>
+      <input id="time-cursor" type="range" min="0" max="0" value="0" step="1">
+      <label class="small"><input type="checkbox" id="opt-follow" checked> follow</label>
+      <a id="btn-csv" class="button disabled" download>CSV</a>
+    </div>
+  </div>
+  <div id="dock-instruments" class="dock-page"><div id="instrument-grid"></div>
+    <div id="instrument-empty" class="empty">Drop an <b>Oscilloscope</b>, <b>Multimeter</b>, <b>Logic analyser</b>, <b>Gauge</b>…
+      from <i>Instruments</i> and wire signals to its channels. Sliders and switches from <i>Sources</i> appear here as live controls.</div></div>
+  <div id="dock-console" class="dock-page hidden"><pre id="console"></pre></div>
+  <div id="dock-metrics" class="dock-page hidden"><div id="metrics"></div></div>
+</section>
+
+<div id="modal" class="modal hidden"><div class="modal-box"><div class="modal-head"><span id="modal-title"></span>
+  <button id="modal-close">✕</button></div><div id="modal-body"></div></div></div>
+<div id="toast"></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -40,6 +40,10 @@ def renode_kwargs(project: MechatronicProject, cfg) -> dict:
         "server_name": str(options.get("server_name", "embeddyn")),
         "startup_timeout": float(options.get("startup_timeout", 120.0)),
         "log_path": path("log"),
+        "uarts": list(options.get("uarts", [])),
+        "api": str(options.get("api", "auto")),
+        "can": dict(options.get("can") or {}),
+        "spi": list(options.get("spi") or []),
     }
 
 
@@ -90,6 +94,15 @@ def _build_instance(project: MechatronicProject, cfg: SimulatorConfig, mock: boo
     if backend == "replay":
         from .adapters.replay import ReplayAdapter
         return ReplayAdapter(**replay_kwargs(project, cfg))
+    if backend == "mujoco":
+        from .adapters.mujoco_adapter import MujocoAdapter
+        if not cfg.model:
+            raise ValueError(f"{cfg.name}: mujoco backend needs `model: path/to/model.xml` (MJCF)")
+        timestep = options.get("timestep")
+        return MujocoAdapter(str(project.resolve(cfg.model)), inputs=dict(options.get("inputs", {})),
+                             outputs=dict(options.get("outputs", {})),
+                             timestep=float(timestep) if timestep is not None else None,
+                             initial=dict(options.get("initial") or {}))
     if not core:
         raise ValueError(f"{cfg.name}: {domain.value} instances support backends python, fmu and replay (got {backend})")
     if domain is Domain.FIRMWARE:
@@ -149,6 +162,22 @@ def replay_kwargs(project: MechatronicProject, cfg) -> dict:
         "interpolation": str(options.get("interpolation", "previous")),
         "time_column": str(options.get("time_column", "time")),
     }
+
+
+def use_private_endpoints(project: MechatronicProject) -> None:
+    """Give every simulator this project launches its own TCP port and log file, so several
+    runs of the same project can go on at once (parallel tuning and tolerance evaluations).
+    Only instances embeddyn launches itself change; attached ones keep their configured port."""
+    import os
+    from .adapters.renode import _free_port
+    for cfg in project.simulator_instances().values():
+        options = cfg.options
+        if str(options.get("backend", "")).lower() != "renode" or not options.get("launch"):
+            continue
+        options["port"] = _free_port()
+        if options.get("log"):
+            log = Path(str(options["log"]))
+            options["log"] = str(log.with_name(f"{log.stem}.{os.getpid()}{log.suffix or '.log'}"))
 
 
 def build_adapters(project: MechatronicProject, mock: bool = False, isolate: bool = False):

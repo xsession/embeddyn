@@ -4,6 +4,9 @@ duration_seconds: 0.25
 metadata:
   description: Real STM32 firmware in Renode drives a switching H-bridge in ngspice; mechanics use the built-in model.
 
+parameters:
+  motor.k: {value: 0.08, unit: N*m/A}   # torque constant Kt = back-EMF constant Ke (V*s/rad), declared once
+
 simulators:
   firmware:
     # Real firmware in Renode (xsession/renode custom-cores branch).
@@ -49,8 +52,8 @@ signals:
 
 couplings:
   - {source: firmware.pwm_duty, target: electrical.pwm_duty}
-  - {source: mechanical.velocity, target: electrical.back_emf, gain: 0.08, delay_steps: 1}
-  - {source: electrical.motor_current, target: mechanical.motor_torque, gain: 0.08}
+  - {source: mechanical.velocity, target: electrical.back_emf, gain: "@motor.k", delay_steps: 1}
+  - {source: electrical.motor_current, target: mechanical.motor_torque, gain: "@motor.k"}
   - {source: mechanical.velocity, target: firmware.measured_velocity, delay_steps: 1}
 
 metrics:

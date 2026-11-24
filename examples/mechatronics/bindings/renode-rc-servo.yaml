@@ -1,0 +1,25 @@
+# Renode External Control bindings for the STM32L476 RC-servo firmware
+# (firmware/rc-servo-l476, platform renode/stm32l476-servo.repl).
+adapter: renode
+machine: l476
+bindings:
+  # Servo signal: TIM2 CH1 (PA0). Width of the last pulse in seconds, from
+  # GPIO edge timestamps (resolution = Renode sync quantum). The servo treats
+  # 0 as "no signal"; 50 ms without a pulse counts as lost.
+  - signal: mcu.servo_pulse
+    endpoint: {object: sysbus.timer2, property: gpio_pulse_width, pin: 0, timeout: 0.05, direction: output}
+  # Fault LED (PA5).
+  - signal: mcu.fault_led
+    endpoint: {object: sysbus.gpioPortA, property: gpio_state, pin: 5, direction: output}
+  # Firmware telemetry: `struct servo_telemetry tm` at 0x2000002C (fixed by
+  # the .telemetry section in link.ld, right after servo_cal).
+  - signal: mcu.setpoint_deg
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000003C, float32: true, direction: output, unit: deg}
+  - signal: mcu.trim_deg
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000044, float32: true, direction: output, unit: deg}
+  # ADC1 inputs (STM32F3_ADC model, microvolts): command pot on IN1, servo
+  # feedback pot on IN2.
+  - signal: operator.command_voltage
+    endpoint: {object: sysbus.adc1, property: adc, channel: 1, scale: 1.0e6, min: 0, max: 3300000, direction: input, unit: V}
+  - signal: servo.feedback_voltage
+    endpoint: {object: sysbus.adc1, property: adc, channel: 2, scale: 1.0e6, min: 0, max: 3300000, direction: input, unit: V}

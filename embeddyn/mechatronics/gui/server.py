@@ -1,0 +1,344 @@
+"""HTTP server of the Lab (standard library only).
+
+JSON API under ``/api``, live data as Server-Sent Events, the single-page app
+from ``static/``. Binds to 127.0.0.1 by default: the API reads and writes
+project files and launches simulators, so it is a local tool.
+"""
+from __future__ import annotations
+
+import json
+import mimetypes
+import os
+import threading
+import time
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+import yaml
+
+from .document import graph_from_raw, instance_ports, load_graph, project_from_graph, raw_from_graph, to_yaml
+from .parts import EXAMPLES, instantiate_part, part_library
+from .session import RunSession
+
+STATIC = Path(__file__).resolve().parent / "static"
+_PATH_KEYS = ("script", "firmware", "bindings", "log")
+
+
+def _examples() -> list[dict[str, Any]]:
+    result = []
+    for path in sorted(EXAMPLES.glob("*.yaml")):
+        try:
+            raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            continue
+        description = str((raw.get("metadata") or {}).get("description", "")).strip()
+        result.append({"name": str(raw.get("name", path.stem)), "file": path.name, "path": str(path),
+                       "description": " ".join(description.split())[:240]})
+    return result
+
+
+def _rebase(graph: dict[str, Any], new_root: Path) -> None:
+    """Keep relative model/script/firmware/bindings paths valid after Save As elsewhere."""
+    old_root = Path(graph.get("root") or new_root)
+    if old_root.resolve() == new_root.resolve():
+        return
+
+    def move(value: Any) -> Any:
+        if not isinstance(value, str) or not value or os.path.isabs(value):
+            return value
+        try:
+            return os.path.relpath((old_root / value).resolve(), new_root)
+        except ValueError:                       # another drive on Windows
+            return str((old_root / value).resolve())
+
+    for node in graph.get("nodes") or []:
+        spec = node.get("spec")
+        if not spec:
+            continue
+        model = spec.get("model")
+        if isinstance(model, str) and model and ":" not in model:
+            spec["model"] = move(model)
+        elif isinstance(model, str) and model.split(":")[0].endswith(".py"):
+            location, cls = model.rsplit(":", 1)
+            spec["model"] = f"{move(location)}:{cls}"
+        options = spec.get("options") or {}
+        for key in _PATH_KEYS:
+            if key in options:
+                options[key] = move(options[key])
+    graph["root"] = str(new_root.resolve())
+
+
+class LabState:
+    def __init__(self, startup: Path | None = None) -> None:
+        self.startup = startup
+        self.sessions: dict[str, RunSession] = {}
+        self.lock = threading.Lock()
+
+    def session(self, session_id: str) -> RunSession:
+        try:
+            return self.sessions[session_id]
+        except KeyError:
+            raise LookupError(f"unknown run session {session_id}") from None
+
+    def new_session(self, session: RunSession) -> RunSession:
+        with self.lock:
+            for old in list(self.sessions.values()):     # one live run at a time: simulators share ports
+                if not old.finished:
+                    old.stop()
+            finished = [k for k, s in self.sessions.items() if s.finished]
+            for key in finished[:-4]:
+                self.sessions.pop(key, None)
+            self.sessions[session.id] = session
+        return session.start()
+
+    def stop_all(self) -> None:
+        for session in self.sessions.values():
+            session.stop()
+        for session in self.sessions.values():
+            session.join(10)
+
+
+def make_handler(state: LabState):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "EmbeddynLab/1.0"
+
+        def log_message(self, format: str, *args: Any) -> None:        # quiet by default
+            if os.environ.get("EMBEDDYN_LAB_VERBOSE"):
+                super().log_message(format, *args)
+
+        # helpers -------------------------------------------------------------
+        def _send(self, status: int, body: bytes, content_type: str, extra: dict[str, str] | None = None) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            for key, value in (extra or {}).items():
+                self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _json(self, payload: Any, status: int = 200) -> None:
+            self._send(status, json.dumps(payload, allow_nan=False, default=str).encode(), "application/json")
+
+        def _body(self) -> dict[str, Any]:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > 32 * 1024 * 1024:
+                raise ValueError("request too large")
+            data = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(data, dict):
+                raise ValueError("expected a JSON object")
+            return data
+
+        def _same_origin(self) -> bool:
+            """Reject cross-site requests: another web page must not drive the local API."""
+            origin = self.headers.get("Origin")
+            if not origin:
+                return True
+            host = self.headers.get("Host", "")
+            return urlparse(origin).netloc == host
+
+        # routing -------------------------------------------------------------
+        def do_GET(self) -> None:
+            url = urlparse(self.path)
+            query = {k: v[-1] for k, v in parse_qs(url.query).items()}
+            try:
+                if url.path == "/api/stream":
+                    return self._stream(state.session(query.get("session", "")), int(query.get("from", 0)))
+                if url.path == "/api/state":
+                    return self._json({"examples": _examples(), "parts": part_library(), "cwd": os.getcwd(),
+                                       "startup": str(state.startup) if state.startup else None,
+                                       "renode": bool(os.environ.get("RENODE_BIN"))})
+                if url.path == "/api/session":
+                    return self._json(state.session(query.get("session", "")).info())
+                if url.path == "/api/csv":
+                    session = state.session(query.get("session", ""))
+                    return self._send(200, session.csv().encode(), "text/csv",
+                                      {"Content-Disposition": f'attachment; filename="run-{session.id}.csv"'})
+                return self._static(url.path)
+            except LookupError as error:
+                self._json({"error": str(error)}, 404)
+            except Exception as error:                 # noqa: BLE001
+                self._json({"error": f"{type(error).__name__}: {error}"}, 500)
+
+        def do_POST(self) -> None:
+            if not self._same_origin():
+                return self._json({"error": "cross-origin request refused"}, 403)
+            url = urlparse(self.path)
+            try:
+                body = self._body()
+                handler = getattr(self, "_post_" + url.path.removeprefix("/api/").replace("/", "_"), None)
+                if not url.path.startswith("/api/") or handler is None:
+                    return self._json({"error": "not found"}, 404)
+                return self._json(handler(body))
+            except LookupError as error:
+                self._json({"error": str(error)}, 404)
+            except (ValueError, KeyError, TypeError, FileNotFoundError, yaml.YAMLError) as error:
+                self._json({"error": f"{type(error).__name__}: {error}"}, 400)
+            except Exception as error:                 # noqa: BLE001
+                self._json({"error": f"{type(error).__name__}: {error}"}, 500)
+
+        # API -----------------------------------------------------------------
+        def _post_open(self, body: dict[str, Any]) -> dict[str, Any]:
+            path = Path(str(body["path"])).expanduser()
+            if not path.is_absolute():
+                path = (Path(os.getcwd()) / path)
+            if path.suffix not in {".yaml", ".yml"}:
+                raise ValueError("open a .yaml project file")
+            return load_graph(path)
+
+        def _post_new(self, body: dict[str, Any]) -> dict[str, Any]:
+            root = Path(str(body.get("root") or os.getcwd())).expanduser().resolve()
+            graph = graph_from_raw({"name": body.get("name") or "untitled", "step_seconds": 0.001,
+                                    "duration_seconds": 2.0, "signals": {}}, root)
+            return graph
+
+        def _post_instantiate(self, body: dict[str, Any]) -> dict[str, Any]:
+            return instantiate_part(str(body["part"]), str(body["id"]), Path(str(body.get("root") or os.getcwd())),
+                                    dict(body.get("signals") or {}))
+
+        def _post_ports(self, body: dict[str, Any]) -> dict[str, Any]:
+            spec = dict(body["spec"])
+            return {"ports": instance_ports(spec, Path(str(body.get("root") or os.getcwd())),
+                                            dict(body.get("signals") or {}), list(body.get("couplings") or []))}
+
+        def _post_yaml(self, body: dict[str, Any]) -> dict[str, Any]:
+            return {"yaml": to_yaml(raw_from_graph(body["graph"]))}
+
+        def _post_yaml_parse(self, body: dict[str, Any]) -> dict[str, Any]:
+            value = yaml.safe_load(str(body.get("text") or "")) or {}
+            if not isinstance(value, dict):
+                raise ValueError("expected a mapping")
+            return {"value": value}
+
+        def _post_yaml_dump(self, body: dict[str, Any]) -> dict[str, Any]:
+            return {"text": to_yaml(body.get("value") or {})}
+
+        def _post_validate(self, body: dict[str, Any]) -> dict[str, Any]:
+            graph = body["graph"]
+            errors: list[str] = []
+            warnings: list[str] = []
+            try:
+                project = project_from_graph(graph)
+                from ..bindings import validate_project_bindings
+                errors += validate_project_bindings(project)["errors"]
+            except Exception as error:                 # noqa: BLE001
+                errors.append(f"{type(error).__name__}: {error}")
+            for node in graph.get("nodes") or []:
+                for port in node.get("ports") or []:
+                    if node.get("kind") == "instance" and port["direction"] == "in" and not port.get("signal") \
+                            and port.get("mappable"):
+                        warnings.append(f"{node['id']}.{port['name']} is unconnected (plant default applies)")
+                    if node.get("kind") in {"instrument", "scene"} and not port.get("signal") and port["name"] == "A":
+                        warnings.append(f"{node['id']} has no signal on channel A")
+            return {"ok": not errors, "errors": errors, "warnings": warnings}
+
+        def _post_save(self, body: dict[str, Any]) -> dict[str, Any]:
+            graph = body["graph"]
+            path = Path(str(body.get("path") or graph.get("path") or "")).expanduser()
+            if not str(path) or path.suffix not in {".yaml", ".yml"}:
+                raise ValueError("save as a .yaml file")
+            if not path.is_absolute():
+                path = Path(graph.get("root") or os.getcwd()) / path
+            path = path.resolve()
+            _rebase(graph, path.parent)
+            text = to_yaml(raw_from_graph(graph))
+            project_from_graph(graph)                     # refuse to write an invalid project
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# Saved by embeddyn Lab. Layout and instruments live in metadata.gui.\n" + text,
+                            encoding="utf-8")
+            return {"path": str(path), "graph": load_graph(path)}
+
+        def _post_run(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = RunSession(body["graph"], mock=bool(body.get("mock")), realtime=bool(body.get("realtime")),
+                                 speed=float(body.get("speed") or 1.0), duration=body.get("duration"))
+            state.new_session(session)
+            return session.info()
+
+        def _post_control(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = state.session(str(body["session"]))
+            action = body.get("action")
+            if action == "pause":
+                session.pause()
+            elif action == "resume":
+                session.resume()
+            elif action == "stop":
+                session.stop()
+            elif action == "speed":
+                session.set_speed(float(body["value"]), body.get("realtime"))
+            else:
+                raise ValueError(f"unknown action {action!r}")
+            return session.info()
+
+        def _post_uart(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = state.session(str(body["session"]))
+            text = str(body.get("text", ""))
+            if len(text) > 4096:
+                raise ValueError("text too long")
+            return session.uart_write(str(body["signal"]), text)
+
+        def _post_force(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = state.session(str(body["session"]))
+            value = body.get("value")
+            session.force(str(body["signal"]), None if value is None else float(value))
+            return {"forced": session.forced}
+
+        # streaming and files -----------------------------------------------------
+        def _stream(self, session: RunSession, cursor: int) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            last_status = None
+            event_cursor = 0
+            try:
+                while True:
+                    events, event_cursor = session.events_since(event_cursor)
+                    if events:
+                        self._event("events", {"events": events})
+                    rows, cursor_next = session.snapshot(cursor)
+                    if session.status != last_status or (rows and cursor == 0):
+                        last_status = session.status
+                        self._event("status", session.info())
+                    for start in range(0, len(rows), 2000):
+                        self._event("rows", {"from": cursor + start, "rows": rows[start:start + 2000]})
+                    cursor = cursor_next
+                    if session.finished and cursor >= len(session.rows):
+                        events, event_cursor = session.events_since(event_cursor)
+                        if events:
+                            self._event("events", {"events": events})
+                        self._event("status", session.info())
+                        self._event("end", {"rows": cursor})
+                        return
+                    time.sleep(0.05)
+            except (BrokenPipeError, ConnectionResetError):
+                return
+
+        def _event(self, name: str, payload: Any) -> None:
+            data = json.dumps(payload, allow_nan=False, default=str)
+            self.wfile.write(f"event: {name}\ndata: {data}\n\n".encode())
+            self.wfile.flush()
+
+        def _static(self, path: str) -> None:
+            relative = "index.html" if path in {"", "/"} else path.lstrip("/")
+            file = (STATIC / relative).resolve()
+            if STATIC not in file.parents or not file.is_file():
+                return self._json({"error": "not found"}, 404)
+            content_type = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
+            if file.suffix == ".js":
+                content_type = "text/javascript"
+            self._send(200, file.read_bytes(), content_type + ("; charset=utf-8" if content_type.startswith("text") else ""))
+
+    return Handler
+
+
+def serve(project: Path | None = None, host: str = "127.0.0.1", port: int = 8710) -> ThreadingHTTPServer:
+    """Create the server (not yet serving). `serve_forever()` runs it."""
+    state = LabState(project)
+    server = ThreadingHTTPServer((host, port), make_handler(state))
+    server.daemon_threads = True
+    server.lab_state = state                     # type: ignore[attr-defined]
+    return server

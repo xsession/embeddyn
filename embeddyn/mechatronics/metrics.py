@@ -16,6 +16,12 @@ metrics:
   energy:
     type: integral               # time integral (e.g. power -> energy in J)
     signal: electrical.input_power
+  trip:
+    type: threshold              # first crossing: time, delay (from the window start), crossings
+    signal: mcu.fault_led
+    threshold: 0.5
+    direction: rising            # rising (default), falling or either
+    start: 1.2                   # e.g. when a fault is injected: delay = detection time
 ```
 
 `compute_metrics` returns a flat mapping such as `speed.settling_time`,
@@ -28,7 +34,8 @@ import math
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
-METRIC_TYPES = ("step_response", "stats", "integral")
+METRIC_TYPES = ("step_response", "stats", "integral", "threshold")
+DIRECTIONS = ("rising", "falling", "either")
 
 
 @dataclass(frozen=True)
@@ -40,6 +47,8 @@ class MetricSpec:
     settling_band: float = 0.02
     start: float | None = None
     end: float | None = None
+    threshold: float = 0.5
+    direction: str = "rising"
 
 
 def parse_metric_specs(raw: Mapping[str, Any] | None) -> dict[str, MetricSpec]:
@@ -54,6 +63,9 @@ def parse_metric_specs(raw: Mapping[str, Any] | None) -> dict[str, MetricSpec]:
         target = entry.get("target")
         if kind == "step_response" and target is None:
             raise ValueError(f"metric {name}: step_response needs 'target' (signal name or number)")
+        direction = str(entry.get("direction", "rising"))
+        if direction not in DIRECTIONS:
+            raise ValueError(f"metric {name}: direction must be one of {', '.join(DIRECTIONS)}")
         band = float(entry.get("settling_band", 0.02))
         if not 0 < band < 1:
             raise ValueError(f"metric {name}: settling_band must be between 0 and 1")
@@ -63,6 +75,7 @@ def parse_metric_specs(raw: Mapping[str, Any] | None) -> dict[str, MetricSpec]:
             settling_band=band,
             start=None if entry.get("start") is None else float(entry["start"]),
             end=None if entry.get("end") is None else float(entry["end"]),
+            threshold=float(entry.get("threshold", 0.5)), direction=direction,
         )
     return specs
 
@@ -127,6 +140,21 @@ def step_response(times: Sequence[float], values: Sequence[float], target: float
     return result
 
 
+def threshold_crossings(times: Sequence[float], values: Sequence[float], threshold: float,
+                        direction: str = "rising") -> dict[str, float | None]:
+    """When `values` first crosses `threshold` (interpolated), the delay from the first sample and
+    how often it crosses; time and delay are None if it never does."""
+    crossings: list[float] = []
+    for i in range(1, len(values)):
+        a, b = values[i - 1] - threshold, values[i] - threshold
+        rising, falling = a < 0 <= b, a >= 0 > b
+        if (rising and direction != "falling") or (falling and direction != "rising"):
+            fraction = a / (a - b) if a != b else 1.0
+            crossings.append(times[i - 1] + fraction * (times[i] - times[i - 1]))
+    first = crossings[0] if crossings else None
+    return {"time": first, "delay": None if first is None else first - times[0], "crossings": float(len(crossings))}
+
+
 def signal_stats(times: Sequence[float], values: Sequence[float]) -> dict[str, float]:
     span = times[-1] - times[0] if len(times) > 1 else 0.0
     rms = math.sqrt(_trapezoid(times, [v * v for v in values]) / span) if span > 0 else abs(values[-1])
@@ -153,6 +181,8 @@ def compute_metrics(rows: Sequence[Mapping[str, Any]], specs: Mapping[str, Metri
             figures: Mapping[str, float | None] = {"integral": _trapezoid(times, values)}
         elif spec.type == "stats":
             figures = signal_stats(times, values)
+        elif spec.type == "threshold":
+            figures = threshold_crossings(times, values, spec.threshold, spec.direction)
         else:
             target = spec.target if isinstance(spec.target, float) else _column(window, str(spec.target))
             figures = step_response(times, values, target, spec.settling_band)

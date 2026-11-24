@@ -1,0 +1,15 @@
+# STM32L476 robot-arm joint (firmware/arm-joint-l476): the RC-servo platform
+# plus TIM3 (quadrature encoder), TIM2 CH2 on PA1, and SPI/I2C sensors. Needs Renode >= 1.17,
+# whose STM32_Timer models encoder mode (no internal clock counting).
+mach create "l476"
+machine LoadPlatformDescription $ORIGIN/stm32l476-servo.repl
+machine LoadPlatformDescriptionFromString "timer2: { 1 -> gpioPortA#01@01 }"
+machine LoadPlatformDescriptionFromString "timer3: Timers.STM32_Timer @ sysbus 0x40000400 { frequency: 80000000; initialLimit: 0xFFFF; -> nvic@29 }"
+machine LoadPlatformDescription $ORIGIN/stm32l476-arm-sensors.repl
+
+$bin?=$ORIGIN/../firmware/arm-joint-l476.elf
+sysbus LoadELF $bin
+logLevel 3 sysbus
+
+$quantum?="0.00001"
+emulation SetGlobalQuantum $quantum

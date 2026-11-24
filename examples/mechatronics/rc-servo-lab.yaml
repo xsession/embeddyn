@@ -1,0 +1,102 @@
+# RC servo bench for the embeddyn Lab (`embeddyn mechatronics gui examples/mechatronics/rc-servo-lab.yaml`).
+# Runs without Renode: a function generator commands a software servo controller.
+# The load is a live slider; the scope, meter, gauge and 3-D servo observe the run.
+# The firmware-in-the-loop version of the same servo is rc-servo-l476.yaml.
+name: rc-servo-lab
+step_seconds: 0.001
+duration_seconds: 4.0
+instances:
+  command:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: square, amplitude: 45.0, offset: 0.0, frequency: 0.5, phase: 0.0}
+      outputs: {value: command.value}
+  controller:
+    domain: firmware
+    model: embeddyn.mechatronics.gui.sources:ServoPulseGenerator
+    options:
+      backend: python
+      inputs: {angle_deg: command.value}
+      outputs: {pulse_width: controller.pulse_width}
+  servo:
+    domain: mechanical
+    model: embeddyn.mechatronics.plants:RCServo
+    options:
+      backend: python
+      max_step: 1.0e-4
+      parameters: {supply: 6.0, load_inertia: 2.0e-4, coulomb_friction: 0.01}
+      inputs: {pulse_width: controller.pulse_width, load_torque: load.value}
+      outputs: {angle_deg: servo.angle_deg, speed: servo.speed, current: servo.current, power: servo.power,
+                feedback_voltage: servo.feedback_voltage, signal_valid: servo.signal_valid}
+signals:
+  command.value: {domain: environment, unit: deg, initial: 0.0}
+  controller.pulse_width: {domain: firmware, unit: s, initial: 0.0015}
+  load.value: {domain: environment, unit: N*m, initial: 0.0}
+  servo.angle_deg: {domain: mechanical, unit: deg, initial: 0.0}
+  servo.speed: {domain: mechanical, unit: rad/s, initial: 0.0}
+  servo.current: {domain: mechanical, unit: A, initial: 0.0}
+  servo.power: {domain: mechanical, unit: W, initial: 0.0}
+  servo.feedback_voltage: {domain: mechanical, unit: V, initial: 1.65}
+  servo.signal_valid: {domain: mechanical, initial: 0.0}
+metrics:
+  current: {type: stats, signal: servo.current}
+  energy: {type: integral, signal: servo.power}
+metadata:
+  description: >
+    RC servo bench without firmware: a square-wave angle command, a software
+    pulse generator and the RCServo plant. Drag the load slider while it runs
+    to see the proportional servo droop.
+  gui:
+    layout:
+      command: [60, 60]
+      load: [60, 240]
+      controller: [360, 60]
+      servo: [660, 60]
+      scope: [1000, 40]
+      dmm: [1000, 230]
+      gauge: [1000, 340]
+      arm: [1000, 450]
+    nodes:
+      - id: load
+        kind: source
+        part: slider
+        label: load torque
+        icon: slider
+        settings: {minimum: 0.0, maximum: 0.4, value: 0.0, unit: N*m, step: 0.0}
+        ports: [{name: value, direction: out, unit: N*m}]
+        channels: {value: load.value}
+      - id: scope
+        kind: instrument
+        part: oscilloscope
+        label: scope
+        icon: scope
+        settings: {timebase: 2, mode: roll, layout: stack}
+        ports: [{name: A, direction: in, unit: ''}, {name: B, direction: in, unit: ''}, {name: C, direction: in, unit: ''},
+                {name: D, direction: in, unit: ''}]
+        channels: {A: command.value, B: servo.angle_deg, C: servo.current}
+      - id: dmm
+        kind: instrument
+        part: multimeter
+        label: motor current
+        icon: meter
+        settings: {mode: value, window: 0.1}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: servo.current}
+      - id: gauge
+        kind: instrument
+        part: gauge
+        label: horn angle
+        icon: gauge
+        settings: {minimum: -90.0, maximum: 90.0}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: servo.angle_deg}
+      - id: arm
+        kind: scene
+        part: scene_servo
+        label: servo
+        icon: servo
+        settings: {x: 0.0, z: 0.0, yaw: 0.0, length: 0.12, unit: auto, color: '#2f6fdf'}
+        ports: [{name: angle, direction: in, unit: ''}]
+        channels: {angle: servo.angle_deg}

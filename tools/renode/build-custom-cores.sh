@@ -7,7 +7,7 @@
 #   <workdir> gets: src/ (Renode checkout), dotnet/, nuget/, env.sh, build.log
 #   Afterwards:  . <workdir>/env.sh && <workdir>/src/renode --version
 #
-# Why each fix is needed is documented in docs/mechatronics/RENODE.md
+# Why each fix is needed is documented in docs/reference/renode.md
 # ("Building the custom-cores branch"). Upstreaming them to the fork makes
 # this script reduce to clone + ./build.sh.
 set -euo pipefail

@@ -1,0 +1,33 @@
+<!-- One robot-arm joint for embeddyn co-simulation: a 0.25 m link with a 0.2 kg
+     payload on a hinge, driven through a 20:1 gearbox by a torque actuator.
+     The motor winding is modelled outside MuJoCo (DCMotorRL), so the actuator
+     is a plain <motor>: ctrl = motor shaft torque, joint torque = gear * ctrl.
+     armature = rotor inertia reflected through the gear (2.5e-5 kg m^2 * 20^2). -->
+<mujoco model="arm-joint">
+  <option timestep="0.0005" integrator="implicitfast" gravity="0 0 -9.81"/>
+  <worldbody>
+    <light pos="0 -1 2" dir="0 1 -2"/>
+    <geom name="floor" type="plane" size="1 1 0.01" pos="0 0 -0.4"/>
+    <body name="base" pos="0 0 0">
+      <geom type="cylinder" size="0.04 0.03" euler="90 0 0" rgba="0.3 0.3 0.35 1"/>
+      <body name="link" pos="0 0 0">
+        <joint name="shoulder" type="hinge" axis="0 -1 0" damping="0.02" armature="0.01"
+               range="-100 100" limited="true"/>
+        <geom name="link_geom" type="capsule" fromto="0 0 0 0.25 0 0" size="0.015" mass="0.3" rgba="0.2 0.5 0.9 1"/>
+        <body name="tip" pos="0.25 0 0">
+          <geom name="payload" type="box" size="0.025 0.025 0.025" mass="0.2" rgba="0.9 0.6 0.1 1"/>
+          <site name="tip_site"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="shoulder_motor" joint="shoulder" gear="20"/>
+  </actuator>
+  <sensor>
+    <jointpos name="angle" joint="shoulder"/>
+    <jointvel name="speed" joint="shoulder"/>
+    <actuatorfrc name="joint_torque" actuator="shoulder_motor"/>
+    <accelerometer name="tip_acc" site="tip_site"/>
+  </sensor>
+</mujoco>

@@ -42,7 +42,8 @@ def description(version: str) -> str:
         structure = "".join(f'<Unknown index="{i}"/>' for i in outputs)
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <fmiModelDescription fmiVersion="2.0" modelName="rotational_load" guid="{TOKEN}" generationTool="embeddyn example">
-  <CoSimulation modelIdentifier="rotational_load" canHandleVariableCommunicationStepSize="true"/>
+  <CoSimulation modelIdentifier="rotational_load" canHandleVariableCommunicationStepSize="true"
+                canGetAndSetFMUstate="true" canSerializeFMUstate="true"/>
   <DefaultExperiment stepSize="1e-4"/>
   <ModelVariables>
 {chr(10).join(rows)}
@@ -50,10 +51,14 @@ def description(version: str) -> str:
   <ModelStructure><Outputs>{structure}</Outputs><InitialUnknowns>{structure}</InitialUnknowns></ModelStructure>
 </fmiModelDescription>
 """
+    # FMI 3 needs exactly one independent variable and lists calculated outputs as InitialUnknowns.
+    rows.insert(0, '    <Float64 name="time" valueReference="999" causality="independent" variability="continuous"/>')
     structure = "".join(f'<Output valueReference="{v[1]}"/>' for v in VARIABLES if v[2] == "output")
+    structure += "".join(f'<InitialUnknown valueReference="{v[1]}"/>' for v in VARIABLES if v[2] == "output")
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <fmiModelDescription fmiVersion="3.0" modelName="rotational_load" instantiationToken="{TOKEN}" generationTool="embeddyn example">
-  <CoSimulation modelIdentifier="rotational_load" canHandleVariableCommunicationStepSize="true"/>
+  <CoSimulation modelIdentifier="rotational_load" canHandleVariableCommunicationStepSize="true"
+                canGetAndSetFMUState="true" canSerializeFMUState="true"/>
   <DefaultExperiment stepSize="1e-4"/>
   <ModelVariables>
 {chr(10).join(rows)}

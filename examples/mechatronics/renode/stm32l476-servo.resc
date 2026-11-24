@@ -1,0 +1,20 @@
+# Renode script for the RC-servo co-simulation (firmware domain, STM32L476).
+# Embeddyn runs Renode with:
+#   -e '$bin=@<firmware>; include @<this file>; emulation CreateExternalControlServer "embeddyn" <port>'
+# and then advances virtual time with RunFor. Do NOT call `start` here.
+
+mach create "l476"
+machine LoadPlatformDescription $ORIGIN/stm32l476-servo.repl
+
+# Firmware: TIM2 CH1 servo pulses on PA0, ADC1 IN1 = command, IN2 = feedback.
+$bin?=$ORIGIN/../firmware/rc-servo-l476.elf
+sysbus LoadELF $bin
+
+# Unmapped register accesses (PWR, GPIO ASCR, ...) are expected.
+logLevel 3 sysbus
+
+# GPIO edge timestamps, and therefore the measured servo pulse width, are
+# quantised to the sync quantum: 2 us = 0.18 deg. Override with the simulator
+# option `variables: {quantum: "0.000001"}`.
+$quantum?="0.000002"
+emulation SetGlobalQuantum $quantum

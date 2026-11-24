@@ -4,7 +4,8 @@
  * Integrated with fixed-step RK4 (h <= 10 us) inside each doStep.
  * Built twice by build_fmu.py: as FMI 2.0 (default) and with -DFMI3 as FMI 3.0.
  * Only the functions a co-simulation master needs for real variables are
- * implemented; others are omitted to keep the example short.
+ * implemented, plus FMU state get/set/serialize (the state is the whole Model
+ * struct), so masters can checkpoint and roll back; others are omitted.
  */
 #include <math.h>
 #include <stdbool.h>
@@ -83,6 +84,30 @@ static int step(void *c, double t, double h)
     return isfinite(w) ? OK : ERROR;
 }
 
+/* FMU state = a copy of the Model struct (shared by FMI 2 and FMI 3). */
+static int state_get(void *c, void **state)
+{
+    if (*state == NULL && (*state = malloc(sizeof(Model))) == NULL) return ERROR;
+    memcpy(*state, c, sizeof(Model));
+    return OK;
+}
+static int state_set(void *c, void *state) { if (!state) return ERROR; memcpy(c, state, sizeof(Model)); return OK; }
+static int state_free(void **state) { free(*state); *state = NULL; return OK; }
+static int state_size(size_t *size) { *size = sizeof(Model); return OK; }
+static int state_serialize(void *state, unsigned char *buffer, size_t size)
+{
+    if (size < sizeof(Model)) return ERROR;
+    memcpy(buffer, state, sizeof(Model));
+    return OK;
+}
+static int state_deserialize(const unsigned char *buffer, size_t size, void **state)
+{
+    if (size != sizeof(Model)) return ERROR;
+    if (*state == NULL && (*state = malloc(sizeof(Model))) == NULL) return ERROR;
+    memcpy(*state, buffer, sizeof(Model));
+    return OK;
+}
+
 #ifndef FMI3
 /* ---- FMI 2.0 ---- */
 const char *fmi2GetTypesPlatform(void) { return "default"; }
@@ -106,6 +131,42 @@ int fmi2GetReal(void *c, const unsigned *vr, size_t n, double *v) { return get(c
 int fmi2DoStep(void *c, double t, double h, int noSetPrior) { (void)noSetPrior; return step(c, t, h); }
 int fmi2Terminate(void *c) { (void)c; return OK; }
 void fmi2FreeInstance(void *c) { free(c); }
+int fmi2GetFMUstate(void *c, void **s) { return state_get(c, s); }
+int fmi2SetFMUstate(void *c, void *s) { return state_set(c, s); }
+int fmi2FreeFMUstate(void *c, void **s) { (void)c; return state_free(s); }
+int fmi2SerializedFMUstateSize(void *c, void *s, size_t *n) { (void)c; (void)s; return state_size(n); }
+int fmi2SerializeFMUstate(void *c, void *s, unsigned char *b, size_t n) { (void)c; return state_serialize(s, b, n); }
+int fmi2DeSerializeFMUstate(void *c, const unsigned char *b, size_t n, void **s) { (void)c; return state_deserialize(b, n, s); }
+/* The rest of the FMI 2.0 API, so generic importers (FMPy) can bind every symbol.
+ * Unsupported here: they return an error. Declared without a prototype on purpose:
+ * they ignore their arguments (callers clean up the stack on every supported ABI). */
+int fmi2CancelStep() { return ERROR; }
+int fmi2CompletedIntegratorStep() { return ERROR; }
+int fmi2EnterContinuousTimeMode() { return ERROR; }
+int fmi2EnterEventMode() { return ERROR; }
+int fmi2GetBoolean() { return ERROR; }
+int fmi2GetBooleanStatus() { return ERROR; }
+int fmi2GetContinuousStates() { return ERROR; }
+int fmi2GetDerivatives() { return ERROR; }
+int fmi2GetDirectionalDerivative() { return ERROR; }
+int fmi2GetEventIndicators() { return ERROR; }
+int fmi2GetInteger() { return ERROR; }
+int fmi2GetIntegerStatus() { return ERROR; }
+int fmi2GetNominalsOfContinuousStates() { return ERROR; }
+int fmi2GetRealOutputDerivatives() { return ERROR; }
+int fmi2GetRealStatus() { return ERROR; }
+int fmi2GetStatus() { return ERROR; }
+int fmi2GetString() { return ERROR; }
+int fmi2GetStringStatus() { return ERROR; }
+int fmi2NewDiscreteStates() { return ERROR; }
+int fmi2Reset() { return ERROR; }
+int fmi2SetBoolean() { return ERROR; }
+int fmi2SetContinuousStates() { return ERROR; }
+int fmi2SetInteger() { return ERROR; }
+int fmi2SetRealInputDerivatives() { return ERROR; }
+int fmi2SetString() { return ERROR; }
+int fmi2SetTime() { return ERROR; }
+int fmi2SetDebugLogging() { return OK; }
 #else
 /* ---- FMI 3.0 ---- */
 const char *fmi3GetVersion(void) { return "3.0"; }
@@ -139,4 +200,73 @@ int fmi3DoStep(void *c, double t, double h, bool noSetPrior, bool *eventNeeded, 
 }
 int fmi3Terminate(void *c) { (void)c; return OK; }
 void fmi3FreeInstance(void *c) { free(c); }
+int fmi3GetFMUState(void *c, void **s) { return state_get(c, s); }
+int fmi3SetFMUState(void *c, void *s) { return state_set(c, s); }
+int fmi3FreeFMUState(void *c, void **s) { (void)c; return state_free(s); }
+int fmi3SerializedFMUStateSize(void *c, void *s, size_t *n) { (void)c; (void)s; return state_size(n); }
+int fmi3SerializeFMUState(void *c, void *s, unsigned char *b, size_t n) { (void)c; return state_serialize(s, b, n); }
+int fmi3DeserializeFMUState(void *c, const unsigned char *b, size_t n, void **s) { (void)c; return state_deserialize(b, n, s); }
+/* The rest of the FMI 3.0 API, so generic importers (FMPy) can bind every symbol.
+ * Unsupported here: they return an error. Declared without a prototype on purpose:
+ * they ignore their arguments (callers clean up the stack on every supported ABI). */
+int fmi3ActivateModelPartition() { return ERROR; }
+int fmi3CompletedIntegratorStep() { return ERROR; }
+int fmi3EnterConfigurationMode() { return ERROR; }
+int fmi3EnterContinuousTimeMode() { return ERROR; }
+int fmi3EnterEventMode() { return ERROR; }
+int fmi3EnterStepMode() { return ERROR; }
+int fmi3EvaluateDiscreteStates() { return ERROR; }
+int fmi3ExitConfigurationMode() { return ERROR; }
+int fmi3GetAdjointDerivative() { return ERROR; }
+int fmi3GetBinary() { return ERROR; }
+int fmi3GetBoolean() { return ERROR; }
+int fmi3GetClock() { return ERROR; }
+int fmi3GetContinuousStateDerivatives() { return ERROR; }
+int fmi3GetContinuousStates() { return ERROR; }
+int fmi3GetDirectionalDerivative() { return ERROR; }
+int fmi3GetEventIndicators() { return ERROR; }
+int fmi3GetIntervalDecimal() { return ERROR; }
+int fmi3GetIntervalFraction() { return ERROR; }
+int fmi3GetNominalsOfContinuousStates() { return ERROR; }
+int fmi3GetNumberOfContinuousStates() { return ERROR; }
+int fmi3GetNumberOfEventIndicators() { return ERROR; }
+int fmi3GetNumberOfVariableDependencies() { return ERROR; }
+int fmi3GetOutputDerivatives() { return ERROR; }
+int fmi3GetShiftDecimal() { return ERROR; }
+int fmi3GetShiftFraction() { return ERROR; }
+int fmi3GetString() { return ERROR; }
+int fmi3GetVariableDependencies() { return ERROR; }
+int fmi3Reset() { return ERROR; }
+int fmi3SetBinary() { return ERROR; }
+int fmi3SetBoolean() { return ERROR; }
+int fmi3SetClock() { return ERROR; }
+int fmi3SetContinuousStates() { return ERROR; }
+int fmi3SetIntervalDecimal() { return ERROR; }
+int fmi3SetIntervalFraction() { return ERROR; }
+int fmi3SetShiftDecimal() { return ERROR; }
+int fmi3SetShiftFraction() { return ERROR; }
+int fmi3SetString() { return ERROR; }
+int fmi3SetTime() { return ERROR; }
+int fmi3UpdateDiscreteStates() { return ERROR; }
+int fmi3GetFloat32() { return ERROR; }
+int fmi3GetInt8() { return ERROR; }
+int fmi3GetUInt8() { return ERROR; }
+int fmi3GetInt16() { return ERROR; }
+int fmi3GetUInt16() { return ERROR; }
+int fmi3GetInt32() { return ERROR; }
+int fmi3GetUInt32() { return ERROR; }
+int fmi3GetInt64() { return ERROR; }
+int fmi3GetUInt64() { return ERROR; }
+int fmi3SetFloat32() { return ERROR; }
+int fmi3SetInt8() { return ERROR; }
+int fmi3SetUInt8() { return ERROR; }
+int fmi3SetInt16() { return ERROR; }
+int fmi3SetUInt16() { return ERROR; }
+int fmi3SetInt32() { return ERROR; }
+int fmi3SetUInt32() { return ERROR; }
+int fmi3SetInt64() { return ERROR; }
+int fmi3SetUInt64() { return ERROR; }
+int fmi3SetDebugLogging() { return OK; }
+void *fmi3InstantiateModelExchange() { return NULL; }
+void *fmi3InstantiateScheduledExecution() { return NULL; }
 #endif

@@ -12,7 +12,7 @@ from embeddyn.mechatronics.metrics import compute_metrics, parse_metric_specs, s
 from embeddyn.mechatronics.model import Domain, MechatronicProject
 from embeddyn.mechatronics.orchestrator import CoSimulationOrchestrator
 from embeddyn.mechatronics.plants import GearedDrivetrain, ThermalRC
-from embeddyn.mechatronics.tuning import load_tuning_spec, nelder_mead, score, tune
+from embeddyn.mechatronics.tuning import cmaes, load_tuning_spec, nelder_mead, score, tune
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVO = ROOT / "examples/mechatronics/servo-drivetrain.yaml"
@@ -105,6 +105,89 @@ def test_tuning_improves_objective_on_mock_system(tmp_path):
     assert result["evaluations"] == 12
     assert result["best"]["objective"] < result["initial"]["objective"]
     assert result["best"]["parameters"]["controller.kp"] <= 2.0
+
+
+def test_batched_nelder_mead_takes_the_sequential_path():
+    """With a batch evaluator the counted evaluations (and the simplex path) are exactly the
+    sequential ones; the batch only adds speculative points."""
+    rosenbrock = lambda x: (1 - 2 * x[0]) ** 2 + 10 * (2 * x[1] - 4 * x[0] ** 2) ** 2
+    sequential_used, batched_used, batches = [], [], []
+
+    def batch(points):
+        batches.append(len(points))
+        return [rosenbrock(point) for point in points]
+
+    sequential = nelder_mead(rosenbrock, [0.1, 0.9], 60, 1e-6, used=sequential_used)
+    batched = nelder_mead(rosenbrock, [0.1, 0.9], 60, 1e-6, batch=batch, used=batched_used)
+    assert batched == sequential and batched_used == sequential_used and len(batched_used) == 60
+    assert batches[0] == 3 and max(batches) == 3                 # initial simplex, then r/e/k per iteration
+    assert sum(batches) > len(set(sequential_used))              # some speculative points
+
+
+def test_parallel_tuning_counts_the_same_evaluations(tmp_path):
+    spec = load_tuning_spec(_spec_file(tmp_path))
+    sequential = tune(spec)
+    spec.workers = 3
+    parallel = tune(spec)
+    counted = lambda result: [entry["parameters"] for entry in result["history"] if entry["counted"]]
+    assert parallel["workers"] == 3 and parallel["evaluations"] == sequential["evaluations"] == 12
+    assert set(map(lambda p: tuple(sorted(p.items())), counted(parallel))) == \
+        set(map(lambda p: tuple(sorted(p.items())), counted(sequential)))
+    assert parallel["runs"] == len(parallel["history"]) > len(counted(parallel))
+    assert parallel["speculative_runs"] == parallel["runs"] - len(counted(parallel))
+    assert parallel["best"]["objective"] <= sequential["best"]["objective"]
+    assert not any("error" in entry for entry in parallel["history"])
+
+
+def test_private_endpoints_only_touch_launched_renode(tmp_path):
+    from embeddyn.mechatronics.factory import use_private_endpoints
+    project = MechatronicProject.load(ROOT / "examples/mechatronics/mujoco-arm-firmware.yaml")
+    use_private_endpoints(project)
+    options = project.instances["mcu"].options
+    assert options["port"] != 21260
+    assert options["log"].endswith(f"renode-arm-joint.{__import__('os').getpid()}.log")
+    assert project.instances["arm"].options.get("port") is None
+
+
+def _batch_of(function, batches=None):
+    def batch(points):
+        if batches is not None:
+            batches.append(len(points))
+        return [function(point) for point in points]
+    return batch
+
+
+def test_cmaes_solves_a_curved_valley_inside_the_box():
+    rosenbrock = lambda x: (1 - 2 * x[0]) ** 2 + 100 * (2 * x[1] - 4 * x[0] ** 2) ** 2   # minimum at (0.5, 0.5)
+    batches, used = [], []
+    point, value = cmaes(_batch_of(rosenbrock, batches), [0.1, 0.9], 1200, sigma=0.3, seed=3, tolerance=1e-9, used=used)
+    assert point == pytest.approx([0.5, 0.5], abs=2e-3) and value < 1e-5
+    assert set(batches) == {6} and len(used) == sum(batches) <= 1200        # 4 + 3 ln 2 = 6 per generation
+    assert all(0.0 <= u <= 1.0 for candidate in used for u in candidate)   # mirrored into the box
+
+
+def test_cmaes_reaches_an_optimum_on_the_bound_and_is_reproducible():
+    slope = lambda x: x[0] + (x[1] - 0.3) ** 2
+    first = cmaes(_batch_of(slope), [0.8, 0.8], 300, seed=7)
+    again = cmaes(_batch_of(slope), [0.8, 0.8], 300, seed=7)
+    assert first == again
+    assert first[0][0] < 0.01 and first[0][1] == pytest.approx(0.3, abs=0.01)
+    other = cmaes(_batch_of(slope), [0.8, 0.8], 300, seed=8)
+    assert other[0] != first[0]
+
+
+def test_cmaes_tuning_does_not_depend_on_the_worker_count(tmp_path):
+    spec = load_tuning_spec(_spec_file(tmp_path, method="cma-es", population=4, max_evaluations=13))
+    sequential = tune(spec)
+    spec.workers = 4
+    parallel = tune(spec)
+    points = lambda result: [entry["parameters"] for entry in result["history"]]
+    assert sequential["method"] == "cmaes" and points(parallel) == points(sequential)
+    assert sequential["evaluations"] == sequential["runs"] == 13 and sequential["speculative_runs"] == 0
+    assert sequential["initial"]["parameters"] == pytest.approx({"controller.kp": 0.12, "controller.ki": 0.8})
+    assert sequential["best"]["objective"] < sequential["initial"]["objective"]
+    with pytest.raises(ValueError, match="unknown tuning method"):
+        load_tuning_spec(_spec_file(tmp_path, method="annealing"))
 
 
 def test_score_penalises_violations_and_missing(tmp_path):

@@ -153,9 +153,11 @@ class ProjectCompiler:
                     "delay_steps": c.delay_steps,
                     "interpolation": c.interpolation,
                     "extrapolation": c.extrapolation,
+                    **({"parameters": dict(c.references)} if c.references else {}),
                 }
-                for c in project.couplings
+                for c in project.resolved_couplings()
             ],
+            **({"faults": [fault.to_dict() for fault in project.faults]} if project.faults else {}),
         }
 
     @staticmethod

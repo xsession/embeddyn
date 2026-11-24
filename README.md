@@ -11,26 +11,38 @@ The tool can also be used to generate and build [Zephyr RTOS](https://zephyrproj
 
 ## Documentation
 
-The complete documentation portal is [`docs/README.md`](docs/README.md). It is organized into three main tracks:
+The documentation is an [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) site built from [`docs/`](docs/index.md):
 
-- **[User guide](docs/user/README.md)** — installation, quick start, Local Studio, CLI, projects/data, mechatronics/HIL/digital twin, RF/EMC, and troubleshooting.
-- **[Contributor guide](docs/contributing/README.md)** — development setup, architecture, code ownership, testing, extension recipes, data migrations, security, and release/dependency policy.
-- **[C4 architecture](docs/c4/README.md)** — C1 system context, C2 containers, C3 components, dynamic workflows, deployment topologies, and architectural decisions/boundaries.
+```bash
+pip install -e ".[docs]"
+mkdocs serve        # http://127.0.0.1:8000
+```
+
+| Section | Start here |
+|---|---|
+| Getting started | [installation, first simulation, core concepts](docs/getting-started/index.md) |
+| Tutorials | [eleven step-by-step lessons](docs/tutorials/index.md), from a DC motor loop to STM32 firmware with SPI/I²C sensors, tuning and tolerance analysis |
+| Theory of operation | [how the master algorithm, adapters and analysis methods work](docs/theory/index.md) |
+| How-to guides | [plants, SPI sensor models, firmware bindings, parallel runs, Renode builds](docs/guides/index.md) |
+| Reference | [project file, CLI, every adapter](docs/reference/index.md) |
+| Platform | [Studio, Zephyr builds, RF/EMC, HIL, digital twin](docs/user/README.md) |
+| Contributing | [contributor guide](docs/contributing/README.md) and [C4 architecture](docs/c4/README.md) |
+
+Every plot in the docs comes from a real run of `examples/mechatronics/` (`tools/docs/make_figures.py`), and the Lab screenshots from the running Lab (`tools/docs/capture_lab.py`).
 
 The root [`CONTRIBUTING.md`](CONTRIBUTING.md) is a short discoverable entry point for contributors.
 
 
 ## Mechatronic co-simulation
 
-The extended project can couple Renode/firmware, SPICE electrical models and Webots mechanical models in one deterministic simulation. Start with:
+embeddyn couples real firmware in Renode, circuits in ngspice, multibody mechanics in MuJoCo, Python plants and FMI 2.0/3.0 FMUs in one deterministic co-simulation, then measures, tunes (Nelder–Mead, CMA-ES), analyses tolerances (Monte Carlo, Sobol), estimates parameters from bench data, verifies models and injects faults into any signal or UART/CAN traffic (the real firmware sees them). Start with:
 
 ```bash
 embeddyn mechatronics run examples/mechatronics/dc-motor.yaml --mock
+embeddyn mechatronics gui examples/mechatronics/rc-servo-lab.yaml --open
 ```
 
-See [the architecture](docs/mechatronics/ARCHITECTURE.md) and [quick start](docs/mechatronics/QUICKSTART.md).
-
-Real firmware can run in the loop in Renode (custom-cores branch, External Control API); see [Renode firmware-in-the-loop](docs/mechatronics/RENODE.md). Switching electronics run in ngspice with state kept across steps; see [ngspice in the loop](docs/mechatronics/NGSPICE.md). Mechanical and thermal plants can be Python models, and `embeddyn mechatronics tune` optimises parameters against response metrics; see [metrics, tuning and plant models](docs/mechatronics/TUNING.md). Systems can have any number of named simulator instances, including FMI 2.0/3.0 FMUs; see [instances and FMI](docs/mechatronics/INSTANCES_AND_FMI.md). `embeddyn mechatronics verify` checks energy balance, step-size convergence, golden waveforms and scenario matrices; see [verification](docs/mechatronics/VERIFICATION.md). `embeddyn mechatronics estimate` fits physical parameters to bench measurements with confidence intervals; see [parameter estimation](docs/mechatronics/ESTIMATION.md). `embeddyn mechatronics tolerance` computes Monte Carlo yield and Sobol sensitivity over component tolerances; see [tolerance analysis](docs/mechatronics/TOLERANCE.md). The plan toward full firmware + electronics + mechanics emulation and tuning is in the [roadmap](docs/mechatronics/ROADMAP.md).
+and [Your first simulation](docs/getting-started/first-simulation.md). The plan toward full firmware + electronics + mechanics emulation and tuning is in the [roadmap](docs/project/roadmap.md).
 
 
 ## RF / EMC simulation perspective
@@ -351,4 +363,4 @@ The integration layer validates Webots/Renode signal bindings and SPICE artifact
 
 ## Digital twin and evidence workflows
 
-Phase 6 adds measurement synchronization, simulation-to-real comparison, calibration fitting, uncertainty sampling, requirements verification, and evidence-report generation. See `docs/mechatronics/PHASE6_COMPLETION.md`.
+Phase 6 adds measurement synchronization, simulation-to-real comparison, calibration fitting, uncertainty sampling, requirements verification, and evidence-report generation. See `docs/project/history/phase6-completion.md`.

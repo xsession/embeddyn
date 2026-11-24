@@ -15,6 +15,7 @@ bindings:
   #              denominator_address: 0x4001002C, denominator_offset: 1, direction: output}
 
   # Speed sensor (tachogenerator) into ADC1 channel 0 as raw 12-bit counts:
-  # counts = rad/s * scale. Needs the STM32_ADC IADC patch (see docs/mechatronics/RENODE.md).
+  # counts = rad/s * scale. Pre-1.17 fork: needs the STM32_ADC IADC patch and takes counts.
+  # Renode >= 1.17 ADCs take microvolts: counts_vref converts (counts / 4095 * 3.3 V).
   - signal: firmware.measured_velocity
-    endpoint: {object: sysbus.adc1, property: adc, channel: 0, scale: 100.0, max: 4095, direction: input, unit: rad/s}
+    endpoint: {object: sysbus.adc1, property: adc, channel: 0, scale: 100.0, max: 4095, counts_vref: 3.3, direction: input, unit: rad/s}

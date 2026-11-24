@@ -1,0 +1,111 @@
+name: rc-servo-stm32l476-can
+step_seconds: 0.001
+duration_seconds: 2.5
+metadata:
+  description: >
+    Hobby RC servo driven by real STM32L476 firmware running in Renode. The
+    firmware reads a command potentiometer and the servo's feedback
+    potentiometer on ADC1, slew-limits the set-point, trims out load droop
+    with an outer integrator and emits 50 Hz servo pulses on TIM2 CH1. The
+    servo (pulse decoder, amplifier, motor, gearbox, horn) is a Python model;
+    an operator profile (command voltage, load torque) is replayed from CSV.
+    Build the firmware first: make -C examples/mechatronics/firmware/rc-servo-l476
+    This variant adds CAN: the firmware's bxCAN status frames reach embeddyn
+    through Renode's External Control CAN endpoint (Renode >= 1.17).
+  gui:
+    nodes:
+      - id: console
+        kind: instrument
+        part: serial_monitor
+        label: USART2 console
+        icon: terminal
+        settings: {line_end: CRLF}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: mcu.console}
+      - id: scope
+        kind: instrument
+        part: oscilloscope
+        label: scope
+        icon: scope
+        settings: {timebase: all, mode: roll, layout: stack}
+        ports: [{name: A, direction: in, unit: ''}, {name: B, direction: in, unit: ''}, {name: C, direction: in, unit: ''},
+                {name: D, direction: in, unit: ''}]
+        channels: {A: operator.command_voltage, B: mcu.setpoint_deg, C: servo.angle_deg, D: mcu.trim_deg}
+      - id: fault
+        kind: instrument
+        part: led
+        label: fault LED (PA5)
+        icon: led
+        settings: {threshold: 0.5, color: '#ff3b30'}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: mcu.fault_led}
+
+instances:
+  mcu:
+    domain: firmware
+    options:
+      backend: renode
+      launch: true
+      script: renode/stm32l476-servo-can.resc         # adds bxCAN + CAN hub (Renode >= 1.17)
+      api: message
+      firmware: firmware/rc-servo-l476.elf
+      machine: l476
+      port: 21240
+      bindings: bindings/renode-rc-servo.yaml
+      variables: {quantum: "0.00001"}       # 10 us edge resolution = 0.9 deg
+      log: ../../.embeddyn/renode-rc-servo-can.log
+      uarts:                                # USART2 console: telemetry lines every 100 ms, 'R' clears a fault
+        - {name: console, peripheral: sysbus.usart2, signal: mcu.console}
+      can:                                  # status frame 0x101 every 100 ms; 0x200 [1] clears a fault
+        bus: extcan
+        signal: mcu.can
+        fields:
+          - {signal: mcu.can_setpoint_deg, id: 0x101, offset: 0, format: "<h", scale: 0.01}
+          - {signal: mcu.can_feedback_deg, id: 0x101, offset: 2, format: "<h", scale: 0.01}
+          - {signal: mcu.can_pulse_us, id: 0x101, offset: 4, format: "<H"}
+          - {signal: mcu.can_fault, id: 0x101, offset: 7, format: "<B"}
+  servo:
+    domain: mechanical
+    model: "embeddyn.mechatronics.plants:RCServo"
+    options:
+      backend: python
+      max_step: 1.0e-4
+      parameters: {supply: 6.0, load_inertia: 2.0e-4, coulomb_friction: 0.01}
+      inputs: {pulse_width: mcu.servo_pulse, load_torque: arm.load_torque}
+      outputs: {angle_deg: servo.angle_deg, speed: servo.speed, target_angle: servo.decoded_angle,
+                current: servo.current, power: servo.power, feedback_voltage: servo.feedback_voltage,
+                signal_valid: servo.signal_valid}
+  operator:
+    domain: environment
+    model: rc-servo/command-profile.csv
+    options:
+      backend: replay
+      columns: {command_voltage: operator.command_voltage, load_torque: arm.load_torque}
+
+signals:
+  operator.command_voltage: {domain: environment, unit: V, initial: 1.65}
+  arm.load_torque: {domain: environment, unit: N*m, initial: 0.0}
+  mcu.servo_pulse: {domain: firmware, unit: s, initial: 0.0}
+  mcu.fault_led: {domain: firmware, initial: 0.0}
+  mcu.setpoint_deg: {domain: firmware, unit: deg, initial: 0.0}
+  mcu.trim_deg: {domain: firmware, unit: deg, initial: 0.0}
+  mcu.console: {domain: firmware, kind: event}
+  mcu.can: {domain: firmware, kind: event}
+  mcu.can_setpoint_deg: {domain: firmware, unit: deg, initial: 0.0}
+  mcu.can_feedback_deg: {domain: firmware, unit: deg, initial: 0.0}
+  mcu.can_pulse_us: {domain: firmware, unit: us, initial: 0.0}
+  mcu.can_fault: {domain: firmware, initial: 0.0}
+  servo.angle_deg: {domain: mechanical, unit: deg, initial: 0.0}
+  servo.speed: {domain: mechanical, unit: rad/s, initial: 0.0}
+  servo.decoded_angle: {domain: mechanical, unit: rad, initial: 0.0}
+  servo.current: {domain: mechanical, unit: A, initial: 0.0}
+  servo.power: {domain: mechanical, unit: W, initial: 0.0}
+  servo.feedback_voltage: {domain: mechanical, unit: V, initial: 1.65}
+  servo.signal_valid: {domain: mechanical, initial: 0.0}
+
+metrics:
+  move_up:   {type: step_response, signal: servo.angle_deg, target: 45.0, start: 0.1, end: 0.6, settling_band: 0.05}
+  move_down: {type: step_response, signal: servo.angle_deg, target: -45.0, start: 0.6, end: 1.1, settling_band: 0.05}
+  loaded_hold: {type: stats, signal: servo.angle_deg, start: 2.3, end: 2.5}
+  current: {type: stats, signal: servo.current}
+  energy: {type: integral, signal: servo.power}
