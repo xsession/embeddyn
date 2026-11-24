@@ -6,6 +6,13 @@
 name: mujoco-arm-firmware
 step_seconds: 0.001
 duration_seconds: 4.0
+# Firmware PID gains. The bindings write them into `arm_cal` in MCU RAM every
+# step, so a tuning job changes them without rebuilding the firmware. Values
+# from tuning/arm-firmware.yaml; the firmware's built-in defaults are 6 / 3 / 0.15.
+parameters:
+  firmware.kp: 26.7         # duty per rad
+  firmware.ki: 3.33         # duty per rad*s
+  firmware.kd: 0.53         # duty per rad/s
 instances:
   mcu:
     domain: firmware

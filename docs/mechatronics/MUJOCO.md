@@ -84,8 +84,10 @@ closes the same joint through real STM32L476 firmware
 | Command | ADC1 IN1 (PC0), 0–3.3 V = ±1.5 rad |
 | Control | 1 kHz PID with anti-windup, run from TIM2's update interrupt. Gains in `arm_cal` at 0x20000000 can be tuned over the bus. |
 
-Result: 0 → 1.2 rad settles in 0.68 s with 0.35 % overshoot and a 3 mrad
-error. The firmware's encoder angle stays within 2 mrad of MuJoCo, and the
+Result with the firmware's built-in gains: 0 → 1.2 rad settles in 0.68 s
+with 0.35 % overshoot and a 3 mrad error. With the tuned gains the project
+now uses (`firmware.kp/ki/kd`, see [TUNING.md](TUNING.md#firmware-in-the-loop-the-arm-joint)),
+it settles in 0.63 s, the drive's limit, with 0.2 mrad error. The firmware's encoder angle stays within 2 mrad of MuJoCo, and the
 duty measured on the pins equals the firmware's duty one step later. 4 s of
 simulation take about 30 s (`tests/mechatronics/test_arm_firmware.py`).
 

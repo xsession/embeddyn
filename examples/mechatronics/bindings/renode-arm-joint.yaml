@@ -23,3 +23,12 @@ bindings:
     endpoint: {object: sysbus, property: sysbus, address: 0x2000002C, float32: true, direction: output, unit: rad}
   - signal: mcu.duty
     endpoint: {object: sysbus, property: sysbus, address: 0x20000034, float32: true, direction: output}
+  # PID gains (struct arm_cal at 0x20000000) from the project parameters
+  # firmware.kp/ki/kd. Written every step: the reset handler copies the flash
+  # defaults over RAM, so the first write the firmware keeps comes at 1 ms.
+  - signal: firmware.kp
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000004, float32: true, direction: input}
+  - signal: firmware.ki
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000008, float32: true, direction: input}
+  - signal: firmware.kd
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000000C, float32: true, direction: input}

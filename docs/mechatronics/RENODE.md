@@ -206,7 +206,12 @@ renode --disable-gui --console --plain -e '$bin=@<firmware>; include @<script>; 
 ```
 
 then connects, retrying until `startup_timeout`, and terminates Renode at the
-end of the run. To debug the firmware, start Renode yourself (with a GDB
+end of the run. Renode runs in its own process group, and the adapter stops
+the whole group and waits until it is gone. The `renode` launcher script
+starts .NET as a child process, so stopping only the script used to leave
+Renode listening on the port. The next run (a tuning evaluation, say) then
+connected to the dying instance and failed with "Can't start emulation while
+disposing". To debug the firmware, start Renode yourself (with a GDB
 server if you like), run the same two Monitor commands, and set `launch: false`.
 
 Check a project before running it:

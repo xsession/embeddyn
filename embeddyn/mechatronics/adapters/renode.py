@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import socket
 import struct
 import subprocess
@@ -108,6 +109,43 @@ STARTUP_ERROR_MARKERS = ("There was an error executing command", "Could not find
 
 def _int(value: Any) -> int:
     return int(value, 0) if isinstance(value, str) else int(value)
+
+
+def _stop_process_tree(process: subprocess.Popen, timeout: float = 10.0) -> None:
+    """Terminate a launched Renode and everything it started, and wait until all of it is gone,
+    so the next run can bind the same External Control port."""
+    if os.name != "posix":
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        return
+    group = process.pid                       # start_new_session: the group id is the leader's pid
+
+    def signal_group(number: int) -> bool:
+        try:
+            os.killpg(group, number)
+            return True
+        except ProcessLookupError:
+            return False                      # the whole group has exited
+        except PermissionError:
+            return True                       # a member is still there (zombie or other owner)
+
+    signal_group(signal.SIGTERM)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        process.poll()                        # reap the leader so it does not linger as a zombie
+        if not signal_group(0):
+            return
+        time.sleep(0.05)
+    signal_group(signal.SIGKILL)
+    process.wait(timeout=5)
+    deadline = time.monotonic() + 5.0
+    while signal_group(0) and time.monotonic() < deadline:
+        time.sleep(0.05)
 
 
 def _float32_bits(value: float) -> int:
@@ -423,13 +461,7 @@ class RenodeAdapter(SimulatorAdapter):
             self.client.close()
             self.client = None
         if self.process is not None:
-            if self.process.poll() is None:
-                self.process.terminate()
-                try:
-                    self.process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self.process.kill()
-                    self.process.wait(timeout=5)
+            _stop_process_tree(self.process)
             self.process = None
         if self._log_handle is not None:
             self._log_handle.close()
@@ -462,8 +494,10 @@ class RenodeAdapter(SimulatorAdapter):
         Path(self.log_path).parent.mkdir(parents=True, exist_ok=True)
         self._log_handle = open(self.log_path, "wb")
         # stdin stays open: with --console Renode would quit on EOF.
+        # Own process group: the `renode` launcher script runs dotnet as a child (no exec), so
+        # stopping only the script would leave Renode alive and still listening on the port.
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=self._log_handle,
-                                        stderr=subprocess.STDOUT)
+                                        stderr=subprocess.STDOUT, start_new_session=os.name == "posix")
 
     def _startup_error(self) -> str | None:
         """Return the first Monitor error Renode logged while running the script."""

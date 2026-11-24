@@ -138,6 +138,8 @@ Next:
 - [x] Firmware parameter injection at run time (`float32` sysbus binding into
   the firmware's `motor_cal` struct), so tuning doesn't need a rebuild.
   Optimiser jobs can now vary `kp`/`ki` in the real firmware.
+- [x] Firmware-in-the-loop tuning of the arm joint (`tuning/arm-firmware.yaml`):
+  30 Renode + MuJoCo runs, settling 0.68 → 0.63 s (the drive's limit).
 
 ## Phase R5: usability
 

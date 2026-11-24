@@ -58,9 +58,11 @@ max_evaluations: 30
   parameter, logarithmic with `scale: log`). It is deterministic.
 * Every evaluation is a full co-simulation with whatever backends the project
   uses. To tune the **real firmware**, bind the parameter name to its RAM
-  location in the Renode bindings (a `float32` `sysbus` input, as the
-  set-point test in `test_renode_real.py` does); `integration-validate`
-  accepts bindings to parameter names.
+  location in the Renode bindings (a `float32` `sysbus` input, as
+  `bindings/renode-arm-joint.yaml` does for `firmware.kp/ki/kd`);
+  `integration-validate` accepts bindings to parameter names. The adapter
+  writes inputs every step, so the value survives the reset handler copying
+  the flash defaults over RAM (it takes effect from the first step on).
 * A failing candidate (diverging model, simulator error) is recorded with its
   error and scored as infinite; the search continues.
 * `result.json` holds every evaluation: parameters, objective, violations,
@@ -72,6 +74,33 @@ Results on this machine:
 |------|-------|-----------|------|
 | `tuning/pi-mock.yaml` (dc-motor, 1 s) | kp 0.12, ki 0.8: violates overshoot and settling | kp 2.0 (bound), ki 0.74: feasible | 40 runs, 10 s |
 | `tuning/servo-pi.yaml` (geared servo, 1 s) | kp 0.5, ki 4.0: overshoot 34 % | kp 0.56, ki 1.45: feasible | 30 runs, 50 s |
+| `tuning/arm-firmware.yaml` (STM32L476 firmware in Renode + MuJoCo arm, 3 s) | kp 6, ki 3, kd 0.15: settling 0.68 s violates 0.65 s | kp 26.7, ki 3.33, kd 0.53: feasible | 30 runs, 12 min |
+
+### Firmware in the loop: the arm joint
+
+`tuning/arm-firmware.yaml` tunes the PID gains of the real arm-joint firmware.
+Each evaluation boots the firmware in Renode and runs it against the MuJoCo
+arm, with the gains written into `arm_cal` in RAM.
+
+| 0 → 1.2 rad step | Built-in gains (6 / 3 / 0.15) | Tuned (26.7 / 3.33 / 0.53) |
+|---|---|---|
+| Settling time (5 %) | 0.679 s | 0.630 s |
+| Overshoot | 0.35 % | 0.013 % |
+| Steady-state error | 3.3 mrad | 0.2 mrad |
+| ITAE | 0.0971 | 0.0908 |
+| Energy over 3 s | 443 J | 468 J |
+
+What the search showed:
+
+* **0.63 s is the drive's limit, not the controller's.** The duty saturates
+  for most of the step, so every gain set that keeps it saturated until the
+  end of the swing settles in 0.63 s. A 0.6 s constraint can't be met with
+  this motor and gear; the spec asks for 0.65 s.
+* Past kp ≈ 15 the objective is flat to 0.5 %. Higher gains mostly buy
+  precision at standstill (steady-state error) and cost energy.
+* Peak current is 11.5 A for any useful gains (duty saturation, stall
+  12 A), so it isn't a useful constraint here.
+* The project now uses the tuned gains. The firmware's built-in defaults are unchanged.
 
 The servo case first came out infeasible: the mock controller's integrator
 wound up during saturation, so every gain pair that settled fast overshot.
