@@ -14,9 +14,13 @@ constraints:                    # violations add a penalty (missing value = viol
   - {metric: speed.settling_time, max: 0.6}
 max_evaluations: 40
 workers: 4                      # optional: parallel evaluations (processes)
+method: nelder-mead             # or cmaes (population-based; keeps every worker busy)
+population: 8                   # cmaes only: candidates per generation (default 4 + 3 ln n)
+sigma: 0.25                     # cmaes only: initial step in the 0..1 space
+seed: 1                         # cmaes only
 ```
 
-The optimiser is a bounded Nelder-Mead in a normalised space (0..1 per
+The default optimiser is a bounded Nelder-Mead in a normalised space (0..1 per
 parameter, logarithmic when `scale: log`). It is deterministic: the same file
 gives the same evaluation sequence. Every evaluation is a full co-simulation,
 so firmware gains can be tuned in real Renode firmware through bindings to the
@@ -97,6 +101,10 @@ class TuningSpec:
     max_evaluations: int = 40
     tolerance: float = 1e-4
     workers: int = 1
+    method: str = "nelder-mead"
+    population: int | None = None
+    sigma: float = 0.25
+    seed: int = 1
 
 
 def load_tuning_spec(path: Path) -> TuningSpec:
@@ -129,7 +137,18 @@ def load_tuning_spec(path: Path) -> TuningSpec:
     return TuningSpec(project, parameters, objective, constraints, bool(raw.get("mock", False)),
                       None if raw.get("duration") is None else float(raw["duration"]),
                       int(raw.get("max_evaluations", 40)), float(raw.get("tolerance", 1e-4)),
-                      max(1, int(raw.get("workers", 1))))
+                      max(1, int(raw.get("workers", 1))), _method(raw.get("method", "nelder-mead")),
+                      None if raw.get("population") is None else int(raw["population"]),
+                      float(raw.get("sigma", 0.25)), int(raw.get("seed", 1)))
+
+
+def _method(value: Any) -> str:
+    method = str(value).lower().replace("_", "-")
+    aliases = {"nelder-mead": "nelder-mead", "neldermead": "nelder-mead", "nm": "nelder-mead",
+               "cmaes": "cmaes", "cma-es": "cmaes", "cma": "cmaes"}
+    if method not in aliases:
+        raise ValueError(f"unknown tuning method {value!r} (nelder-mead or cmaes)")
+    return aliases[method]
 
 
 def simulate(spec: TuningSpec, values: Mapping[str, float], private: bool = False) -> dict[str, float | None]:
@@ -252,6 +271,76 @@ def nelder_mead(function: Callable[[list[float]], float], start: Sequence[float]
     return simplex[best], values[best]
 
 
+def cmaes(batch: Callable[[list[list[float]]], list[float]], start: Sequence[float], max_evaluations: int,
+          sigma: float = 0.25, population: int | None = None, seed: int = 1, tolerance: float = 1e-4,
+          used: list[tuple[float, ...]] | None = None) -> tuple[list[float], float]:
+    """Minimise over the unit box with CMA-ES (Hansen's (mu/mu_w, lambda) with rank-one and rank-mu
+    updates and cumulative step-size adaptation).
+
+    Every generation's `population` candidates go to `batch` together, so a
+    process pool stays busy. Candidates outside [0, 1] are mirrored back
+    inside, and the search uses the mirrored point. The generator is seeded,
+    so a run is reproducible and independent of the number of workers. Stops
+    after the last whole generation within `max_evaluations`, or when the
+    largest step falls below `tolerance`.
+    """
+    import numpy as np
+    n = len(start)
+    lam = int(population or 4 + math.floor(3 * math.log(n)))
+    if lam < 2:
+        raise ValueError("cmaes needs a population of at least 2")
+    mu = lam // 2
+    weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+    weights /= weights.sum()
+    mueff = 1.0 / float(np.sum(weights ** 2))
+    cc = (4 + mueff / n) / (n + 4 + 2 * mueff / n)
+    cs = (mueff + 2) / (n + mueff + 5)
+    c1 = 2 / ((n + 1.3) ** 2 + mueff)
+    cmu = min(1 - c1, 2 * (mueff - 2 + 1 / mueff) / ((n + 2) ** 2 + mueff))
+    damps = 1 + 2 * max(0.0, math.sqrt((mueff - 1) / (n + 1)) - 1) + cs
+    chin = math.sqrt(n) * (1 - 1 / (4 * n) + 1 / (21 * n * n))
+    rng = np.random.default_rng(seed)
+    mean = np.clip(np.asarray(start, dtype=float), 0.0, 1.0)
+    pc, ps = np.zeros(n), np.zeros(n)
+    B, D, C = np.eye(n), np.ones(n), np.eye(n)
+    best_point, best_value = list(mean), math.inf
+    evaluations, generation = 0, 0
+
+    def mirror(x):
+        x = np.mod(x, 2.0)                       # reflect at 0 and 1 (period 2)
+        return np.where(x > 1.0, 2.0 - x, x)
+
+    while evaluations + lam <= max_evaluations:
+        z = rng.standard_normal((lam, n))
+        y = z @ np.diag(D) @ B.T                 # ~ N(0, C)
+        x = mirror(mean + sigma * y)
+        y = (x - mean) / sigma                   # the step actually taken, after mirroring
+        values = batch([list(map(float, point)) for point in x])
+        evaluations += lam
+        generation += 1
+        if used is not None:
+            used.extend(tuple(map(float, point)) for point in x)
+        order = np.argsort(np.asarray(values, dtype=float), kind="stable")
+        if values[order[0]] < best_value:
+            best_value, best_point = float(values[order[0]]), list(map(float, x[order[0]]))
+        y_sel = y[order[:mu]]
+        y_w = weights @ y_sel
+        mean = mean + sigma * y_w
+        inv_sqrt_c = B @ np.diag(1 / D) @ B.T
+        ps = (1 - cs) * ps + math.sqrt(cs * (2 - cs) * mueff) * (inv_sqrt_c @ y_w)
+        hsig = float(np.linalg.norm(ps) / math.sqrt(1 - (1 - cs) ** (2 * generation)) / chin < 1.4 + 2 / (n + 1))
+        pc = (1 - cc) * pc + hsig * math.sqrt(cc * (2 - cc) * mueff) * y_w
+        rank_mu = (y_sel.T * weights) @ y_sel
+        C = ((1 - c1 - cmu) * C + c1 * (np.outer(pc, pc) + (1 - hsig) * cc * (2 - cc) * C) + cmu * rank_mu)
+        sigma *= math.exp((cs / damps) * (np.linalg.norm(ps) / chin - 1))
+        C = (C + C.T) / 2
+        eigenvalues, B = np.linalg.eigh(C)
+        D = np.sqrt(np.maximum(eigenvalues, 1e-20))
+        if sigma * float(D.max()) < tolerance:
+            break
+    return best_point, best_value
+
+
 def _evaluate(task: tuple[TuningSpec, dict[str, float], bool]) -> dict[str, Any]:
     """One evaluation: metrics, objective and violations, or the error. Runs in worker processes."""
     spec, values, private = task
@@ -301,7 +390,14 @@ def tune(spec: TuningSpec, progress: Callable[[dict[str, Any]], None] | None = N
     used: list[tuple[float, ...]] = []
     start = [p.to_unit(p.initial) for p in spec.parameters]
     try:
-        nelder_mead(objective, start, spec.max_evaluations, spec.tolerance, batch=batch, used=used)
+        if spec.method == "cmaes":
+            objective(start)                     # the baseline the result reports as `initial`
+            used.append(tuple(min(max(u, 0.0), 1.0) for u in start))
+            sequential = lambda points: [objective(point) for point in points]
+            cmaes(batch or sequential, start, spec.max_evaluations - 1, spec.sigma, spec.population, spec.seed,
+                  spec.tolerance, used=used)
+        else:
+            nelder_mead(objective, start, spec.max_evaluations, spec.tolerance, batch=batch, used=used)
     finally:
         if pool is not None:
             pool.shutdown(cancel_futures=True)
@@ -314,6 +410,7 @@ def tune(spec: TuningSpec, progress: Callable[[dict[str, Any]], None] | None = N
     best = min(finite, key=lambda record: record["objective"])
     return {
         "project": str(spec.project),
+        "method": spec.method,
         "workers": spec.workers,
         "evaluations": len(used),
         "runs": len(history),

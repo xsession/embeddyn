@@ -65,6 +65,19 @@ max_evaluations: 30
   the flash defaults over RAM (it takes effect from the first step on).
 * A failing candidate (diverging model, simulator error) is recorded with its
   error and scored as infinite; the search continues.
+* **Methods** (`method:` or `--method`):
+  * `nelder-mead` (default): a deterministic simplex search. It suits few
+    parameters and runs that are mostly sequential.
+  * `cmaes`: CMA-ES (Hansen's (μ/μ_w, λ) with rank-one and rank-μ updates and
+    step-size adaptation), written with numpy, no extra dependency.
+    * Each generation's `population` candidates (default 4 + 3 ln n) run as
+      one batch, so with `workers` every worker stays busy. Pick a population
+      that is a multiple of `workers`.
+    * `sigma` is the initial step in the 0..1 space (default 0.25), and
+      `seed` makes runs reproducible.
+    * Results don't depend on the number of workers (tested).
+    * Candidates outside the box are mirrored back in.
+    * The start point is evaluated first as the reported `initial`.
 * **Parallel evaluations** (`workers: 4` or `--workers 4`). Nelder–Mead is
   sequential, so the pool evaluates each iteration's reflection, expansion
   and contraction together, and a shrink's points together. Then it takes
@@ -129,6 +142,24 @@ The speed-up is about 1.7×, not 4×. Nelder–Mead has at most three candidates
 per iteration (reflection, expansion, contraction), so one worker always
 idles. A population method (CMA-ES) would keep every worker busy. The
 different best gains confirm how flat the optimum is past kp ≈ 15.
+
+**CMA-ES against Nelder–Mead** on the same problem, 4 workers each
+(`tuning/arm-firmware-cmaes.yaml`: population 8, σ 0.25, seed 1):
+
+| | Nelder–Mead | CMA-ES |
+|---|---|---|
+| Runs (counted / total) | 30 / 52 | 49 / 49 |
+| Within 0.1 % of the final best after run | 36 | 12 |
+| Worker utilisation (sum of run time ÷ wall time) | 3.0 of 4 | 3.85 of 4 |
+| Best objective | 13.7639 (kp 33.3, ki 2.0, kd 0.46) | 13.7675 (kp 26.1, ki 2.6, kd 0.33) |
+| Wall time | 6.8 min | 9.3 min |
+
+Read the wall times with care. Other load on the host (load average 11–14)
+stretched some CMA-ES runs from about 30 s to 76–147 s. Without that the six
+generations take about 6.5 min. CMA-ES finds the optimum region with a third
+of the runs and keeps all four workers busy. Nelder–Mead ends a little lower
+on this flat, smooth problem. Use CMA-ES when there are more parameters, a
+noisy or multi-modal objective, or many workers.
 
 The servo case first came out infeasible: the mock controller's integrator
 wound up during saturation, so every gain pair that settled fast overshot.

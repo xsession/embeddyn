@@ -132,7 +132,8 @@ Next:
   co-simulations with weighted objectives and constraints.
 - [x] Parallel tuning evaluations (`workers`): speculative Nelder–Mead that
   takes the sequential path, private Renode ports and logs per run.
-- [ ] Optimiser jobs on the distributed-worker system, CMA-ES / Bayesian methods.
+- [x] CMA-ES (`method: cmaes`): population batches keep every worker busy.
+- [ ] Optimiser jobs on the distributed-worker system; Bayesian optimisation.
 - [x] Physical parameter estimation from bench traces (`mechatronics estimate`):
   Levenberg–Marquardt over full co-simulations, replayed inputs, 95 %
   confidence intervals and parameter correlations.

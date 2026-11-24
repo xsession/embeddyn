@@ -164,14 +164,18 @@ def tune_command(
     output: Path = typer.Option(Path(".embeddyn/tuning/result.json"), "--output", "-o"),
     max_evaluations: Optional[int] = typer.Option(None, "--max-evaluations"),
     workers: Optional[int] = typer.Option(None, "--workers", help="Parallel evaluations (overrides the spec)."),
+    method: Optional[str] = typer.Option(None, "--method", help="nelder-mead or cmaes (overrides the spec)."),
 ) -> None:
-    """Tune project parameters by repeated co-simulation (bounded Nelder-Mead)."""
+    """Tune project parameters by repeated co-simulation (bounded Nelder-Mead or CMA-ES)."""
     from .tuning import load_tuning_spec, tune, write_result
     spec = load_tuning_spec(spec_file)
     if max_evaluations is not None:
         spec.max_evaluations = max_evaluations
     if workers is not None:
         spec.workers = max(1, workers)
+    if method is not None:
+        from .tuning import _method
+        spec.method = _method(method)
 
     def progress(record):
         values = ", ".join(f"{name}={value:.5g}" for name, value in record["parameters"].items())

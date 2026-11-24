@@ -12,7 +12,7 @@ from embeddyn.mechatronics.metrics import compute_metrics, parse_metric_specs, s
 from embeddyn.mechatronics.model import Domain, MechatronicProject
 from embeddyn.mechatronics.orchestrator import CoSimulationOrchestrator
 from embeddyn.mechatronics.plants import GearedDrivetrain, ThermalRC
-from embeddyn.mechatronics.tuning import load_tuning_spec, nelder_mead, score, tune
+from embeddyn.mechatronics.tuning import cmaes, load_tuning_spec, nelder_mead, score, tune
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVO = ROOT / "examples/mechatronics/servo-drivetrain.yaml"
@@ -147,6 +147,47 @@ def test_private_endpoints_only_touch_launched_renode(tmp_path):
     assert options["port"] != 21260
     assert options["log"].endswith(f"renode-arm-joint.{__import__('os').getpid()}.log")
     assert project.instances["arm"].options.get("port") is None
+
+
+def _batch_of(function, batches=None):
+    def batch(points):
+        if batches is not None:
+            batches.append(len(points))
+        return [function(point) for point in points]
+    return batch
+
+
+def test_cmaes_solves_a_curved_valley_inside_the_box():
+    rosenbrock = lambda x: (1 - 2 * x[0]) ** 2 + 100 * (2 * x[1] - 4 * x[0] ** 2) ** 2   # minimum at (0.5, 0.5)
+    batches, used = [], []
+    point, value = cmaes(_batch_of(rosenbrock, batches), [0.1, 0.9], 1200, sigma=0.3, seed=3, tolerance=1e-9, used=used)
+    assert point == pytest.approx([0.5, 0.5], abs=2e-3) and value < 1e-5
+    assert set(batches) == {6} and len(used) == sum(batches) <= 1200        # 4 + 3 ln 2 = 6 per generation
+    assert all(0.0 <= u <= 1.0 for candidate in used for u in candidate)   # mirrored into the box
+
+
+def test_cmaes_reaches_an_optimum_on_the_bound_and_is_reproducible():
+    slope = lambda x: x[0] + (x[1] - 0.3) ** 2
+    first = cmaes(_batch_of(slope), [0.8, 0.8], 300, seed=7)
+    again = cmaes(_batch_of(slope), [0.8, 0.8], 300, seed=7)
+    assert first == again
+    assert first[0][0] < 0.01 and first[0][1] == pytest.approx(0.3, abs=0.01)
+    other = cmaes(_batch_of(slope), [0.8, 0.8], 300, seed=8)
+    assert other[0] != first[0]
+
+
+def test_cmaes_tuning_does_not_depend_on_the_worker_count(tmp_path):
+    spec = load_tuning_spec(_spec_file(tmp_path, method="cma-es", population=4, max_evaluations=13))
+    sequential = tune(spec)
+    spec.workers = 4
+    parallel = tune(spec)
+    points = lambda result: [entry["parameters"] for entry in result["history"]]
+    assert sequential["method"] == "cmaes" and points(parallel) == points(sequential)
+    assert sequential["evaluations"] == sequential["runs"] == 13 and sequential["speculative_runs"] == 0
+    assert sequential["initial"]["parameters"] == pytest.approx({"controller.kp": 0.12, "controller.ki": 0.8})
+    assert sequential["best"]["objective"] < sequential["initial"]["objective"]
+    with pytest.raises(ValueError, match="unknown tuning method"):
+        load_tuning_spec(_spec_file(tmp_path, method="annealing"))
 
 
 def test_score_penalises_violations_and_missing(tmp_path):
