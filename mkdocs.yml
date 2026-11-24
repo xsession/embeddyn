@@ -121,6 +121,7 @@ nav:
       - Bind firmware variables: guides/firmware-bindings.md
       - Run many simulations in parallel: guides/parallel-runs.md
       - Build Renode with custom cores: guides/build-renode.md
+      - Emulate a real product end to end: guides/emulate-a-product.md
       - Export a KiCad schematic to SPICE: guides/kicad.md
       - Rebuild these docs and figures: guides/docs.md
   - Reference:
@@ -178,6 +179,7 @@ nav:
       - project/index.md
       - Roadmap: project/roadmap.md
       - Renode 1.17 merge record: project/renode-1-17-merge.md
+      - "Design: body contour on dsPIC30F5011": project/body-contour-dspic.md
       - Architecture and parameter storage spec: project/architecture-and-parameter-storage.md
       - Feature set: EMBEDDYN_FEATURES.md
       - Identity: EMBEDDYN_BRANDING.md
