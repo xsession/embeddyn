@@ -107,6 +107,48 @@ def test_tuning_improves_objective_on_mock_system(tmp_path):
     assert result["best"]["parameters"]["controller.kp"] <= 2.0
 
 
+def test_batched_nelder_mead_takes_the_sequential_path():
+    """With a batch evaluator the counted evaluations (and the simplex path) are exactly the
+    sequential ones; the batch only adds speculative points."""
+    rosenbrock = lambda x: (1 - 2 * x[0]) ** 2 + 10 * (2 * x[1] - 4 * x[0] ** 2) ** 2
+    sequential_used, batched_used, batches = [], [], []
+
+    def batch(points):
+        batches.append(len(points))
+        return [rosenbrock(point) for point in points]
+
+    sequential = nelder_mead(rosenbrock, [0.1, 0.9], 60, 1e-6, used=sequential_used)
+    batched = nelder_mead(rosenbrock, [0.1, 0.9], 60, 1e-6, batch=batch, used=batched_used)
+    assert batched == sequential and batched_used == sequential_used and len(batched_used) == 60
+    assert batches[0] == 3 and max(batches) == 3                 # initial simplex, then r/e/k per iteration
+    assert sum(batches) > len(set(sequential_used))              # some speculative points
+
+
+def test_parallel_tuning_counts_the_same_evaluations(tmp_path):
+    spec = load_tuning_spec(_spec_file(tmp_path))
+    sequential = tune(spec)
+    spec.workers = 3
+    parallel = tune(spec)
+    counted = lambda result: [entry["parameters"] for entry in result["history"] if entry["counted"]]
+    assert parallel["workers"] == 3 and parallel["evaluations"] == sequential["evaluations"] == 12
+    assert set(map(lambda p: tuple(sorted(p.items())), counted(parallel))) == \
+        set(map(lambda p: tuple(sorted(p.items())), counted(sequential)))
+    assert parallel["runs"] == len(parallel["history"]) > len(counted(parallel))
+    assert parallel["speculative_runs"] == parallel["runs"] - len(counted(parallel))
+    assert parallel["best"]["objective"] <= sequential["best"]["objective"]
+    assert not any("error" in entry for entry in parallel["history"])
+
+
+def test_private_endpoints_only_touch_launched_renode(tmp_path):
+    from embeddyn.mechatronics.factory import use_private_endpoints
+    project = MechatronicProject.load(ROOT / "examples/mechatronics/mujoco-arm-firmware.yaml")
+    use_private_endpoints(project)
+    options = project.instances["mcu"].options
+    assert options["port"] != 21260
+    assert options["log"].endswith(f"renode-arm-joint.{__import__('os').getpid()}.log")
+    assert project.instances["arm"].options.get("port") is None
+
+
 def test_score_penalises_violations_and_missing(tmp_path):
     spec = load_tuning_spec(_spec_file(tmp_path, constraints=[{"metric": "speed.settling_time", "max": 0.1}]))
     value, violations = score(spec, {"speed.itae": 0.2, "speed.settling_time": None})

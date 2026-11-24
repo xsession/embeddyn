@@ -130,8 +130,9 @@ Next:
   computed after every run and recorded on sweep jobs.
 - [x] `mechatronics tune`: deterministic bounded Nelder–Mead over full
   co-simulations with weighted objectives and constraints.
-- [ ] Optimiser jobs on the distributed-worker system (parallel evaluations),
-  CMA-ES / Bayesian methods.
+- [x] Parallel tuning evaluations (`workers`): speculative Nelder–Mead that
+  takes the sequential path, private Renode ports and logs per run.
+- [ ] Optimiser jobs on the distributed-worker system, CMA-ES / Bayesian methods.
 - [x] Physical parameter estimation from bench traces (`mechatronics estimate`):
   Levenberg–Marquardt over full co-simulations, replayed inputs, 95 %
   confidence intervals and parameter correlations.

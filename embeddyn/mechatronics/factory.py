@@ -164,6 +164,22 @@ def replay_kwargs(project: MechatronicProject, cfg) -> dict:
     }
 
 
+def use_private_endpoints(project: MechatronicProject) -> None:
+    """Give every simulator this project launches its own TCP port and log file, so several
+    runs of the same project can go on at once (parallel tuning and tolerance evaluations).
+    Only instances embeddyn launches itself change; attached ones keep their configured port."""
+    import os
+    from .adapters.renode import _free_port
+    for cfg in project.simulator_instances().values():
+        options = cfg.options
+        if str(options.get("backend", "")).lower() != "renode" or not options.get("launch"):
+            continue
+        options["port"] = _free_port()
+        if options.get("log"):
+            log = Path(str(options["log"]))
+            options["log"] = str(log.with_name(f"{log.stem}.{os.getpid()}{log.suffix or '.log'}"))
+
+
 def build_adapters(project: MechatronicProject, mock: bool = False, isolate: bool = False):
     """Adapters keyed by simulator instance name (legacy instances are named
     after their domain, and Domain keys work for lookups)."""

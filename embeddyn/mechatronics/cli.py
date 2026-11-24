@@ -163,12 +163,15 @@ def tune_command(
     spec_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Tuning spec (YAML)."),
     output: Path = typer.Option(Path(".embeddyn/tuning/result.json"), "--output", "-o"),
     max_evaluations: Optional[int] = typer.Option(None, "--max-evaluations"),
+    workers: Optional[int] = typer.Option(None, "--workers", help="Parallel evaluations (overrides the spec)."),
 ) -> None:
     """Tune project parameters by repeated co-simulation (bounded Nelder-Mead)."""
     from .tuning import load_tuning_spec, tune, write_result
     spec = load_tuning_spec(spec_file)
     if max_evaluations is not None:
         spec.max_evaluations = max_evaluations
+    if workers is not None:
+        spec.workers = max(1, workers)
 
     def progress(record):
         values = ", ".join(f"{name}={value:.5g}" for name, value in record["parameters"].items())
@@ -177,7 +180,8 @@ def tune_command(
 
     result = tune(spec, progress)
     write_result(result, output)
-    typer.echo(json.dumps({"output": str(output), "evaluations": result["evaluations"], "feasible": result["feasible"],
+    typer.echo(json.dumps({"output": str(output), "evaluations": result["evaluations"], "runs": result["runs"],
+                           "wall_seconds": result["wall_seconds"], "feasible": result["feasible"],
                            "initial": {"parameters": result["initial"]["parameters"], "objective": result["initial"]["objective"]},
                            "best": {key: result["best"][key] for key in ("parameters", "objective", "violations")}},
                           indent=2, default=lambda value: None))

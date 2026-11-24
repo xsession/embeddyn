@@ -125,3 +125,12 @@ def test_hot_motor_is_derated_through_the_i2c_temperature_sensor(tmp_path):
     assert 0.42 < limit < 0.5
     assert max(abs(r["mcu.duty"]) for r in late) <= max(r["mcu.duty_limit"] for r in late) + 1e-6
     assert max(abs(r["bridge.duty"]) for r in late) < 0.51 and int(late[-1]["mcu.fault"]) == 0
+
+
+def test_parallel_tuning_runs_renode_instances_side_by_side(tmp_path):
+    """Three firmware-in-the-loop evaluations at once: each launched Renode gets its own port and log."""
+    from embeddyn.mechatronics.tuning import load_tuning_spec, tune
+    spec = load_tuning_spec(ROOT / "examples/mechatronics/tuning/arm-firmware.yaml")
+    spec.duration, spec.max_evaluations, spec.workers = 2.05, 4, 3      # just into the `lift` window (2-3 s)
+    result = tune(spec)
+    assert result["runs"] >= 4 and not [entry["error"] for entry in result["history"] if "error" in entry]

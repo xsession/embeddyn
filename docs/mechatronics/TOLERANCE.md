@@ -19,7 +19,7 @@ embeddyn mechatronics tolerance spec.yaml --workers 8 --samples 500
 project: ../servo-drivetrain.yaml
 duration: 1.0
 seed: 1                       # reproducible samples
-workers: 8                    # parallel processes
+workers: 8                    # parallel processes (launched Renodes get their own ports and logs)
 parameters:                   # project parameters or constant signals
   motor.resistance_20c: {nominal: 2.0, tolerance: 0.05, distribution: normal}   # +-5 % = 3 sigma
   drivetrain.backlash: {distribution: uniform, minimum: 0.002, maximum: 0.008}

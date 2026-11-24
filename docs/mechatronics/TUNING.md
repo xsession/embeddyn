@@ -65,6 +65,21 @@ max_evaluations: 30
   the flash defaults over RAM (it takes effect from the first step on).
 * A failing candidate (diverging model, simulator error) is recorded with its
   error and scored as infinite; the search continues.
+* **Parallel evaluations** (`workers: 4` or `--workers 4`). Nelder–Mead is
+  sequential, so the pool evaluates each iteration's reflection, expansion
+  and contraction together, and a shrink's points together. Then it takes
+  exactly the decisions of the one-worker search:
+  * The simplex path and the evaluations that count against
+    `max_evaluations` are identical; a test checks this.
+  * The runs that search wouldn't have needed are *speculative*:
+    `counted: false` in the history, `speculative_runs` in the result. They
+    only cost idle workers, and `best` may come from one of them.
+  * Workers are spawned processes. Every Renode they launch gets its own
+    free port and its own log (`<log>.<pid>.log`, via
+    `factory.use_private_endpoints`), so a fixed `port:` in the project is no
+    obstacle. Tolerance runs with `workers` > 1 do the same.
+  * Evaluations must be deterministic, which co-simulations are: a point the
+    search revisits is not run again.
 * `result.json` holds every evaluation: parameters, objective, violations,
   all metrics, wall time.
 
@@ -101,6 +116,19 @@ What the search showed:
 * Peak current is 11.5 A for any useful gains (duty saturation, stall
   12 A), so it isn't a useful constraint here.
 * The project now uses the tuned gains. The firmware's built-in defaults are unchanged.
+
+**In parallel** (`--workers 4`, firmware with the SPI/I²C sensors, 2026-11-24):
+
+| | Value |
+|---|---|
+| Counted evaluations / runs | 30 / 52 (22 speculative), none failed |
+| Wall time | 6.8 min, against about 11.8 min for the 30 counted runs one after another (23.5 s each) |
+| Best | kp 33.3, ki 2.0, kd 0.46 (a counted point): settling 0.630 s, overshoot 0.007 %, objective within 0.01 % of the sequential result |
+
+The speed-up is about 1.7×, not 4×. Nelder–Mead has at most three candidates
+per iteration (reflection, expansion, contraction), so one worker always
+idles. A population method (CMA-ES) would keep every worker busy. The
+different best gains confirm how flat the optimum is past kp ≈ 15.
 
 The servo case first came out infeasible: the mock controller's integrator
 wound up during saturation, so every gain pair that settled fast overshot.
