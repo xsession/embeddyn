@@ -78,7 +78,11 @@ Next:
 - [x] UART consoles through Renode socket terminals: lines as events, writes from the Lab ([RENODE.md](RENODE.md#uart-consoles)).
 - [x] Fork merged with Renode v1.17.1 on local branches (not pushed yet), with the message protocol client ([RENODE_1_17_MERGE.md](RENODE_1_17_MERGE.md)).
 - [x] CAN through External Control: frames as events, decoded fields, `can_write` (RC-servo CAN example).
-- [ ] SPI/I²C sensor feeds (External Control SPI, RESD); push the merge branches to the forks.
+- [x] SPI/I²C sensor feeds: SPI devices modelled in Python behind
+  `ExternalControlSPIPeripheral` (AS5047P), Renode sensor models fed through
+  a sysbus bridge (AS6221 on I²C); homing, encoder cross-check and thermal
+  derating in the arm firmware ([RENODE.md](RENODE.md#sensors-on-spi-and-ic-renode--117)).
+- [ ] Push the merge branches to the forks.
 
 ## Phase R2: electronics with state (ngspice shared library)
 
@@ -169,7 +173,7 @@ checked against the code.* Order is the build order: each group unblocks the nex
 | 6 | ✅ Verification checks: energy balance, step-size convergence, golden waveforms, scenario matrices | INTEGRATION_PLAN 7 | done: `mechatronics verify` ([VERIFICATION.md](VERIFICATION.md)), CI workflow |
 | 7 | ✅ Physical parameter estimation from bench traces (R, L, Kt, J, friction) with confidence intervals | R4; PHASE6 next steps | done: `mechatronics estimate` ([ESTIMATION.md](ESTIMATION.md)) |
 | 8 | ✅ Monte Carlo tolerance runs with yield; Sobol sensitivity | R4; PHASE6 | done: `mechatronics tolerance` ([TOLERANCE.md](TOLERANCE.md)), local process pool; experiment-queue execution still open |
-| 9 | Renode sensor/bus signals: quadrature encoder, UART/SPI/I²C/CAN frames, fault injection | R1; INTEGRATION_PLAN 4 | UART consoles, CAN frames and quadrature encoders (TIM CNT injection, Renode ≥ 1.17) done; SPI/I²C sensors and fault injection missing |
+| 9 | Renode sensor/bus signals: quadrature encoder, UART/SPI/I²C/CAN frames, fault injection | R1; INTEGRATION_PLAN 4 | UART consoles, CAN frames, quadrature encoders (TIM CNT injection) and SPI/I²C sensors (Renode ≥ 1.17) done; general fault injection missing |
 | 10 | Renode fork fixes upstreamed (pins, patches 0001–0003, platform files), checkpoints via Save/Load | R1 | patches local only |
 | 11 | ngspice: gate drive/dead time/MOSFET models, `.save` filtering, KiCad round trip | R2; INTEGRATION_PLAN 6 | missing |
 | 12 | Webots bridge using real physics (Supervisor motors/sensors, timestep alignment) | R3 | MuJoCo backend now provides multibody physics ([MUJOCO.md](MUJOCO.md)); the Webots bridge still computes the plant itself |

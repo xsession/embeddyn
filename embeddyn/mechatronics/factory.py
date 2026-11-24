@@ -43,6 +43,7 @@ def renode_kwargs(project: MechatronicProject, cfg) -> dict:
         "uarts": list(options.get("uarts", [])),
         "api": str(options.get("api", "auto")),
         "can": dict(options.get("can") or {}),
+        "spi": list(options.get("spi") or []),
     }
 
 
@@ -100,7 +101,8 @@ def _build_instance(project: MechatronicProject, cfg: SimulatorConfig, mock: boo
         timestep = options.get("timestep")
         return MujocoAdapter(str(project.resolve(cfg.model)), inputs=dict(options.get("inputs", {})),
                              outputs=dict(options.get("outputs", {})),
-                             timestep=float(timestep) if timestep is not None else None)
+                             timestep=float(timestep) if timestep is not None else None,
+                             initial=dict(options.get("initial") or {}))
     if not core:
         raise ValueError(f"{cfg.name}: {domain.value} instances support backends python, fmu and replay (got {backend})")
     if domain is Domain.FIRMWARE:

@@ -1,4 +1,5 @@
 """Whole-system loop: STM32L476 firmware (Renode >= 1.17) + H-bridge + DC motor + MuJoCo arm."""
+import dataclasses
 import os
 import socket
 import statistics
@@ -66,3 +67,61 @@ def test_project_parameters_reach_the_firmware_calibration(tmp_path):
     # next run (a tuning evaluation) can't connect to a Renode that is still shutting down.
     with pytest.raises(ConnectionRefusedError):
         socket.create_connection(("127.0.0.1", project.instances["mcu"].options["port"]), timeout=1).close()
+
+
+def _run(tmp_path, duration, edit=None):
+    project = MechatronicProject.load(PROJECT)
+    project.duration_seconds = duration
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        project.instances["mcu"].options.update(port=probe.getsockname()[1], executable=RENODE,
+                                                log=str(tmp_path / "renode.log"))
+    if edit:
+        edit(project)
+    return CoSimulationOrchestrator(project, build_adapters(project)).run()
+
+
+def test_homes_the_encoder_to_the_absolute_spi_sensor(tmp_path):
+    """The arm starts parked at 0.6 rad. The incremental encoder knows nothing of that; the firmware
+    homes it to the AS5047P (SPI, modelled in embeddyn) after the sensor's 10 ms power-up."""
+    def park(project):
+        project.instances["arm"].options["initial"] = {"qpos:shoulder": 0.6}
+        project.signals["arm.angle"] = dataclasses.replace(project.signals["arm.angle"], initial=0.6)
+    rows = _run(tmp_path, 0.15, park)
+    final = rows[-1]
+    assert final["mcu.home_angle"] == pytest.approx(0.6, abs=0.003)
+    assert abs(final["mcu.angle"] - final["arm.angle"]) < 0.005          # encoder-derived angle is absolute
+    assert abs(final["mcu.abs_angle"] - final["arm.angle"]) < 0.01       # one loop of pipeline lag
+    assert final["mcu.abs_frames"] >= 135 and final["mcu.abs_errors"] == 0 and final["mcu.fault"] == 0
+
+
+def test_encoder_disagreeing_with_the_absolute_sensor_trips_the_drive(tmp_path):
+    """A wrong encoder scale (here 20 % too many counts, like a wrong gear ratio) makes the
+    encoder angle drift from the absolute angle as the arm moves; after 20 ms the firmware faults
+    and switches the H-bridge off."""
+    def miscount(project):
+        index = next(i for i, c in enumerate(project.couplings) if c.target == "arm.encoder_counts")
+        coupling = project.couplings[index]
+        project.couplings[index] = dataclasses.replace(
+            coupling, transform=dataclasses.replace(coupling.transform, gain=coupling.transform.gain * 1.2))
+    rows = _run(tmp_path, 0.6, miscount)
+    tripped = next(r for r in rows if int(r["mcu.fault"]) & 1)
+    assert 0.1 < tripped["time"] < 0.6
+    after = [r for r in rows if r["time"] > tripped["time"] + 0.002]
+    assert after and all(r["mcu.duty"] == 0.0 and r["bridge.duty"] == 0.0 for r in after)
+
+
+def test_hot_motor_is_derated_through_the_i2c_temperature_sensor(tmp_path):
+    """Winding at 90 degC: the AS6221 (Renode's I2C model, fed through the sensor bridge) reports it,
+    and the firmware limits the duty to (110 - 90) / (110 - 70) = 0.5."""
+    def hot(project):
+        project.instances["winding"].options["parameters"]["initial_temperature"] = 90.0
+        project.signals["motor.winding_temperature"] = dataclasses.replace(
+            project.signals["motor.winding_temperature"], initial=90.0)
+    rows = _run(tmp_path, 0.3, hot)
+    late = [r for r in rows if r["time"] > 0.15]
+    assert late[-1]["mcu.motor_temperature"] == pytest.approx(late[-1]["motor.winding_temperature"], abs=1.0)
+    limit = late[-1]["mcu.duty_limit"]
+    assert 0.42 < limit < 0.5
+    assert max(abs(r["mcu.duty"]) for r in late) <= max(r["mcu.duty_limit"] for r in late) + 1e-6
+    assert max(abs(r["bridge.duty"]) for r in late) < 0.51 and int(late[-1]["mcu.fault"]) == 0

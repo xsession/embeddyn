@@ -21,6 +21,8 @@ arm:
       qfrc_act:hinge: arm.joint_torque
       sensor:tip_acc[2]: arm.tip_acc_z
       xpos:tip[0]: arm.tip_x
+    initial:                   # optional start state, set before the first step
+      qpos:hinge: 0.6
 ```
 
 Addresses: ``ctrl:<actuator>``, ``qfrc:<joint>`` (inputs);
@@ -28,6 +30,9 @@ Addresses: ``ctrl:<actuator>``, ``qfrc:<joint>`` (inputs);
 all actuators, i.e. after the gear), ``sensor:<name>``, ``act:<actuator>``
 (actuator-side force, before the gear), ``xpos:<body>`` (world position) and
 ``ctrl:<actuator>`` (outputs). ``[i]`` picks a component of a vector quantity (default 0).
+``initial`` accepts ``qpos:<joint>`` and ``qvel:<joint>``. Give the matching
+signals the same ``initial`` value, because other instances read the signal
+before MuJoCo's first step.
 When ngspice or a python plant already models the motor winding, drive a plain
 ``<motor>`` actuator with torque; MuJoCo's ``dcmotor`` would count the
 electrical dynamics twice.
@@ -56,7 +61,8 @@ class MujocoAdapter(SimulatorAdapter):
     name = "mujoco"
 
     def __init__(self, model: str, inputs: Mapping[str, str] | None = None,
-                 outputs: Mapping[str, str] | None = None, timestep: float | None = None) -> None:
+                 outputs: Mapping[str, str] | None = None, timestep: float | None = None,
+                 initial: Mapping[str, float] | None = None) -> None:
         mujoco = _mujoco()
         self.mujoco = mujoco
         self.model_path = Path(model)
@@ -73,6 +79,12 @@ class MujocoAdapter(SimulatorAdapter):
         self._writers = [(self._writer(address), signal) for address, signal in self.input_map.items()]
         self._readers = [(self._reader(address), signal) for address, signal in self.output_map.items()]
         self.state_spec = mujoco.mjtState.mjSTATE_INTEGRATION
+        self._initial = []
+        for address, value in dict(initial or {}).items():
+            kind, name, index = self._parse(address)
+            if kind not in ("qpos", "qvel"):
+                raise ValueError(f"MuJoCo initial {address!r}: only qpos:<joint> and qvel:<joint> can be set")
+            self._initial.append((kind, self._joint_slot(name, index, velocity=kind == "qvel"), float(value)))
 
     # -- address resolution --------------------------------------------------------
     def _parse(self, address: str) -> tuple[str, str, int]:
@@ -136,6 +148,8 @@ class MujocoAdapter(SimulatorAdapter):
     # -- lifecycle ----------------------------------------------------------------------
     def start(self, initial_signals: Mapping[str, float]) -> None:
         self.data = self.mujoco.MjData(self.model)
+        for kind, slot, value in self._initial:
+            (self.data.qpos if kind == "qpos" else self.data.qvel)[slot] = value
         self.mujoco.mj_forward(self.model, self.data)
 
     def _apply(self, inputs: Mapping[str, float]) -> None:

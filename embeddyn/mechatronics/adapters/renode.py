@@ -47,6 +47,13 @@ machine's CAN hub carries frames to and from embeddyn::
 
 ``can_write(frame_id, data)`` sends a frame. Like UART input it is a logged
 boundary input that takes effect at Renode's next sync point.
+
+SPI sensors (message protocol only): devices modelled in Python
+(``options.spi``, see ``spi_devices.py``) answer an
+``SPI.ExternalControlSPIPeripheral`` byte by byte, with their inputs taken
+from signals at the start of each step. Renode's own sensor models (I2C
+temperature, IMU, ...) are fed through a sysbus bridge peripheral and a plain
+``sysbus`` binding; see docs/mechatronics/RENODE.md.
 """
 from __future__ import annotations
 
@@ -64,6 +71,7 @@ from typing import Any, Mapping
 
 from .base import SimulatorAdapter, StepResult
 from .renode_api import GpioEvent, RenodeExternalControl
+from ..spi_devices import SpiDevice, create_device
 from .renode_api_v2 import CanFrame, RenodeMessageClient
 
 
@@ -109,6 +117,28 @@ STARTUP_ERROR_MARKERS = ("There was an error executing command", "Could not find
 
 def _int(value: Any) -> int:
     return int(value, 0) if isinstance(value, str) else int(value)
+
+
+def _parse_spi(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate one `spi:` entry (and that its device can be built) before any Renode starts."""
+    peripheral, device = str(spec.get("peripheral", "")), str(spec.get("device", ""))
+    if not peripheral or any(ch.isspace() or ch in ';"' for ch in peripheral) or not device:
+        raise ValueError(f"spi entries need 'peripheral' (an ExternalControlSPIPeripheral path) and 'device': {dict(spec)}")
+    parameters = dict(spec.get("parameters") or {})
+    probe = create_device(device, parameters)
+    inputs = {}
+    for field, source in dict(spec.get("inputs") or {}).items():
+        source = {"signal": source} if isinstance(source, str) else dict(source)
+        if field not in getattr(probe, "inputs", ()):
+            raise ValueError(f"SPI device {device} has no input {field!r} (inputs: {', '.join(probe.inputs)})")
+        inputs[str(field)] = {"signal": str(source["signal"]), "scale": float(source.get("scale", 1.0)),
+                              "offset": float(source.get("offset", 0.0))}
+    outputs = {str(field): str(signal) for field, signal in dict(spec.get("outputs") or {}).items()}
+    unknown = set(outputs) - set(getattr(probe, "outputs", ()))
+    if unknown:
+        raise ValueError(f"SPI device {device} has no output {', '.join(sorted(unknown))} (outputs: {', '.join(probe.outputs)})")
+    return {"peripheral": peripheral, "device": device, "parameters": parameters, "machine": spec.get("machine"),
+            "inputs": inputs, "outputs": outputs}
 
 
 def _stop_process_tree(process: subprocess.Popen, timeout: float = 10.0) -> None:
@@ -283,6 +313,7 @@ class RenodeAdapter(SimulatorAdapter):
         uarts: list[dict[str, Any]] | None = None,
         api: str = "auto",
         can: dict[str, Any] | None = None,
+        spi: list[dict[str, Any]] | None = None,
     ) -> None:
         self.host, self.port, self.timeout = host, int(port), float(timeout)
         self.machine = machine
@@ -312,6 +343,8 @@ class RenodeAdapter(SimulatorAdapter):
         self.can = dict(can or {})
         self._can_frames: list[CanFrame] = []
         self._can_last: dict[int, bytes] = {}
+        self.spi = [_parse_spi(spec) for spec in spi or []]
+        self._spi_devices: list[SpiDevice] = []
         self.uarts: list[_Uart] = []
         for spec in uarts or []:
             name, peripheral = str(spec["name"]), str(spec["peripheral"])
@@ -384,6 +417,14 @@ class RenodeAdapter(SimulatorAdapter):
             if not isinstance(self.client, RenodeMessageClient):
                 raise RuntimeError("CAN bindings need Renode >= 1.17 (External Control message protocol)")
             self.client.can_subscribe(self.machine or "", str(self.can["bus"]), self._on_can_frame)
+        self._spi_devices = []
+        if self.spi and not isinstance(self.client, RenodeMessageClient):
+            raise RuntimeError("SPI devices need Renode >= 1.17 (External Control message protocol)")
+        for spec in self.spi:          # a fresh device per run, so every run starts from power-up
+            device = create_device(spec["device"], spec["parameters"])
+            self._spi_devices.append(device)
+            self.client.spi_register(spec["machine"] or self.machine or "", spec["peripheral"],
+                                     device.transmit, device.finish)
         self._apply_inputs(initial_signals)
 
     def _drain_uarts(self, now_seconds: float) -> list[dict[str, Any]]:
@@ -442,6 +483,9 @@ class RenodeAdapter(SimulatorAdapter):
         diagnostics: dict[str, Any] = {"renode_time_us": target_us, "run_for_us": interval}
         if self.uarts:
             diagnostics["events"] = self._drain_uarts((target_us - self._origin_us) / 1_000_000)
+        for spec, device in zip(self.spi, self._spi_devices):
+            values = device.output_values()
+            outputs.update({signal: values[field] for field, signal in spec["outputs"].items()})
         if self.can:
             outputs.update(self._can_outputs())
             topic = str(self.can.get("signal", "can"))
@@ -534,6 +578,7 @@ class RenodeAdapter(SimulatorAdapter):
 
     def _apply_inputs(self, inputs: Mapping[str, Any]) -> None:
         assert self.client is not None
+        self._apply_spi_inputs(inputs)
         for binding in self.bindings:
             if binding.direction != "input" or binding.signal not in inputs:
                 continue
@@ -556,6 +601,15 @@ class RenodeAdapter(SimulatorAdapter):
                 width = 4 if binding.opt("float32", False) else int(binding.opt("width", 4))
                 self.client.bus_write(binding.machine, _int(binding.opt("address")), value,
                                       width=width, context=binding.peripheral)
+
+    def _apply_spi_inputs(self, inputs: Mapping[str, Any]) -> None:
+        for spec, device in zip(self.spi, self._spi_devices):
+            values = {}
+            for field, source in spec["inputs"].items():
+                if source["signal"] in inputs:
+                    values[field] = float(inputs[source["signal"]]) * source["scale"] + source["offset"]
+            if values:
+                device.set_inputs(values)
 
     def protocol(self) -> str:
         if self.api != "auto":

@@ -125,8 +125,20 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
     uarts = [{"name": f"uart:{u.get('name')}", "direction": "out", "signal": u.get("signal") or f"uart.{u.get('name')}",
               "label": f"{str(u.get('peripheral', '')).removeprefix('sysbus.')} console", "unit": "", "mappable": False,
               "kind": "event"} for u in (options.get("uarts") or []) if isinstance(u, dict)]
-    if bound is not None or uarts:
-        return (bound or []) + uarts
+    spi = []
+    for entry in options.get("spi") or []:
+        if not isinstance(entry, dict):
+            continue
+        device = str(entry.get("peripheral", "spi")).split(".")[-1]
+        for field, source in dict(entry.get("inputs") or {}).items():
+            signal = source if isinstance(source, str) else dict(source).get("signal")
+            spi.append({"name": f"spi:{device}.{field}", "direction": "in", "signal": signal, "mappable": False,
+                        "label": f"{device} {field} (SPI {entry.get('device', '')})", "unit": _unit(signals, signal)})
+        for field, signal in dict(entry.get("outputs") or {}).items():
+            spi.append({"name": f"spi:{device}.{field}", "direction": "out", "signal": signal, "mappable": False,
+                        "label": f"{device} {field}", "unit": _unit(signals, signal)})
+    if bound is not None or uarts or spi:
+        return (bound or []) + uarts + spi
     domain = str(spec.get("domain") or domain_fallback or "")
     targets = {c.get("target") for c in couplings}
     ports = []

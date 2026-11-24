@@ -18,7 +18,18 @@ the event's id. Virtual time is in nanoseconds.
 
 The public methods mirror ``RenodeExternalControl`` (``run_for`` and
 ``get_time_us`` still take and return microseconds), so the Renode adapter
-works with either protocol. CAN is only available here.
+works with either protocol. Only available here:
+
+* CAN frames in and out (``CAN.CANExternalControlBus``).
+* SPI devices answered by the client (``SPI.ExternalControlSPIPeripheral``):
+  every byte the MCU clocks out arrives as an event, and the reply is the
+  byte it clocks in.
+
+Not used: the ``CustomCommand`` event request (run a Monitor command) fails
+with a NullReferenceException unless a Monitor-side
+``AttachCustomCommandCallbackToMonitor`` ran first, which itself needs a
+connected client. Sensor models are fed through a sysbus bridge instead (see
+``docs/mechatronics/RENODE.md``).
 """
 from __future__ import annotations
 
@@ -61,6 +72,7 @@ _ADC_GET_COUNT, _ADC_GET_VALUE, _ADC_SET_VALUE = 0, 1, 2
 _GPIO_GET, _GPIO_SET, _GPIO_REGISTER = 0, 1, 2
 _BUS_READ, _BUS_WRITE = 0, 1
 _CAN_SEND, _CAN_REGISTER = 0, 2
+_SPI_TRANSMIT, _SPI_FINISH = 0, 1
 _WIDTH_FORMATS = {1: "<B", 2: "<H", 4: "<I", 8: "<Q"}
 
 
@@ -248,3 +260,22 @@ class RenodeMessageClient:
         descriptor = self._register(on_frame)
         self.request(Command.CAN_BUS, struct.pack("<ibi", instance, _CAN_REGISTER, descriptor))
         return descriptor
+
+    # ------------------------------------------------------------------ SPI
+    def spi_register(self, machine: str, peripheral: str, transmit: Callable[[int], int],
+                     finish: Callable[[], None] | None = None) -> int:
+        """Answer an `SPI.ExternalControlSPIPeripheral`: `transmit(mosi)` returns the MISO byte;
+        `finish()` runs when the controller ends a transmission (not every controller does)."""
+        instance = self._instance(Command.SPI, machine, peripheral)
+
+        def on_event(data: bytes) -> bytes:
+            if data and data[0] == _SPI_TRANSMIT and len(data) >= 2:
+                return bytes([int(transmit(data[1])) & 0xFF])
+            if data and data[0] == _SPI_FINISH and finish is not None:
+                finish()
+            return b""
+
+        descriptor = self._register(on_event)
+        self.request(Command.SPI, struct.pack("<ii", instance, descriptor))
+        return descriptor
+

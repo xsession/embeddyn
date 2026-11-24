@@ -1,6 +1,9 @@
 # Whole-system loop: real STM32L476 firmware (Renode >= 1.17) reads a
 # quadrature encoder and drives an H-bridge; a DC motor model turns a MuJoCo
 # arm joint through a 20:1 gear; the joint angle comes back as encoder counts.
+# Sensors: an AS5047P absolute angle sensor on SPI1 (modelled in embeddyn)
+# homes and cross-checks the encoder; an AS6221 on I2C1 (Renode's model, fed
+# by the winding thermal model) lets the firmware derate when the motor is hot.
 #   make -C examples/mechatronics/firmware/arm-joint-l476
 #   embeddyn mechatronics run examples/mechatronics/mujoco-arm-firmware.yaml -o arm.csv
 name: mujoco-arm-firmware
@@ -26,6 +29,11 @@ instances:
       port: 21260
       bindings: bindings/renode-arm-joint.yaml
       log: ../../.embeddyn/renode-arm-joint.log
+      spi:
+        - peripheral: sysbus.spi1.abs_encoder       # SPI.ExternalControlSPIPeripheral
+          device: as5047p
+          inputs: {angle: arm.angle}                # magnet on the joint shaft
+          outputs: {frames: mcu.abs_frames, errors: mcu.abs_errors}
   command:
     domain: environment
     model: embeddyn.mechatronics.gui.sources:FunctionGenerator
@@ -50,6 +58,14 @@ instances:
       parameters: {resistance: 2.0, inductance: 0.003, ke: 0.08, kt: 0.08}
       inputs: {duty: bridge.duty, speed: motor.shaft_speed}
       outputs: {current: motor.current, torque: motor.torque, power: motor.power}
+  winding:
+    domain: thermal
+    model: embeddyn.mechatronics.plants:ThermalRC
+    options:
+      backend: python
+      parameters: {thermal_resistance: 3.0, thermal_capacitance: 20.0, resistance_20c: 2.0, initial_temperature: 25.0}
+      inputs: {current: motor.current, ambient: environment.ambient}
+      outputs: {temperature: motor.winding_temperature, copper_loss: motor.copper_loss}
   arm:
     domain: mechanical
     model: mujoco/arm-joint.xml
@@ -65,6 +81,16 @@ signals:
   mcu.target: {domain: firmware, unit: rad, initial: 0.0}
   mcu.angle: {domain: firmware, unit: rad, initial: 0.0}
   mcu.duty: {domain: firmware, initial: 0.0}
+  mcu.abs_angle: {domain: firmware, unit: rad, initial: 0.0}
+  mcu.home_angle: {domain: firmware, unit: rad, initial: 0.0}
+  mcu.motor_temperature: {domain: firmware, unit: degC, initial: 25.0}
+  mcu.duty_limit: {domain: firmware, initial: 1.0}
+  mcu.fault: {domain: firmware, initial: 0.0}
+  mcu.abs_frames: {domain: firmware, initial: 0.0}
+  mcu.abs_errors: {domain: firmware, initial: 0.0}
+  environment.ambient: {domain: environment, unit: degC, initial: 25.0}
+  motor.winding_temperature: {domain: thermal, unit: degC, initial: 25.0}
+  motor.copper_loss: {domain: thermal, unit: W, initial: 0.0}
   bridge.duty: {domain: electrical, initial: 0.0}
   motor.shaft_speed: {domain: electrical, unit: rad/s, initial: 0.0}
   motor.current: {domain: electrical, unit: A, initial: 0.0}

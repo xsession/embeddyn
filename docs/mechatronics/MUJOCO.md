@@ -83,6 +83,12 @@ closes the same joint through real STM32L476 firmware
 | H-bridge | TIM2 CH1/CH2 at 20 kHz, sign-magnitude. Each pin's duty is measured from GPIO edges, and `HBridgePWM` gives duty = IN1 − IN2 for `DCMotorRL`. |
 | Command | ADC1 IN1 (PC0), 0–3.3 V = ±1.5 rad |
 | Control | 1 kHz PID with anti-windup, run from TIM2's update interrupt. Gains in `arm_cal` at 0x20000000 can be tuned over the bus. |
+| Absolute angle | AS5047P on SPI1, modelled in embeddyn: homes the encoder at start-up and cross-checks it every loop (fault after 20 ms of disagreement > 0.05 rad) |
+| Motor temperature | `ThermalRC` winding model → Renode's AS6221 on I2C1 through the sensor feed bridge; the firmware derates duty from 70 °C to zero at 110 °C |
+
+`options.initial` sets MuJoCo's start state (`qpos:shoulder: 0.6` parks the
+arm). Give the signal the same `initial`, because the firmware reads the
+sensor before MuJoCo's first step.
 
 Result with the firmware's built-in gains: 0 → 1.2 rad settles in 0.68 s
 with 0.35 % overshoot and a 3 mrad error. With the tuned gains the project

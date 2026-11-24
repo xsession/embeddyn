@@ -16,13 +16,27 @@ bindings:
   # unwraps the 16-bit counter).
   - signal: arm.encoder_counts
     endpoint: {object: sysbus, property: sysbus, address: 0x40000424, width: 4, direction: input}
-  # Firmware telemetry (struct arm_telemetry tm at 0x20000024).
+  # Firmware telemetry (struct arm_telemetry tm at 0x20000038).
   - signal: mcu.target
-    endpoint: {object: sysbus, property: sysbus, address: 0x20000028, float32: true, direction: output, unit: rad}
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000003C, float32: true, direction: output, unit: rad}
   - signal: mcu.angle
-    endpoint: {object: sysbus, property: sysbus, address: 0x2000002C, float32: true, direction: output, unit: rad}
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000040, float32: true, direction: output, unit: rad}
   - signal: mcu.duty
-    endpoint: {object: sysbus, property: sysbus, address: 0x20000034, float32: true, direction: output}
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000048, float32: true, direction: output}
+  - signal: mcu.abs_angle
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000054, float32: true, direction: output, unit: rad}
+  - signal: mcu.motor_temperature
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000058, float32: true, direction: output, unit: degC}
+  - signal: mcu.duty_limit
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000005C, float32: true, direction: output}
+  - signal: mcu.fault
+    endpoint: {object: sysbus, property: sysbus, address: 0x20000060, width: 4, direction: output}
+  - signal: mcu.home_angle
+    endpoint: {object: sysbus, property: sysbus, address: 0x2000006C, float32: true, direction: output, unit: rad}
+  # Motor winding temperature -> Renode's AS6221 model on I2C1, through the
+  # sensor feed bridge (slot 0 of sysbus 0x5F000000, stm32l476-arm-sensors.repl).
+  - signal: motor.winding_temperature
+    endpoint: {object: sysbus, property: sysbus, address: 0x5F000000, float32: true, direction: input, unit: degC}
   # PID gains (struct arm_cal at 0x20000000) from the project parameters
   # firmware.kp/ki/kd. Written every step: the reset handler copies the flash
   # defaults over RAM, so the first write the firmware keeps comes at 1 ms.

@@ -139,6 +139,65 @@ coupling (counts per radian). The count is exact at every sync point, and
 there is no edge-rate limit as with GPIO toggling. The firmware reads CNT as
 it would on hardware. See `bindings/renode-arm-joint.yaml`.
 
+## Sensors on SPI and I²C (Renode ≥ 1.17)
+
+There are two ways to put a sensor in front of the firmware's real SPI or I²C
+driver.
+
+**SPI device modelled in embeddyn.** The platform puts an
+`SPI.ExternalControlSPIPeripheral` on the SPI controller. Every byte the
+firmware clocks out arrives in embeddyn as an External Control event, and a
+Python device model (`embeddyn/mechatronics/spi_devices.py`) answers with the
+byte the firmware clocks in. Its inputs come from co-simulation signals at the
+start of each step.
+
+```yaml
+options:
+  spi:
+    - peripheral: sysbus.spi1.abs_encoder      # the ExternalControlSPIPeripheral
+      device: as5047p                          # or package.module:Class (a SpiDevice)
+      parameters: {direction: 1, zero: 0.0}
+      inputs: {angle: arm.angle}               # or {signal: ..., scale: ..., offset: ...}
+      outputs: {frames: mcu.abs_frames, errors: mcu.abs_errors}
+```
+
+`AS5047P` models the ams 14-bit magnetic angle sensor:
+- 16-bit frames with even parity.
+- The answer comes one frame late, as on the chip.
+- EF and ERRFL (parity, framing, invalid command).
+- DIAAGC magnet diagnostics.
+- Writable ZPOSM/ZPOSL/SETTINGS.
+
+Renode's STM32 SPI model doesn't report chip-select edges, so the device
+counts bytes to find frames. Every byte is one round trip to Python, so a
+16-bit read every millisecond roughly doubles the wall time of the arm
+example.
+
+**Renode's own sensor models through a feed bridge.** Renode models many I²C
+and SPI sensors (AS6221, BME280, LSM6DSO, ...) with properties such as
+`Temperature`. The `CustomCommand` External Control request, which runs a
+Monitor command, can't be used from a client. Renode throws a
+NullReferenceException unless a Monitor-side
+`AttachCustomCommandCallbackToMonitor` ran first, and that itself needs a
+connected client. Instead, a small `Python.PythonPeripheral` on the system bus
+forwards a float32 written to one of its slots to a named property. embeddyn
+then feeds it with an ordinary `sysbus` input binding. The value lands before
+each step, so the feed is deterministic and works on either protocol. See
+`renode/stm32l476-arm-sensors.repl` (slot 0 → `sysbus.i2c1.motor_temp`
+`Temperature`):
+
+```yaml
+- signal: motor.winding_temperature
+  endpoint: {object: sysbus, property: sysbus, address: 0x5F000000, float32: true, direction: input}
+```
+
+The arm example uses both. At start-up the firmware waits out the AS5047P's
+10 ms power-up and homes the incremental encoder to it. Every loop it
+cross-checks the encoder against the absolute angle. It reads the AS6221 over
+I²C every 100 ms and derates the duty limit between 70 and 110 °C. Tests:
+homing from a parked 0.6 rad, a 20 % wrong encoder scale tripping the drive,
+and a 90 °C winding limiting the duty to 0.5 (`test_arm_firmware.py`).
+
 ## UART consoles
 
 ```yaml
