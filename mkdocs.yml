@@ -183,6 +183,13 @@ nav:
       - Migrating from VSD: EMBEDDYN_MIGRATION.md
       - Unified release: EMBEDDYN_UNIFIED_RELEASE.md
       - Deep review (2026-08): DEEP_REVIEW_2026-08-26.md
+      - Research:
+          - Integration candidates: project/research/integration-candidates.md
+          - "Notes: firmware and digital HW emulation": project/research/notes/firmware-and-digital-hw-emulation.md
+          - "Notes: circuits, power electronics, EDA": project/research/notes/circuits-power-electronics-and-eda.md
+          - "Notes: mechanics, physics, 3-D": project/research/notes/mechanics-physics-and-3d.md
+          - "Notes: model exchange and Modelica": project/research/notes/model-exchange-and-modelica.md
+          - "Notes: comms, HIL, CI, digital twin": project/research/notes/comms-hil-ci-and-twin.md
       - History:
           - Implementation status: project/history/implementation-status.md
           - Integration plan: project/history/integration-plan.md
