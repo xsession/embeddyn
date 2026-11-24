@@ -29,7 +29,7 @@ Not used: the ``CustomCommand`` event request (run a Monitor command) fails
 with a NullReferenceException unless a Monitor-side
 ``AttachCustomCommandCallbackToMonitor`` ran first, which itself needs a
 connected client. Sensor models are fed through a sysbus bridge instead (see
-``docs/mechatronics/RENODE.md``).
+``docs/reference/renode.md``).
 """
 from __future__ import annotations
 

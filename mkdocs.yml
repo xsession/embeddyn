@@ -1,0 +1,197 @@
+site_name: embeddyn
+site_description: Emulate, test and tune whole embedded systems — firmware, electronics and mechanics in one deterministic co-simulation.
+docs_dir: docs
+site_dir: site
+strict: true
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep orange
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep orange
+      toggle: {icon: material/weather-sunny, name: Light mode}
+  icon:
+    logo: material/chip
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+extra_css:
+  - stylesheets/extra.css
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+not_in_nav: |
+  /C4.md
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Your first simulation: getting-started/first-simulation.md
+      - Core concepts: getting-started/concepts.md
+  - Tutorials:
+      - tutorials/index.md
+      - 1 · DC motor speed loop: tutorials/dc-motor.md
+      - 2 · A switching bridge in ngspice: tutorials/ngspice.md
+      - 3 · A robot arm in MuJoCo: tutorials/mujoco-arm.md
+      - 4 · Firmware in the loop — RC servo: tutorials/rc-servo-firmware.md
+      - 5 · Arm joint with SPI and I²C sensors: tutorials/arm-joint-sensors.md
+      - 6 · Several instances and FMUs: tutorials/instances-and-fmus.md
+      - 7 · Tuning controller gains: tutorials/tuning.md
+      - 8 · Tolerances and yield: tutorials/tolerance.md
+      - 9 · Estimating parameters from a bench test: tutorials/estimation.md
+      - 10 · Verifying a model: tutorials/verification.md
+      - 11 · Building and running in the Lab: tutorials/lab.md
+  - Theory of operation:
+      - theory/index.md
+      - System model: theory/system-model.md
+      - Master algorithm: theory/master-algorithm.md
+      - Firmware emulation: theory/firmware.md
+      - Electronics: theory/electronics.md
+      - Mechanics and plants: theory/mechanics.md
+      - FMI co-simulation: theory/fmi.md
+      - Metrics: theory/metrics.md
+      - Optimisation: theory/optimisation.md
+      - Uncertainty and sensitivity: theory/uncertainty.md
+      - Parameter estimation: theory/estimation.md
+      - Model verification: theory/verification.md
+      - The Lab: theory/lab.md
+  - How-to guides:
+      - guides/index.md
+      - Write a Python plant: guides/python-plant.md
+      - Add an SPI sensor model: guides/spi-device.md
+      - Bind firmware variables: guides/firmware-bindings.md
+      - Run many simulations in parallel: guides/parallel-runs.md
+      - Build Renode with custom cores: guides/build-renode.md
+      - Export a KiCad schematic to SPICE: guides/kicad.md
+      - Rebuild these docs and figures: guides/docs.md
+  - Reference:
+      - reference/index.md
+      - Project file: reference/project-file.md
+      - Command line: reference/cli.md
+      - Renode adapter: reference/renode.md
+      - ngspice adapter: reference/ngspice.md
+      - MuJoCo adapter: reference/mujoco.md
+      - Instances and FMI: reference/instances-and-fmi.md
+      - Metrics and tuning: reference/tuning.md
+      - Tolerance analysis: reference/tolerance.md
+      - Parameter estimation: reference/estimation.md
+      - Verification: reference/verification.md
+      - The Lab: reference/lab.md
+      - "Example: STM32L476 RC servo": reference/rc-servo-l476.md
+      - Examples catalogue: reference/examples.md
+  - Platform:
+      - user/README.md
+      - Installation and bootstrap: user/INSTALLATION.md
+      - Studio quick start: user/QUICKSTART.md
+      - Local Studio: user/STUDIO.md
+      - Studio CLI reference: user/CLI_REFERENCE.md
+      - Projects and data: user/PROJECTS_AND_DATA.md
+      - Distributed runs, HIL and digital twin: user/MECHATRONICS.md
+      - RF / EMC workflow: user/RF_EMC.md
+      - RF / EMC perspective: RF_EMC_PERSPECTIVE.md
+      - Bootstrap and dependency versioning: BOOTSTRAP_AND_DEPENDENCY_VERSIONING.md
+      - Local Studio architecture: LOCAL_STUDIO_ARCHITECTURE.md
+      - Observability: OBSERVABILITY.md
+      - Reverse engineering: REVERSE_ENGINEERING.md
+      - Security model: SECURITY_LOCAL.md
+      - Deployment: DEPLOYMENT_LOCAL.md
+      - Troubleshooting: user/TROUBLESHOOTING.md
+  - Contributing:
+      - contributing/README.md
+      - Development setup: contributing/DEVELOPMENT_SETUP.md
+      - Architecture: contributing/ARCHITECTURE.md
+      - Code organization: contributing/CODE_ORGANIZATION.md
+      - Testing: contributing/TESTING.md
+      - Extension recipes: contributing/EXTENDING.md
+      - Data and migrations: contributing/DATA_AND_MIGRATIONS.md
+      - Security: contributing/SECURITY.md
+      - Release: contributing/RELEASE.md
+      - C4 architecture:
+          - c4/README.md
+          - C1 · Context: c4/C1_CONTEXT.md
+          - C2 · Containers: c4/C2_CONTAINERS.md
+          - C3 · Components: c4/C3_COMPONENTS.md
+          - Dynamic views: c4/DYNAMIC_VIEWS.md
+          - Deployment: c4/DEPLOYMENT.md
+          - Decisions and boundaries: c4/DECISIONS_AND_BOUNDARIES.md
+  - Project:
+      - project/index.md
+      - Roadmap: project/roadmap.md
+      - Renode 1.17 merge record: project/renode-1-17-merge.md
+      - Architecture and parameter storage spec: project/architecture-and-parameter-storage.md
+      - Feature set: EMBEDDYN_FEATURES.md
+      - Identity: EMBEDDYN_BRANDING.md
+      - Migrating from VSD: EMBEDDYN_MIGRATION.md
+      - Unified release: EMBEDDYN_UNIFIED_RELEASE.md
+      - Deep review (2026-08): DEEP_REVIEW_2026-08-26.md
+      - History:
+          - Implementation status: project/history/implementation-status.md
+          - Integration plan: project/history/integration-plan.md
+          - Feature-pack merge report: project/history/feature-pack-merge-report.md
+          - Phase 1 changelog: project/history/phase1-changelog.md
+          - Phase 2 changelog: project/history/phase2-changelog.md
+          - Phase 3 changelog: project/history/phase3-changelog.md
+          - Phase 3 completion: project/history/phase3-completion.md
+          - Phase 4 completion: project/history/phase4-completion.md
+          - Phase 5 completion: project/history/phase5-completion.md
+          - Phase 5 operations: project/history/phase5-operations.md
+          - Phase 6 completion: project/history/phase6-completion.md

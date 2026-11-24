@@ -15,3 +15,6 @@ examples/mechatronics/firmware/*/build/
 __pycache__/
 examples/mechatronics/fmus/*.fmu
 .cache/
+
+# MkDocs build output
+site/

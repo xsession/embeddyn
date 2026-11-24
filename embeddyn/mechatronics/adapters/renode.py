@@ -19,7 +19,7 @@ Binding manifest (``options.bindings``)::
 
 Output properties: ``gpio_duty``, ``gpio_pulse_width``, ``gpio_state``, ``sysbus``,
 ``register_ratio``.
-Input properties: ``adc``, ``gpio``, ``sysbus``.  See docs/mechatronics/RENODE.md.
+Input properties: ``adc``, ``gpio``, ``sysbus``.  See docs/reference/renode.md.
 
 UARTs (``options.uarts``) are exposed by Renode as TCP socket terminals
 (``CreateServerSocketTerminal`` + ``connector Connect``). After every step the
@@ -53,7 +53,7 @@ SPI sensors (message protocol only): devices modelled in Python
 ``SPI.ExternalControlSPIPeripheral`` byte by byte, with their inputs taken
 from signals at the start of each step. Renode's own sensor models (I2C
 temperature, IMU, ...) are fed through a sysbus bridge peripheral and a plain
-``sysbus`` binding; see docs/mechatronics/RENODE.md.
+``sysbus`` binding; see docs/reference/renode.md.
 """
 from __future__ import annotations
 
