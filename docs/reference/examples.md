@@ -8,6 +8,7 @@ All examples live in `examples/mechatronics/`. Run any of them with `embeddyn me
 |---|---|---|---|
 | `dc-motor.yaml` | firmware, electrical, mechanical: all mock | — | [Tutorial 1](../tutorials/dc-motor.md), [10](../tutorials/verification.md) |
 | `dc-motor-ngspice.yaml` | mock firmware · **ngspice** 20 kHz H-bridge · mock mechanics | libngspice | [Tutorial 2](../tutorials/ngspice.md) |
+| `dc-motor-mosfet.yaml` | mock firmware · **ngspice** MOSFET H-bridge with dead time and device losses · mock mechanics | libngspice | [ngspice adapter](ngspice.md#example-mosfet-h-bridge-with-dead-time) |
 | `dc-motor-renode.yaml` | **Renode** STM32 speed controller · mock electrical/mechanical | Renode | |
 | `dc-motor-full.yaml` | **Renode** firmware · **ngspice** H-bridge · mock mechanics | Renode, libngspice | [Tutorial 2](../tutorials/ngspice.md#step-5-with-real-firmware-too) |
 | `servo-drivetrain.yaml` | PI · DCMotorRL · **GearedDrivetrain** with backlash · **ThermalRC** | — | [Tutorials 7](../tutorials/tuning.md), [8](../tutorials/tolerance.md) |
@@ -27,6 +28,7 @@ All examples live in `examples/mechatronics/`. Run any of them with `embeddyn me
 | `tuning/two-wheel.yaml` | `tune` | two-wheel-drive |
 | `tuning/arm-firmware.yaml` | `tune` (Nelder–Mead) | mujoco-arm-firmware |
 | `tuning/arm-firmware-cmaes.yaml` | `tune` (CMA-ES, 4 workers) | mujoco-arm-firmware |
+| `tuning/dead-time.yaml` | `tune` (4 workers) | dc-motor-mosfet |
 | `tolerance/servo.yaml` | `tolerance` | servo-drivetrain |
 | `estimation/dc-motor.yaml` | `estimate` | dc-motor + `bench/dc-motor-step-test.csv` |
 
@@ -37,7 +39,7 @@ All examples live in `examples/mechatronics/`. Run any of them with `embeddyn me
 | `firmware/` | C sources and Makefiles for the STM32L476 examples (`rc-servo-l476`, `arm-joint-l476`, `motor-speed-control`) |
 | `renode/` | `.resc` scripts and `.repl` platform descriptions (incl. the SPI/I²C sensor platform) |
 | `bindings/` | Renode, ngspice and Webots binding files |
-| `circuits/` | SPICE netlists (`motor-hbridge.cir`) |
+| `circuits/` | SPICE netlists (`motor-hbridge.cir`, `motor-hbridge-mosfet.cir`) |
 | `mujoco/` | MJCF models (`arm-joint.xml`) |
 | `fmus/` | the rotational-load FMU (FMI 2 and 3) and its build script |
 | `golden/` | golden waveforms for verification |

@@ -1,0 +1,13 @@
+# Signal bindings for circuits/motor-hbridge-mosfet.cir (backend: ngspice-shared).
+# Same inputs and outputs as ngspice-hbridge.yaml, plus the MOSFETs' dissipation.
+bindings:
+  - {signal: electrical.pwm_duty, direction: input, source: Vdutyp, min: 0.0, max: 1.0}
+  - {signal: electrical.pwm_duty, direction: input, source: Vdutyn, scale: -1.0, min: 0.0, max: 1.0}
+  - {signal: electrical.supply_voltage, direction: input, source: Vbus}
+  - {signal: electrical.back_emf, direction: input, source: Vbemf}
+
+  - {signal: electrical.motor_current, direction: output, vector: "i(Vsense)", mode: mean}
+  - {signal: electrical.motor_voltage, direction: output, vector: "V(a,b)", mode: mean}
+  - {signal: electrical.input_power, direction: output, vector: "V(pin)", mode: mean}
+  # Channel + body-diode dissipation of the four MOSFETs, averaged over each step.
+  - {signal: electrical.bridge_loss, direction: output, vector: "V(ploss)", mode: mean}

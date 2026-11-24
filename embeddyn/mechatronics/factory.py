@@ -60,6 +60,7 @@ def ngspice_shared_kwargs(project: MechatronicProject, cfg) -> dict:
         "max_step": float(max_step) if max_step is not None else project.step_seconds / 50,
         "duration": project.duration_seconds,
         "options": dict(options.get("spice_options", {})),
+        "save": str(options.get("save", "bound")),
     }
 
 

@@ -1,0 +1,13 @@
+# Choose the H-bridge dead time that minimises MOSFET losses (ngspice, libngspice).
+# Too short: both switches of a leg conduct at once (shoot-through). Too long:
+# the body diodes carry the current for longer and the bridge voltage sags.
+#   embeddyn mechatronics tune examples/mechatronics/tuning/dead-time.yaml --workers 4
+# Each evaluation simulates 30 ms of switching (~12 s); every worker runs its own libngspice.
+project: ../dc-motor-mosfet.yaml
+duration: 0.03                    # the loop leaves saturation at ~15 ms and switches at ~55 % duty
+parameters:
+  bridge.dead_time: {initial: 5.0e-7, min: 2.0e-8, max: 2.0e-6, scale: log}
+objective:
+  - {metric: loss_energy.integral, weight: 1000.0}   # MOSFET losses over the run, mJ
+max_evaluations: 12
+workers: 4

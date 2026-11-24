@@ -1,0 +1,63 @@
+name: dc-motor-mosfet-bridge
+step_seconds: 0.0005
+duration_seconds: 0.1
+metadata:
+  description: >
+    DC motor speed loop on a MOSFET H-bridge in ngspice: gate drivers with
+    dead time, body diodes, device losses. Dead time and gate resistance are
+    parameters, so `tune`, `tolerance` and `-p` overrides reach the circuit.
+
+parameters:
+  motor.k: {value: 0.08, unit: N*m/A}   # torque constant Kt = back-EMF constant Ke (V*s/rad), declared once
+  bridge.dead_time: {value: 2.0e-7, unit: s}        # {{bridge.dead_time}} in the netlist
+  bridge.gate_resistance: {value: 10.0, unit: ohm}  # external gate resistor per MOSFET
+
+simulators:
+  firmware:
+    options: {backend: mock, bindings: bindings/renode.yaml}
+  electrical:
+    model: circuits/motor-hbridge-mosfet.cir
+    # library: /path/to/libngspice.so.0   (or NGSPICE_LIBRARY, or the system library)
+    # max_step 0.2 us resolves the dead time; ngspice refines further on the switching edges.
+    # save: bound (default) keeps only the vectors the bindings read.
+    # method=gear: trapezoidal integration rings on the stiff MOSFET edges ("timestep too small").
+    options: {backend: ngspice-shared, bindings: bindings/ngspice-hbridge-mosfet.yaml, max_step: 2.0e-7,
+              spice_options: {method: gear}}
+  mechanical:
+    model: worlds/dc_motor.wbt
+    options: {backend: mock, headless: true, port: 8765, bindings: bindings/webots.yaml}
+
+signals:
+  firmware.target_velocity: {domain: firmware, unit: rad/s, initial: 8.0}
+  firmware.measured_velocity: {domain: firmware, unit: rad/s, initial: 0.0}
+  firmware.pwm_duty: {domain: firmware, initial: 0.0, min: -1.0, max: 1.0}
+  firmware.control_error: {domain: firmware, unit: rad/s, initial: 0.0}
+  electrical.pwm_duty: {domain: electrical, initial: 0.0, min: -1.0, max: 1.0}
+  electrical.supply_voltage: {domain: electrical, unit: V, initial: 24.0}
+  electrical.motor_resistance: {domain: electrical, unit: ohm, initial: 2.0}
+  electrical.motor_inductance: {domain: electrical, unit: H, initial: 0.003}
+  electrical.back_emf: {domain: electrical, unit: V, initial: 0.0}
+  electrical.motor_voltage: {domain: electrical, unit: V, initial: 0.0}
+  electrical.motor_current: {domain: electrical, unit: A, initial: 0.0}
+  electrical.input_power: {domain: electrical, unit: W, initial: 0.0}
+  electrical.bridge_loss: {domain: electrical, unit: W, initial: 0.0}
+  mechanical.motor_torque: {domain: mechanical, unit: N*m, initial: 0.0}
+  mechanical.load_torque: {domain: mechanical, unit: N*m, initial: 0.03}
+  mechanical.damping: {domain: mechanical, unit: N*m*s/rad, initial: 0.08}
+  mechanical.inertia: {domain: mechanical, unit: kg*m^2, initial: 0.002}   # light rotor: settles in ~40 ms, then switches at ~75 % duty
+  mechanical.position: {domain: mechanical, unit: rad, initial: 0.0}
+  mechanical.velocity: {domain: mechanical, unit: rad/s, initial: 0.0}
+  mechanical.acceleration: {domain: mechanical, unit: rad/s^2, initial: 0.0}
+
+couplings:
+  - {source: firmware.pwm_duty, target: electrical.pwm_duty}
+  - {source: mechanical.velocity, target: electrical.back_emf, gain: "@motor.k", delay_steps: 1}
+  - {source: electrical.motor_current, target: mechanical.motor_torque, gain: "@motor.k"}
+  - {source: mechanical.velocity, target: firmware.measured_velocity, delay_steps: 1}
+
+metrics:
+  speed: {type: step_response, signal: mechanical.velocity, target: firmware.target_velocity, settling_band: 0.02}
+  current: {type: stats, signal: electrical.motor_current}
+  energy: {type: integral, signal: electrical.input_power}
+  bridge_loss: {type: stats, signal: electrical.bridge_loss}
+  loss_energy: {type: integral, signal: electrical.bridge_loss}

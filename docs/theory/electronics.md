@@ -57,6 +57,22 @@ The netlist is plain SPICE. Before loading, the adapter replaces `{{signal.name}
 
 The mechanical domain integrates torque over the macro step. Feeding it the step-mean current gives the correct impulse \(\int \tau\,dt = K_t \int i\,dt\) regardless of ripple phase; feeding it the end-of-step current would alias the 20 kHz ripple into a spurious low-frequency torque. The same argument applies to input power for energy balances.
 
+### Dead time and switching losses
+
+A half-bridge leg must never have both switches on: the supply would be
+shorted through them (shoot-through). The gate driver therefore waits a
+dead time \(t_d\) after turning one switch off before turning the other on.
+During \(t_d\) the load current keeps flowing through a body diode, at
+about 0.8 V instead of \(I R_{DS(on)}\), and the bridge output follows the
+current direction instead of the duty, so the switching leg delivers about
+\(t_d f_{PWM} V_{bus}\) less (0.96 V for 2 µs at 20 kHz and 24 V; the
+simulated bridge loses 0.98 V). The loss therefore has two
+regimes: below the switches' turn-off time it is dominated by shoot-through
+(here 11 W at \(t_d = 0\)); above it, it rises slowly with \(t_d\)
+(diode conduction). Because the dead time is a netlist placeholder bound to
+a project parameter, `tune` can choose it against a loss metric
+([MOSFET bridge](../reference/ngspice.md#example-mosfet-h-bridge-with-dead-time)).
+
 ## Circuits from KiCad
 
 `embeddyn mechatronics kicad-export board.kicad_sch -o board.cir` calls `kicad-cli sch export netlist --format spice`. Mark the sources the co-simulation drives as `external` and map them in a bindings file; see [Export a KiCad schematic to SPICE](../guides/kicad.md).
@@ -64,5 +80,5 @@ The mechanical domain integrates torque over the macro step. Feeding it the step
 ## Limits
 
 * libngspice is a process-global library: **one ngspice-shared instance per process** (use `--isolate-adapters` for more).
-* All result points are kept in memory for the run.
+* The points of the saved vectors are kept in memory for the run (`save: bound`, the default, keeps only the vectors the bindings read).
 * No checkpoint/restore of the SPICE state.

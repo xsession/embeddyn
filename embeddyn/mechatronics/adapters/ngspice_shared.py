@@ -16,6 +16,14 @@ Each step:
 
 libngspice holds global state, so only one instance can run per process. Use
 `--isolate` (process-isolated adapters) to run several at once.
+
+ngspice keeps every saved vector for the whole run. With `save: bound` (the
+default) only the vectors the output bindings read are saved, so memory grows
+with the bound outputs, not with the size of the circuit; `save: all` keeps
+ngspice's default (every node and branch). libngspice ignores `.save` cards
+outside batch mode, and `save` entries share the debug list with `stop`
+breakpoints, so the adapter issues the `save` command after clearing that
+list each step.
 """
 from __future__ import annotations
 
@@ -34,6 +42,7 @@ import yaml
 from .base import SimulatorAdapter, StepResult
 
 OUTPUT_MODES = ("last", "mean", "rms", "min", "max")
+SAVE_MODES = ("bound", "all")
 INPUT_KINDS = ("source", "current_source", "alter")
 
 _SendChar = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_void_p)
@@ -91,6 +100,9 @@ class _Ngspice:
         self.lib.ngSpice_Circ.argtypes = [ctypes.POINTER(ctypes.c_char_p)]
         self.lib.ngGet_Vec_Info.argtypes = [ctypes.c_char_p]
         self.lib.ngGet_Vec_Info.restype = ctypes.POINTER(_VectorInfo)
+        self.lib.ngSpice_CurPlot.restype = ctypes.c_char_p
+        self.lib.ngSpice_AllVecs.argtypes = [ctypes.c_char_p]
+        self.lib.ngSpice_AllVecs.restype = ctypes.POINTER(ctypes.c_char_p)
         self.owner: object | None = None
         self.output: list[str] = []
         self.exit_status: int | None = None
@@ -165,6 +177,15 @@ class _Ngspice:
         if self.lib.ngSpice_Circ(array) != 0 or self.exit_status is not None or any(
                 "error" in line.lower() for line in self.output[mark:]):
             raise NgspiceError("ngspice could not load the circuit:\n" + "\n".join(self.output[mark:][-20:]))
+
+    def vector_names(self) -> list[str]:
+        """Names of the vectors in the current plot (what ngspice keeps for the run)."""
+        names, array = [], self.lib.ngSpice_AllVecs(self.lib.ngSpice_CurPlot())
+        index = 0
+        while array and array[index]:
+            names.append(array[index].decode())
+            index += 1
+        return names
 
     def vector(self, name: str, start: int = 0) -> list[float]:
         # ngGet_Vec_Info returns a pointer to one static struct: copy before the next call.
@@ -253,6 +274,21 @@ _TEMPLATE = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}")
 _DROP_CARDS = (".tran", ".end", ".op", ".ac", ".dc", ".noise", ".tf")
 
 
+def saved_vectors(outputs: Iterable[NgspiceOutputBinding]) -> list[str]:
+    """`.save` names for the vectors the output bindings read: V(a,b) -> a b, I(Vx) -> vx#branch."""
+    names: list[str] = []
+    for binding in outputs:
+        match = _PROBE.fullmatch(binding.vector.strip())
+        if not match:
+            wanted = [binding.vector.strip()]
+        elif match.group(1).lower() == "i":
+            wanted = [f"{match.group(2).strip()}#branch"]
+        else:
+            wanted = [match.group(2).strip()] + ([match.group(3).strip()] if match.group(3) else [])
+        names.extend(name.lower() for name in wanted if name.lower() not in names)
+    return names
+
+
 def prepare_netlist(text: str, values: Mapping[str, float], tran: str) -> list[str]:
     """Substitute {{signal}} placeholders with start values, drop analyses and
     .control blocks, and append the co-simulation transient analysis."""
@@ -289,7 +325,7 @@ class NgspiceSharedAdapter(SimulatorAdapter):
     def __init__(self, netlist: str | os.PathLike[str], bindings: str | os.PathLike[str] | None = None,
                  inline_bindings: Iterable[Mapping[str, Any]] = (), library: str | None = None,
                  max_step: float | None = None, duration: float | None = None,
-                 options: Mapping[str, Any] | None = None) -> None:
+                 options: Mapping[str, Any] | None = None, save: str = "bound") -> None:
         self.netlist = Path(netlist)
         self.bindings_path = str(bindings) if bindings else None
         self.inline_bindings = [dict(entry) for entry in inline_bindings]
@@ -298,6 +334,9 @@ class NgspiceSharedAdapter(SimulatorAdapter):
         self.max_step = max_step
         self.duration = duration
         self.spice_options = dict(options or {})
+        if save not in SAVE_MODES:
+            raise ValueError(f"ngspice save must be one of {', '.join(SAVE_MODES)}")
+        self.save = save
         self.spice: _Ngspice | None = None
         self._stop_time = 0.0
         self._time_epsilon = 1e-15
@@ -305,6 +344,7 @@ class NgspiceSharedAdapter(SimulatorAdapter):
         self._index = 0
         self._sources: dict[str, float] = {}
         self._altered: dict[str, float] = {}
+        self._save_command: str | None = None
 
     # Called from ngspice's thread (the caller's, in foreground runs).
     def _source_value(self, name: str, _time: float) -> float:
@@ -328,6 +368,8 @@ class NgspiceSharedAdapter(SimulatorAdapter):
         if self.spice_options:
             options = " ".join(f"{key}={value}" for key, value in self.spice_options.items())
             lines.insert(len(lines) - 2, f".options {options}")
+        self._save_command = ("save " + " ".join(["time", *saved_vectors(self.bindings.outputs)])
+                              if self.save == "bound" and self.bindings.outputs else None)
         self.spice = _Ngspice.acquire(find_library(self.library), self)
         try:
             self.spice.command("destroy all")
@@ -360,8 +402,10 @@ class NgspiceSharedAdapter(SimulatorAdapter):
             return StepResult(self._read_outputs(self._index), {"time": self._time})
         self._apply_inputs(inputs)
         self._stop_time = target
-        self.spice.command("delete all")
-        self.spice.command(f"stop when time >= {target - self._time_epsilon!r}")
+        self.spice.command("delete all")          # clears `stop` and `save` entries alike
+        if self._save_command:
+            self.spice.command(self._save_command)
+        self.spice.command(f"stop when time >= {target!r}")
         self.spice.command("resume" if self._started else "run")
         self._started = True
         times = self.spice.vector("time", self._index)
@@ -411,7 +455,10 @@ class NgspiceSharedAdapter(SimulatorAdapter):
             self.spice = None
 
     def health(self) -> dict[str, object]:
-        return {**super().health(), "time": self._time, "points": self._index}
+        health: dict[str, object] = {**super().health(), "time": self._time, "points": self._index, "save": self.save}
+        if self.spice is not None and self._started:
+            health["vectors"] = len(self.spice.vector_names())
+        return health
 
     def capabilities(self) -> dict[str, bool]:
         return {"deterministic_step": True, "variable_step": True, "checkpoint": False, "real_time": False,

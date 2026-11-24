@@ -17,8 +17,12 @@ state) stays for batch use; use `ngspice-shared` for co-simulation.
    `GetVSRCData`/`GetISRCData` callbacks), or through `alter` when a device
    parameter changes (sent only when the value changes).
 2. The adapter sets `stop when time >= t` and runs (first step) or resumes the
-   analysis. ngspice's `GetSyncData` callback shortens the last internal
-   timestep, so the analysis lands **exactly** on the co-simulation time.
+   analysis. ngspice turns the condition into a breakpoint at `t`, and its
+   `GetSyncData` callback shortens the last internal timestep, so the
+   analysis lands **exactly** on the co-simulation time. (The stop used to be
+   set a hair before `t`; when a source breakpoint, such as a PWM carrier
+   corner, fell on the grid, the next step then had to be 10⁻¹⁶ s long and
+   failed with "timestep too small".)
 3. **Outputs** are read from the result vectors over the step window: the last
    value, or the time-weighted `mean`, `rms`, `min` or `max`.
 
@@ -37,6 +41,7 @@ simulators:
       max_step: 1.0e-6        # ngspice max timestep (default: step_seconds / 50)
       # library: /path/to/libngspice.so.0   (or NGSPICE_LIBRARY, or the system library)
       # spice_options: {reltol: 0.001}       (written as one .options card)
+      # save: bound                          (default) or all, see below
       # inline_bindings: [...]               (same format as the bindings file)
 ```
 
@@ -65,6 +70,21 @@ duty split into two legs with `scale: -1` and `min: 0`. Quote vector
 expressions in YAML flow style (`vector: "V(a,b)"`), otherwise the comma
 splits the mapping.
 
+### What ngspice keeps: `save`
+
+ngspice keeps every saved vector for the whole run. With `save: bound` (the
+default) only `time` and the vectors the output bindings read are saved:
+`V(a,b)` saves nodes `a` and `b`, `I(Vx)` saves `vx#branch`, a raw vector
+name is saved as written. `save: all` keeps ngspice's default, every node and
+branch current, which you need only to inspect other vectors interactively.
+On the MOSFET bridge below this keeps 6 vectors instead of 50 (about 5 MB
+instead of 44 MB per 20 ms simulated) with identical outputs.
+
+libngspice ignores `.save` cards outside batch mode, and `save` entries share
+ngspice's debug list with `stop` breakpoints, which the adapter clears every
+step; so the adapter issues the `save` command itself before each run/resume.
+A `.save` card in your netlist has no effect.
+
 ## Example: switching H-bridge
 
 `examples/mechatronics/circuits/motor-hbridge.cir`
@@ -90,6 +110,67 @@ Two netlist pitfalls found while building it:
 * Keep the carrier inside 0..1 by more than the switch hysteresis, so duty 0
   and 1 hold a switch firmly on or off.
 
+## Example: MOSFET H-bridge with dead time
+
+`examples/mechatronics/circuits/motor-hbridge-mosfet.cir` replaces the ideal
+switches with four N-channel power MOSFETs (a generic 60 V, ~10 mΩ `VDMOS`
+model with its body diode, gate charge and junction capacitances) and adds
+the gate drive:
+
+* **Dead time.** Each leg's high side is on while duty > carrier + δ and its
+  low side while duty < carrier − δ, with δ = `tdead` × carrier slope / 2, so
+  both are off for `tdead` around every edge. Duty 0 (below 0.5 %) and 1
+  (above 99.5 %) hold a switch on, so an idle leg is never blanked.
+* **Gate drivers**: a 12 V output with about 10 ns rise and fall (a `tanh`
+  edge, which ngspice integrates more easily than a step) through the gate
+  resistor; the high-side driver floats on its switch node (an ideal
+  bootstrap supply).
+* **Losses**: `V(ploss)` is the dissipation of the four devices,
+  V<sub>DS</sub>·I<sub>D</sub> summed over channel and body diode, measured
+  through 0 V sources in the drains.
+
+`{{bridge.dead_time}}` and `{{bridge.gate_resistance}}` are **project
+parameters** in `dc-motor-mosfet.yaml` (200 ns and 10 Ω), so `-p
+bridge.dead_time=100ns`, `tune` and `tolerance` reach the netlist like any
+parameter. The project uses a ten times lighter rotor than
+`dc-motor-ngspice.yaml`, so the speed loop leaves saturation after about
+15 ms and the bridge switches at about 55 % duty.
+
+Bridge loss at 0.1 s (24 V, about 6 A), from real runs:
+
+| Dead time | 0 | 100 ns | 200 ns | 500 ns | 1 µs |
+|---|---|---|---|---|---|
+| MOSFET losses | 11.2 W | 0.80 W | 0.82 W | 0.85 W | 0.93 W |
+
+Without dead time both switches of a leg conduct at every edge
+(shoot-through, current spikes of about 90 A). Above about 100 ns the
+losses rise slowly, because the body diodes (about 0.8 V) carry the
+current for longer than the channels (a few mΩ), and the mean bridge voltage
+sags by about t<sub>d</sub>·f<sub>PWM</sub>·V<sub>bus</sub> (0.98 V at 2 µs).
+
+`tuning/dead-time.yaml` lets `tune` choose the dead time against the loss
+energy over 30 ms:
+
+```bash
+embeddyn mechatronics tune examples/mechatronics/tuning/dead-time.yaml --workers 4
+```
+
+12 evaluations take about 70 s on 4 workers (each worker runs its own
+libngspice). From 500 ns (35.5 mJ) Nelder–Mead settles at 89 ns (32.0 mJ);
+at 45 ns shoot-through starts (45.0 mJ). The optimum sits just above
+that cliff, and the model has no driver propagation-delay spread, so a real
+design adds margin: put the spread into `tolerance` or constrain the dead
+time's lower bound.
+The peak drain currents are dominated by body-diode reverse recovery and
+ringing of this generic model, so they aren't bound as outputs.
+
+Solver settings: `spice_options: {method: gear}`. The default trapezoidal
+rule rings on the stiff switching edges and stopped one closed-loop run with
+"timestep too small" at a carrier corner; `max_step: 2.0e-7` resolves the
+dead time. 0.1 s takes about 40 s (vs about 2 s for the ideal-switch bridge),
+so use this circuit where the switching itself matters, and the ideal-switch
+bridge or the averaged mock elsewhere.
+
 ## Getting libngspice
 
 * Debian/Ubuntu: `sudo apt install libngspice0`.
@@ -106,9 +187,9 @@ the library is found and are skipped otherwise.
 * libngspice holds global state: **one instance per process**. A second
   adapter in the same process fails with a clear error; run with process
   isolation (`--isolate`) to use several circuits.
-* All result points stay in memory for the whole run (about 250 000 points
-  per 0.25 s at a 1 µs max step). Very long runs need a larger max step or a
-  future `.save`-based vector filter.
+* All result points of the saved vectors stay in memory for the whole run
+  (about 250 000 points per 0.25 s at a 1 µs max step); `save: bound` keeps
+  that to the bound vectors. Very long runs also need a larger max step.
 * No checkpoint/restore.
 * `alter` changes during a transient work for most passive and source
   parameters; check ngspice's documentation for the device you alter.

@@ -1,0 +1,81 @@
+* DC motor on a MOSFET H-bridge: gate drivers with dead time, body diodes.
+* Used with backend ngspice-shared (libngspice), like motor-hbridge.cir, but
+* with real switching devices instead of ideal switches, so conduction,
+* switching, body-diode and shoot-through losses show up in the supply power.
+*
+* Inputs (external sources, values set by Embeddyn each step):
+*   Vdutyp  positive duty 0..1 (leg A switches, leg B low side on)
+*   Vdutyn  negative duty 0..1 (leg B switches, leg A low side on)
+*   Vbus    supply voltage
+*   Vbemf   back-EMF in volts
+* Outputs (vectors read by Embeddyn):
+*   i(Vsense)  winding current     V(a,b)  bridge output voltage
+*   V(pin)     power drawn from the supply
+*   V(ploss)   power dissipated in the four MOSFETs (channel + body diode)
+*   i(Vd2)     leg A low-side drain current (shoot-through shows as a spike)
+* {{name}} placeholders take a signal's start value or a parameter's value:
+*   bridge.dead_time       s    blanking between one switch off and the other on
+*   bridge.gate_resistance ohm  external gate resistor (switching speed)
+
+.param rmotor={{electrical.motor_resistance}}
+.param lmotor={{electrical.motor_inductance}}
+.param tdead={{bridge.dead_time}}
+.param rgate={{bridge.gate_resistance}}
+.param vdrv=12
+* Carrier slope (duty units per second) and the comparator offset that
+* blanks each edge for tdead: the triangle sweeps 0.98 in 24.995 us.
+.param slope={0.98/24.995u}
+.param dband={tdead*slope/2}
+* Gate driver output rise/fall about 10 ns (tanh width in duty units).
+.param kdrv={1/(10n*slope)}
+
+* Supply with source resistance and DC-link capacitor
+Vbus vsrc 0 dc 0 external
+Rsrc vsrc vbus 0.05
+Cbus vbus 0 470u ic={{electrical.supply_voltage}}
+Bpin pin 0 V = -V(vsrc)*I(Vbus)
+
+* 20 kHz triangle carrier (see motor-hbridge.cir for the 10 ns flat top)
+Vtri tri 0 PULSE(0.01 0.99 0 24.995u 24.995u 10n 50u)
+Vdutyp dutyp 0 dc 0 external
+Vdutyn dutyn 0 dc 0 external
+
+* Gate drivers: high side on while duty > carrier + dband, low side on while
+* duty < carrier - dband, so both are off for tdead around every crossing.
+* Duty 0 (below 0.5 %) holds the low side on and duty 1 (above 99.5 %) the
+* high side, so an idle leg is never blanked near the carrier's ends.
+* The high-side driver floats on its switch node (ideal bootstrap supply).
+Bgha gha_d a V = vdrv/2*(1+tanh(kdrv*max(V(dutyp)-V(tri)-dband, V(dutyp)-0.995)))
+Bgla gla_d 0 V = vdrv/2*(1+tanh(kdrv*max(V(tri)-V(dutyp)-dband, 0.005-V(dutyp))))
+Bghb ghb_d b V = vdrv/2*(1+tanh(kdrv*max(V(dutyn)-V(tri)-dband, V(dutyn)-0.995)))
+Bglb glb_d 0 V = vdrv/2*(1+tanh(kdrv*max(V(tri)-V(dutyn)-dband, 0.005-V(dutyn))))
+Rgha gha_d gha {rgate}
+Rgla gla_d gla {rgate}
+Rghb ghb_d ghb {rgate}
+Rglb glb_d glb {rgate}
+
+* Leg A: M1 high side, M2 low side; Vdx sense the drain currents.
+Vd1 vbus d1 0
+M1 d1 gha a nfet
+Vd2 a d2 0
+M2 d2 gla 0 nfet
+* Leg B
+Vd3 vbus d3 0
+M3 d3 ghb b nfet
+Vd4 b d4 0
+M4 d4 glb 0 nfet
+
+* Generic 60 V, ~10 mOhm N-channel power MOSFET with body diode (VDMOS).
+.model nfet VDMOS(Vto=3 Kp=60 Rd=4m Rs=2m Rg=1 Lambda=0.002
++ Cgs=2n Cgdmax=1.2n Cgdmin=80p A=0.6 Cjo=1n M=0.5 Vj=0.8
++ Is=5p N=1.05 Rb=4m tt=40n)
+
+* Dissipation in the four devices: V(drain, source) * drain current.
+Bloss ploss 0 V = V(d1,a)*I(Vd1) + V(d2)*I(Vd2) + V(d3,b)*I(Vd3) + V(d4)*I(Vd4)
+
+* Motor winding: R, L, back-EMF; Vsense measures the current a -> b
+Vsense a wa dc 0
+Rmotor wa wl {rmotor}
+Lmotor wl wb {lmotor} ic={{electrical.motor_current}}
+Vbemf wb b dc 0 external
+.end

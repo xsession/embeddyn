@@ -162,3 +162,92 @@ def test_hbridge_example_closed_loop(tmp_path):
     assert 1.5 < last["mechanical.velocity"] < 2.5
     with (tmp_path / "run.csv").open() as handle:
         assert len(list(csv.DictReader(handle))) == len(rows)
+
+
+def test_saved_vectors_cover_the_output_bindings():
+    from embeddyn.mechatronics.adapters.ngspice_shared import saved_vectors
+    outputs = load_ngspice_bindings(inline=[
+        {"signal": "a", "vector": "V(a,b)"}, {"signal": "b", "vector": "I(Vsense)"},
+        {"signal": "c", "vector": "v(a)"}, {"signal": "d", "vector": "@m1[id]"}]).outputs
+    assert saved_vectors(outputs) == ["a", "b", "vsense#branch", "@m1[id]"]
+    with pytest.raises(ValueError, match="save must be"):
+        NgspiceSharedAdapter("x.cir", save="some")
+
+
+@needs_ngspice
+def test_save_bound_keeps_only_bound_vectors(tmp_path):
+    """`save: bound` (default) gives the same outputs as `save: all` with fewer vectors kept."""
+    results = {}
+    for mode in ("bound", "all"):
+        adapter = _rc_adapter(tmp_path, save=mode)
+        adapter.start({"e.vin": 1.0, "e.r": 1000.0})
+        try:
+            results[mode] = [adapter.step(k * 5e-4, 5e-4, {"e.vin": 1.0, "e.r": 1000.0}).outputs for k in range(1, 4)]
+            names = {name.lower() for name in adapter.spice.vector_names()}
+            assert adapter.health()["vectors"] == len(names)
+        finally:
+            adapter.stop()
+        if mode == "bound":
+            assert "in" not in names and {"out", "vin#branch", "time"} <= names
+        else:
+            assert "in" in names
+    assert results["bound"] == results["all"]
+
+
+PULSED = """* RC driven by a pulse whose period boundaries fall on the co-simulation grid
+Vp in 0 PULSE(0 1 0 24.995u 24.995u 10n 50u)
+R1 in out 1k
+C1 out 0 10n
+"""
+
+
+@needs_ngspice
+def test_steps_ending_on_a_source_breakpoint(tmp_path):
+    """Regression: the step's stop time used to sit 1e-16 s before a PULSE breakpoint that
+    coincides with the grid (every 0.5 ms here), and the next step failed with
+    'timestep too small'."""
+    netlist = tmp_path / "pulsed.cir"
+    netlist.write_text(PULSED, encoding="utf-8")
+    adapter = NgspiceSharedAdapter(netlist, inline_bindings=[{"signal": "e.vout", "vector": "V(out)", "mode": "mean"}],
+                                   max_step=2e-7, duration=0.003)
+    adapter.start({})
+    try:
+        means = [adapter.step(k * 5e-4, 5e-4, {}).outputs["e.vout"] for k in range(1, 7)]
+    finally:
+        adapter.stop()
+    assert all(m == pytest.approx(0.5, abs=0.02) for m in means)
+
+
+MOSFET = ROOT / "examples/mechatronics/dc-motor-mosfet.yaml"
+
+
+def test_mosfet_example_wiring():
+    project = MechatronicProject.load(MOSFET)
+    adapter = build_adapters(project)[Domain.ELECTRICAL]
+    assert adapter.save == "bound" and adapter.spice_options == {"method": "gear"}
+    assert "electrical.bridge_loss" in {b.signal for b in adapter.bindings.outputs}
+    assert project.parameters["bridge.dead_time"].value == pytest.approx(2e-7)
+
+
+def _mosfet_run(dead_time: float):
+    project = MechatronicProject.load(MOSFET)
+    project.duration_seconds = 0.025
+    project.apply_parameter_overrides({"bridge.dead_time": dead_time})
+    return CoSimulationOrchestrator(project, build_adapters(project)).run()
+
+
+@needs_ngspice
+def test_mosfet_bridge_dead_time_prevents_shoot_through():
+    """MOSFET H-bridge in the loop: the dead time is a project parameter that reaches the
+    netlist. Without it both switches of a leg conduct at every edge (shoot-through)."""
+    blanked, shorted = _mosfet_run(2e-7), _mosfet_run(0.0)
+    late = [row for row in blanked if row["time"] >= 0.02]
+    assert all(0.3 < row["firmware.pwm_duty"] < 0.9 for row in late)          # switching, not saturated
+    loss = sum(row["electrical.bridge_loss"] for row in late) / len(late)
+    loss_shorted = sum(row["electrical.bridge_loss"] for row in shorted if row["time"] >= 0.02) / len(late)
+    assert 0.3 < loss < 2.0 and loss_shorted > 5 * loss
+    # Supply power covers the motor's electrical power plus the bridge losses (within the
+    # small source-resistance and bleed losses).
+    last = late[-1]
+    motor = last["electrical.motor_voltage"] * last["electrical.motor_current"]
+    assert last["electrical.input_power"] == pytest.approx(motor + last["electrical.bridge_loss"], rel=0.05)
