@@ -176,6 +176,40 @@ def test_build_and_run_f28069(tmp_path):
     assert list(r["reads"].values()) == ["0x12345678", "0x00000001"], r
 
 
+def test_mspm0_profiles(monkeypatch):
+    monkeypatch.setenv("MSPM0_SDK", "/sdk")
+    monkeypatch.setenv("ARM_BIN", "/arm")
+    for name, dev, lib in (("mspm0g3507", "MSPM0G3507", "mspm0g1x0x_g3x0x"), ("mspm0c1103", "MSPM0C1103", "mspm0c110x")):
+        tc = tools.load_profile(name)["toolchain"]
+        assert tc["cc"] == "/arm/arm-none-eabi-gcc"
+        assert f"-D__{dev}__" in tc["cflags"]
+        assert f"-T/sdk/source/ti/devices/msp/m0p/linker_files/gcc/{dev.lower()}.lds" in tc["cflags"]
+        assert f"/sdk/source/ti/driverlib/lib/gcc/m0p/{lib}/driverlib.a" in tc["cflags_post"]
+
+
+needs_mspm0 = pytest.mark.skipif(not (os.environ.get("MSPM0_SDK") and os.environ.get("ARM_BIN") and os.environ.get("RENODE_BIN")
+                                      and os.environ.get("RENODE_ROOT") and shutil.which("dotnet")),
+                                 reason="MSPM0_SDK, ARM_BIN (arm-none-eabi with newlib), RENODE_BIN, RENODE_ROOT and dotnet needed")
+
+
+@needs_mspm0
+@pytest.mark.parametrize("profile,platform,sram", [("mspm0g3507", "platforms/cpus/ti/mspm0g3507.repl", 0x20200000),
+                                                   ("mspm0c1103", "platforms/cpus/ti/mspm0c1103.repl", 0x20000000)])
+def test_build_and_run_mspm0(tmp_path, profile, platform, sram):
+    src = tmp_path / "t.c"
+    src.write_text("#include <ti/devices/msp/msp.h>\n#include <ti/driverlib/driverlib.h>\nvolatile uint32_t r[2];\n"
+                   "int main(void)\n{\n    DL_GPIO_reset(GPIOA);\n    DL_GPIO_enablePower(GPIOA);\n"
+                   "    DL_GPIO_initDigitalOutput(IOMUX_PINCM1);\n    DL_GPIO_enableOutput(GPIOA, DL_GPIO_PIN_0);\n"
+                   "    DL_GPIO_setPins(GPIOA, DL_GPIO_PIN_0);\n    r[0] = 0x12345678;\n    r[1] = GPIOA->DOUT31_0;\n"
+                   "    for(;;) {\n    }\n}\n")
+    b = tools.build_firmware(profile, str(src), out_dir=str(tmp_path / "b"))
+    assert b["ok"], b
+    r = tools.renode_run(platform, [{"file": b["elf"], "kind": "elf"}], run_for="0.001",
+                         reads=[f"0x{sram:X}:32", f"0x{sram + 4:X}:32"], after=["iomux PinLevel 0"])
+    assert list(r["reads"].values()) == ["0x12345678", "0x00000001"], r
+    assert r["after"]["iomux PinLevel 0"] == "True"
+
+
 needs_tools = pytest.mark.skipif(not (os.environ.get("XC16_BIN") and os.environ.get("RENODE_BIN") and os.environ.get("RENODE_ROOT")
                                       and shutil.which("dotnet")), reason="XC16_BIN, RENODE_BIN, RENODE_ROOT and dotnet needed")
 

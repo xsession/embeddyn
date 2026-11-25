@@ -1,0 +1,70 @@
+{
+  "name": "mspm0c1103",
+  "description": "TI MSPM0C1103 (Cortex-M0+, 24 MHz, 8 KB flash, 1 KB SRAM; C1104: 16 KB flash): GNU Arm toolchain with the MSPM0 SDK, Renode MSPM0 models",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "MSPM0_SDK": "/opt/ti/mspm0_sdk_2_01_00_03",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0plus",
+      "-mthumb",
+      "-O1",
+      "-g",
+      "-D__MSPM0C1103__",
+      "-I${MSPM0_SDK}/source",
+      "-I${MSPM0_SDK}/source/third_party/CMSIS/Core/Include",
+      "-nostartfiles",
+      "-ffunction-sections",
+      "-fdata-sections",
+      "-T${MSPM0_SDK}/source/ti/devices/msp/m0p/linker_files/gcc/mspm0c1103.lds"
+    ],
+    "cflags_post": [
+      "${MSPM0_SDK}/source/ti/devices/msp/m0p/startup_system_files/gcc/startup_mspm0c110x_gcc.c",
+      "${MSPM0_SDK}/source/ti/driverlib/lib/gcc/m0p/mspm0c110x/driverlib.a",
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs",
+      "-lgcc"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump"
+  },
+  "files": {},
+  "image": {
+    "base": "0x0",
+    "notes": "load the ELF ({kind: elf}) to get the symbols, or the LoadBinary images of build_firmware. Sources use the SDK headers (#include <ti/devices/msp/msp.h>, DriverLib <ti/driverlib/driverlib.h>)."
+  },
+  "memory": {
+    "flash": [
+      "0x00000000",
+      "0x00001FFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x200003FF"
+    ],
+    "nonmain": [
+      "0x41C00000",
+      "0x41C001FF"
+    ],
+    "factory": [
+      "0x41C40000",
+      "0x41C4007F"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x40FFFFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/ti/mspm0c1103.repl",
+    "pc_command": "cpu PC",
+    "notes": "Pins: 'iomux PinLevel <n>' (PA n = n, PB n = 32 + n), 'iomux RecordPin <n>' then 'iomux PinEdges/PinFrequency/PinDuty <n>'; external pin level: 'iomux OnGPIO <n> true'. ADC inputs: 'adc0 SetChannelVoltage <ch> <V>'. Without a debugger __BKPT escalates to HardFault (exception 3), as on the device. Peripheral notes: tools/mspm0/PERIPHERALS.md. MSPM0C1104 / LP-MSPM0C1104: platforms/cpus/ti/mspm0c1104.repl, platforms/boards/ti/lp_mspm0c1104.repl (use -D__MSPM0C1104__ and mspm0c1104.lds)."
+  },
+  "reference": {
+    "simulator": "none; peripheral models checked with the MSPM0 SDK DriverLib examples (tools/mspm0/run_examples.py and the examples_*.txt specs in the Renode tree)"
+  }
+}
