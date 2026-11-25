@@ -1,0 +1,94 @@
+{
+  "name": "tms320f28069",
+  "description": "TI TMS320F28069 (Piccolo: C28x + FPU32 + VCU-I + CLA, 90 MHz): TI C2000 code generation tools (cl2000, EABI) and C2000Ware headers, Renode CPU.C2000 core",
+  "env_defaults": {
+    "C2000_CGT": "/opt/ti/ti-cgt-c2000_22.6.1.LTS",
+    "C2000WARE": "/opt/ti/C2000Ware_5_02_00_00",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "style": "ti",
+    "cc": "${C2000_CGT}/bin/cl2000",
+    "cflags": [
+      "-v28",
+      "--float_support=fpu32",
+      "--vcu_support=vcu0",
+      "--cla_support=cla0",
+      "--abi=eabi",
+      "--c99",
+      "-O1",
+      "-q",
+      "-I${C2000_CGT}/include",
+      "-I${C2000WARE}/device_support/f2806x/headers/include"
+    ],
+    "extra_sources": [
+      "${C2000WARE}/device_support/f2806x/headers/source/F2806x_GlobalVariableDefs.c"
+    ],
+    "ldflags": [
+      "-i${C2000_CGT}/lib"
+    ],
+    "link_files": [
+      "${RENODE_ROOT}/tools/c2000/tests/f28069/ram.cmd"
+    ],
+    "noinit_cmd": "${C2000WARE}/device_support/f2806x/headers/cmd/F2806x_Headers_nonBIOS.cmd",
+    "libs": [
+      "-lrts2800_fpu32_eabi.lib"
+    ],
+    "objdump": "${C2000_CGT}/bin/dis2000",
+    "objdump_args": [
+      "-qq"
+    ]
+  },
+  "files": {},
+  "image": {
+    "loader": "cpu LoadTIProgram @{elf}",
+    "notes": "word addressed: word address a is bus address 2a (e.g. SysCtrlRegs at 0x7010 -> 0xE020). LoadTIProgram loads the ELF segments and sets the PC to the entry; 'cpu LoadTIProgram @f.out false' then 'cpu Reset' starts through the generated boot ROM (flash entry 0x3F7FF6). Device headers: F2806x_Device.h (register structs, not #define SFRs)."
+  },
+  "memory": {
+    "word_addressed": true,
+    "m0m1": [
+      "0x0000",
+      "0x07FF"
+    ],
+    "peripheral_frame0": [
+      "0x0800",
+      "0x1FFF"
+    ],
+    "peripheral_frames_1_3": [
+      "0x4000",
+      "0x7FFF"
+    ],
+    "ram_l0_l8": [
+      "0x8000",
+      "0x13FFF"
+    ],
+    "cla_program_l3": [
+      "0x9000",
+      "0x9FFF"
+    ],
+    "cla_message_ram": [
+      "0x1480",
+      "0x157F"
+    ],
+    "otp": [
+      "0x3D7800",
+      "0x3D7FFF"
+    ],
+    "flash": [
+      "0x3D8000",
+      "0x3F7FFF"
+    ],
+    "boot_rom": [
+      "0x3F8000",
+      "0x3FFFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/ti/tms320f28069.repl",
+    "pc_command": "cpu PC",
+    "notes": "reads of word address a: 'sysbus ReadWord 2a' / 'ReadDoubleWord 2a' (32-bit values are low word first). Peripheral docs: tools/c2000/PERIPHERALS.md in the Renode tree."
+  },
+  "reference": {
+    "simulator": "none; the C28x/FPU/VCU and CLA decoders were checked against TI dis2000 over the opcode space, execution against host-compiled references and self-checking firmware (tools/c2000/tests)"
+  }
+}

@@ -377,6 +377,8 @@ def build_firmware(profile: str, source: str, out_dir: str | None = None, extra_
     out.mkdir(parents=True, exist_ok=True)
     elf = out / (src.stem + ".elf")
     logs = []
+    if tc.get("style") == "ti":
+        return _build_ti(p, tc, src, out, extra_flags)
     if src.suffix.lower() in (".s", ".asm"):
         obj = out / (src.stem + ".o")
         r = _run([tc["as"], *tc.get("asflags", []), "-o", str(obj), str(src)])
@@ -404,6 +406,29 @@ def build_firmware(profile: str, source: str, out_dir: str | None = None, extra_
             "warnings": _lines(text, r"warning", 15)}
 
 
+def _build_ti(p: dict, tc: dict, src: Path, out: Path, extra_flags: list | None) -> dict:
+    """TI code generation tools (cl2000): compile and link in one call, load the ELF with LoadTIProgram."""
+    elf = out / (src.stem + ".out")
+    link = [*tc.get("link_files", [])]
+    if tc.get("noinit_cmd"):
+        # EABI zero-initialises uninitialised sections: the register "variables" of the device headers
+        # must be NOINIT, or the start-up code writes 0 to every peripheral register
+        text = Path(tc["noinit_cmd"]).read_text()
+        noinit = out / (Path(tc["noinit_cmd"]).stem + "_noinit.cmd")
+        noinit.write_text(re.sub(r"(> *[A-Za-z0-9_]+, *PAGE *= *1)", r"\1, type=NOINIT", text))
+        link.append(str(noinit))
+    cmd = [tc["cc"], *tc.get("cflags", []), *(extra_flags or []), f"--obj_directory={out}", str(src),
+           *tc.get("extra_sources", []), "-z", f"--output_file={elf}", f"--map_file={elf.with_suffix('.map')}",
+           *tc.get("ldflags", []), *link, *tc.get("libs", [])]
+    r = _run(cmd)
+    text = r.stdout + r.stderr
+    if r.returncode != 0 or not elf.exists():
+        return {"ok": False, "stage": "compile/link", "errors": _lines(text, r"error|undefined|cannot", 25)}
+    loader = p.get("image", {}).get("loader", "cpu LoadTIProgram @{elf}")
+    return {"ok": True, "elf": str(elf), "map": str(elf.with_suffix(".map")), "images": [],
+            "load_commands": [loader.format(elf=elf)], "warnings": _lines(text, r"warning", 15)}
+
+
 @tool("Disassemble part of an ELF with the profile's objdump: a symbol, or an address range (program addresses as the "
       "toolchain prints them).", {"profile": S, "elf": S, "symbol": S, "start": S, "end": S, "max_lines": I},
       ["profile", "elf"])
@@ -412,16 +437,20 @@ def disassemble(profile: str, elf: str, symbol: str | None = None, start: str | 
     objdump = load_profile(profile).get("toolchain", {}).get("objdump")
     if not objdump:
         raise ToolError("profile has no toolchain.objdump")
-    r = _run([objdump, "-d", str(_need_file(_path(elf), "ELF"))])
+    tc = load_profile(profile).get("toolchain", {})
+    r = _run([objdump, *tc.get("objdump_args", ["-d"]), str(_need_file(_path(elf), "ELF"))])
     lines = r.stdout.splitlines()
     if symbol:
-        idx = next((i for i, l in enumerate(lines) if re.search(rf"<_?{re.escape(symbol)}>:", l)), None)
+        # GNU objdump "<sym>:" or TI dis2000 "00009000        sym:"
+        pat = rf"<_?{re.escape(symbol)}>:|^[0-9a-f]+\s+_?{re.escape(symbol)}:\s*$"
+        idx = next((i for i, l in enumerate(lines) if re.search(pat, l)), None)
         if idx is None:
             raise ToolError(f"symbol {symbol} not found")
         sel = lines[idx:idx + max_lines]
     else:
         lo, hi = _int(start or 0), _int(end) if end else 1 << 40
-        sel = [l for l in lines if (m := re.match(r"\s*([0-9a-f]+):", l)) and lo <= int(m.group(1), 16) < hi][:max_lines]
+        sel = [l for l in lines if (m := re.match(r"\s*([0-9a-f]+):|([0-9a-f]{8})   [0-9a-f]{4}", l))
+               and lo <= int(m.group(1) or m.group(2), 16) < hi][:max_lines]
     return {"ok": True, "lines": sel}
 
 
@@ -458,11 +487,13 @@ def _load_lines(loads: list | None) -> list[str]:
     out = []
     for item in loads or []:
         if isinstance(item, str):
-            out.append(item if item.startswith("sysbus") else f"sysbus LoadBinary @{item}")
+            out.append(item if item.startswith(("sysbus", "cpu ")) else f"sysbus LoadBinary @{item}")
         else:
             kind = item.get("kind", "binary")
             if kind == "elf":
                 out.append(f"sysbus LoadELF @{item['file']}")
+            elif kind == "ti":
+                out.append(f"cpu LoadTIProgram @{item['file']}")
             elif kind == "hex":
                 out.append(f"sysbus LoadHEX @{item['file']}")
             else:
@@ -483,7 +514,7 @@ def renode_check_platform(platform: str, extra_repl: list | None = None, renode_
 
 
 @tool("Run firmware in Renode headless and return what you ask for. `loads`: LoadBinary/LoadELF/LoadHEX items "
-      "({file, address} or {file, kind: elf|hex}) or the load_commands from build_firmware. `before`/`after`: monitor "
+      "({file, address} or {file, kind: elf|hex|ti}) or the load_commands from build_firmware. `before`/`after`: monitor "
       "commands around the run (e.g. 'adc SetVoltage 1250000 3'); after-commands return their output. `reads`: "
       "addresses to read after the run ('0xA00', '0xA00:8' for a byte, ':32' for a double word). `uart`: peripheral "
       "names whose output is captured. `stimuli`: [{at: seconds, command}] run at those times. Returns values, UART text, "

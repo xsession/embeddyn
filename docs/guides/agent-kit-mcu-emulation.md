@@ -30,7 +30,9 @@ The agent kit packages that workflow so that an agent running a 27B-class open m
   Every tool returns short JSON with `ok`, so the model calls a tool instead of parsing vendor
   files or logs.
 * **MCU profiles** (`embeddyn/agents/mcu_emu/profiles/`): toolchain, files, image layout and
-  Renode platform per MCU. They cover the dsPIC30F5011, plus an STM32L476 example for SVD-described
+  Renode platform per MCU. They cover the dsPIC30F5011 and dsPIC33FJ128MC802 (XC16), the
+  TMS320F28069 (TI cl2000, `"style": "ti"`: one compile-and-link call, the ELF loaded with
+  `cpu LoadTIProgram`, dis2000 for disassembly), plus an STM32L476 example for SVD-described
   parts. Add your own in `$MCU_EMU_PROFILES`.
 
 ## Install

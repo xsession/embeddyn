@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -144,6 +145,35 @@ def test_profiles_expand_variables(monkeypatch):
     p = tools.load_profile("dspic30f5011")
     assert p["toolchain"]["cc"] == "/x/bin/xc16-gcc" and p["image"]["phantom_lane"] == 3
     assert "stm32l476" in [x["name"] for x in tools.mcu_profile_list()["profiles"]]
+
+
+def test_ti_profile(monkeypatch):
+    monkeypatch.setenv("C2000_CGT", "/cgt")
+    monkeypatch.setenv("RENODE_ROOT", "/r")
+    p = tools.load_profile("tms320f28069")
+    assert p["toolchain"]["style"] == "ti" and p["toolchain"]["cc"] == "/cgt/bin/cl2000"
+    assert p["toolchain"]["link_files"] == ["/r/tools/c2000/tests/f28069/ram.cmd"]
+    assert tools._load_lines([{"file": "a.out", "kind": "ti"}, "cpu LoadTIProgram @b.out"]) == \
+        ["cpu LoadTIProgram @a.out", "cpu LoadTIProgram @b.out"]
+
+
+needs_ti = pytest.mark.skipif(not (os.environ.get("C2000_CGT") and os.environ.get("C2000WARE") and os.environ.get("RENODE_BIN")
+                                   and os.environ.get("RENODE_ROOT") and shutil.which("dotnet")),
+                              reason="C2000_CGT, C2000WARE, RENODE_BIN, RENODE_ROOT and dotnet needed")
+
+
+@needs_ti
+def test_build_and_run_f28069(tmp_path):
+    src = tmp_path / "t.c"
+    src.write_text('#include "F2806x_Device.h"\nvolatile Uint32 r[2];\nvoid main(void)\n{\n    EALLOW;\n'
+                   '    SysCtrlRegs.WDCR = 0x0068;\n    EDIS;\n    r[0] = 0x12345678UL;\n    r[1] = SysCtrlRegs.PLLSTS.all;\n'
+                   '    __asm(" ESTOP0");\n    for(;;) {\n    }\n}\n')
+    b = tools.build_firmware("tms320f28069", str(src), out_dir=str(tmp_path / "b"))
+    assert b["ok"], b
+    word = int(re.search(r"^\S+\s+([0-9a-f]{8})\s+r\s*$", Path(b["map"]).read_text(), re.M).group(1), 16)
+    r = tools.renode_run("platforms/cpus/ti/tms320f28069.repl", b["load_commands"], run_for="0.001",
+                         reads=[f"0x{2 * word:X}:32", f"0x{2 * word + 4:X}:32"])
+    assert list(r["reads"].values()) == ["0x12345678", "0x00000001"], r
 
 
 needs_tools = pytest.mark.skipif(not (os.environ.get("XC16_BIN") and os.environ.get("RENODE_BIN") and os.environ.get("RENODE_ROOT")
