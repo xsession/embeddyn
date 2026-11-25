@@ -1,0 +1,41 @@
+{
+  "name": "mymcu",
+  "description": "Vendor MyMCU: toolchain, files, layout, Renode platform",
+  "env_defaults": {
+    "TOOLCHAIN_BIN": "/opt/vendor/bin",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${TOOLCHAIN_BIN}/vendor-gcc",
+    "cflags": ["-mcpu=mymcu", "-O1"],
+    "cflags_post": ["-Wl,--script=${TOOLCHAIN_BIN}/../lib/mymcu.ld"],
+    "as": "${TOOLCHAIN_BIN}/vendor-as",
+    "asflags": [],
+    "ld": "${TOOLCHAIN_BIN}/vendor-ld",
+    "ldflags": [],
+    "ldflags_post": ["--script=${TOOLCHAIN_BIN}/../lib/mymcu.ld"],
+    "objcopy": "${TOOLCHAIN_BIN}/vendor-objcopy",
+    "objdump": "${TOOLCHAIN_BIN}/vendor-objdump",
+    "reference_simulator": "${TOOLCHAIN_BIN}/vendor-sim"
+  },
+  "files": {
+    "header": "${TOOLCHAIN_BIN}/../include/mymcu.h",
+    "linker_script": "${TOOLCHAIN_BIN}/../lib/mymcu.ld",
+    "svd": ""
+  },
+  "image": {
+    "base": "0x0",
+    "phantom_lane": null,
+    "notes": "how HEX addresses map to the Renode bus"
+  },
+  "memory": {
+    "sfr": ["0x0000", "0x0FFF"],
+    "ram": ["0x1000", "0x1FFF"],
+    "cpu_registers": []
+  },
+  "renode": {
+    "platform": "platforms/cpus/vendor/mymcu.repl",
+    "pc_command": "cpu PC",
+    "vector_skip_traps": 0
+  }
+}

@@ -1,0 +1,25 @@
+# Hermes Agent (~/.hermes/config.yaml) fragment for full-MCU-emulation work.
+# Merge into your config; adjust the paths. Secrets do not belong here (use ~/.hermes/.env).
+
+skills:
+  external_dirs:
+    - ${EMBEDDYN_HOME}/agents/hermes/skills        # the embedded-emulation skills
+
+mcp_servers:
+  mcu_emu:
+    command: "${EMBEDDYN_HOME}/.venv/bin/python"     # any Python >= 3.10 that can import embeddyn
+    args: ["-m", "embeddyn.agents.mcu_emu"]
+    cwd: "${EMBEDDYN_HOME}"
+    timeout: 3600                                    # Renode builds and long runs take minutes
+    connect_timeout: 30
+    env:
+      PYTHONPATH: "${EMBEDDYN_HOME}"
+      RENODE_BIN: "/opt/renode/renode"               # the Renode launcher
+      RENODE_ROOT: "/opt/renode"                     # repo root: platforms/ paths resolve here
+      DOTNET_ROOT: "/opt/dotnet"                     # Renode built from source needs dotnet
+      PATH: "/opt/dotnet:/usr/local/bin:/usr/bin:/bin"
+      XC16_BIN: "/opt/microchip/xc16/v2.10/bin"      # per-profile toolchain variables
+      MCU_EMU_PROFILES: "${HOME}/.config/mcu-emu/profiles"   # your own MCU profiles
+    tools:
+      prompts: false
+      resources: false

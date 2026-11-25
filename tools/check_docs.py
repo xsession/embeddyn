@@ -24,7 +24,9 @@ LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 
 
 def markdown_files() -> list[Path]:
-    return [ROOT / "README.md", ROOT / "CONTRIBUTING.md", *sorted((ROOT / "docs").rglob("*.md"))]
+    # docs/chats holds rendered session transcripts: records of tool calls, not documentation
+    docs = [p for p in sorted((ROOT / "docs").rglob("*.md")) if "chats" not in p.relative_to(ROOT / "docs").parts[:1]]
+    return [ROOT / "README.md", ROOT / "CONTRIBUTING.md", *docs]
 
 
 def strip_fenced_code(text: str) -> str:

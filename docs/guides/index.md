@@ -9,6 +9,7 @@ Short, task-oriented recipes. They assume you have done the first [tutorials](..
 | [Bind firmware variables](firmware-bindings.md) | read firmware telemetry from RAM or inject calibration values |
 | [Run many simulations in parallel](parallel-runs.md) | speed up tuning and tolerance analysis, with or without Renode |
 | [Build Renode with custom cores](build-renode.md) | build the xsession Renode fork that embeddyn is tested with |
+| [Agent kit: full MCU emulation with Hermes](agent-kit-mcu-emulation.md) | skills and an MCP server that let a Hermes agent (27B-class model) repeat the full-MCU emulation workflow |
 | [Emulate a real product end to end](emulate-a-product.md) | turn an existing board set (physics, electronics, firmware, buses) into a verified emulation; worked example: SPECT body contour |
 | [Export a KiCad schematic to SPICE](kicad.md) | simulate your board's analog circuit in the loop |
 | [Rebuild these docs and figures](docs.md) | regenerate images from fresh runs and preview the site |

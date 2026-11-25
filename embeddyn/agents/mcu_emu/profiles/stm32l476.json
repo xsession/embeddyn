@@ -1,0 +1,27 @@
+{
+  "name": "stm32l476",
+  "description": "Example profile for an Arm Cortex-M part (STM32L476): GNU Arm toolchain, CMSIS-SVD register map, Renode stm32l476 platform. Copy and adapt for other SVD-described MCUs.",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "SVD_DIR": "/opt/svd",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": ["-mcpu=cortex-m4", "-mthumb", "-O1", "-nostartfiles"],
+    "cflags_post": [],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump"
+  },
+  "files": {
+    "svd": "${SVD_DIR}/STM32L4x6.svd"
+  },
+  "image": {
+    "base": "0x0"
+  },
+  "renode": {
+    "platform": "platforms/cpus/stm32l476.repl",
+    "pc_command": "cpu PC",
+    "vector_skip_traps": 0
+  }
+}

@@ -21,6 +21,10 @@ REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 KEEP_EMAILS = {"noreply@anthropic.com"}
 
 
+# Markdown links whose target is not a web URL point at files of the original working tree, which
+# do not exist relative to docs/chats: render them as text plus the target in code.
+LOCAL_LINK = re.compile(r"\[([^\]\n]+)\]\((?!https?://|mailto:|#)([^)\s]+)\)")
+
 REPLACE: list = []
 PRIVATE: list = []
 
@@ -47,6 +51,7 @@ def clean(text, output=False):
         text = "\n".join(l if not is_private(l) else "[line from a private location omitted]" for l in text.split("\n"))
     for rx, rep in REPLACE:
         text = rx.sub(rep, text)
+    text = LOCAL_LINK.sub(lambda m: f"{m.group(1)} (`{m.group(2)}`)", text)
     return EMAIL.sub(lambda m: m.group(0) if m.group(0) in KEEP_EMAILS else "[email redacted]", text).strip()
 
 

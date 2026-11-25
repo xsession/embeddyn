@@ -1,4 +1,4 @@
-# embeddyn development chat, part 2 (2026-11-25): dsPIC30 DSP, Renode integration, peripherals
+# embeddyn development chat, part 2 (2026-11-25): dsPIC30 DSP, Renode integration, peripherals, agent kit
 
 Source transcript: `d8aa7d0f-b50e-461e-8002-9130aa10629a.jsonl`. Hidden reasoning, harness records and system reminders are omitted; e-mail addresses are redacted; tool inputs over 8000 and tool outputs over 4000 characters are shortened.
 
@@ -274,7 +274,7 @@ I committed the docs, and wrote and tested the dsPIC30 CPU core. It matches Micr
 **Docs commit:** the workflow guide and the dsPIC design page are committed: `ea0c559d` in the monorepo, `894a1cf2` in the standalone repo, with identical trees.
 
 **The CPU core**
-- [dspic30_core.c](../../../renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/dspic30_core.c) is in your local Renode fork. It's a self-contained interpreter covering:
+- dspic30_core.c (`../../../renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/dspic30_core.c`) is in your local Renode fork. It's a self-contained interpreter covering:
   - every non-DSP instruction, with all addressing modes and byte/word sizes;
   - the core registers mapped into data space;
   - PSV and table reads/writes;
@@ -301,7 +301,7 @@ I committed the docs, and wrote and tested the dsPIC30 CPU core. It matches Micr
 - skipped post-increment/decrement of a destination pointer in a few instruction families;
 - shift counts above 15.
 
-The harness tolerates or avoids these and counts them. They're listed in [tools/dspic30/README.md](../../../renode-merge/renode/tools/dspic30/README.md). They are real ambiguities: without silicon I can't tell which side matches real hardware, and only odd hand-written assembly would notice.
+The harness tolerates or avoids these and counts them. They're listed in tools/dspic30/README.md (`../../../renode-merge/renode/tools/dspic30/README.md`). They are real ambiguities: without silicon I can't tell which side matches real hardware, and only odd hand-written assembly would notice.
 
 **Not done yet**
 - DSP instructions (MAC class, accumulators) report "undefined".
@@ -6957,7 +6957,7 @@ Those two matches are just my own search commands, so there are no addresses in 
 
 ````
 {
- "command": "cp /tmp/claude-1000/-media-riko-model-store-GIT--embeddyn/d8aa7d0f-b50e-461e-8002-9130aa10629a/scratchpad/render_chat.py ./render_chat.py && cat > README.md <<'EOF'\n# Development chats\n\nTranscripts of the Claude Code sessions that built embeddyn's mechatronics co-simulation,\nthe SPECT body-contour emulation and the dsPIC30F5011 Renode core, rendered to Markdown.\n\n| File | Period | Content |\n|---|---|---|\n| [2026-11-21-to-25-part1-main.md](2026-11-21-to-25-part1-main.md) | 2026-11-21 – 2026-11-25 | Project review and roadmap; Renode/ngspice/Webots/MuJoCo/FMI co-simulation; fault injection; bus-frame faults; power electronics; light-curtain optics and the STM32 prototype; the dsPIC30F5011 decision (master/slave, iC-NT/iC-ME, CANopen); XC16 install; workflow guide; the dsPIC30 CPU core and its sim30 differential tests |\n| [2026-11-25-part2-dspic-core.md](2026-11-25-part2-dspic-core.md) | 2026-11-25 | DSP instructions, modulo/bit-reversed addressing (checked against sim30 and the MPLAB X simulator model), the core inside Renode's tlib, peripherals |\n| [2026-11-24-branch-messages.md](2026-11-24-branch-messages.md) | 2026-11-24 | Messages present only in an earlier copy of the transcript (a side branch) |\n\nEach file keeps every user message, the assistant's replies and every tool call with its\nresult, in order. Left out: hidden reasoning, harness bookkeeping and system reminders.\nE-mail addresses are redacted, and tool inputs over 8,000 and outputs over 4,000 characters\nare shortened (marked inline). Context compactions appear as \"Summary of earlier conversation\".\n\nRegenerate with [render_chat.py](render_chat.py):\n\n```bash\npython3 render_chat.py ~/.claude/projects/<project>/<session>.jsonl out.md --title \"...\"\n```\nEOF\nM=/media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs; mkdir -p $M/chats && cp -r ./* $M/chats/ && diff -rq . $M/chats && echo mirrored; grep -n 'exclude_docs\\|not_in_nav' /media/riko/model_store/GIT_/embeddyn/mkdocs.yml | head -3",
+ "command": "cp /tmp/claude-1000/-media-riko-model-store-GIT--embeddyn/d8aa7d0f-b50e-461e-8002-9130aa10629a/scratchpad/render_chat.py ./render_chat.py && cat > README.md <<'EOF'\n# Development chats\n\nTranscripts of the Claude Code sessions that built embeddyn's mechatronics co-simulation,\nthe SPECT body-contour emulation and the dsPIC30F5011 Renode core, rendered to Markdown.\n\n| File | Period | Content |\n|---|---|---|\n| 2026-11-21-to-25-part1-main.md (`2026-11-21-to-25-part1-main.md`) | 2026-11-21 – 2026-11-25 | Project review and roadmap; Renode/ngspice/Webots/MuJoCo/FMI co-simulation; fault injection; bus-frame faults; power electronics; light-curtain optics and the STM32 prototype; the dsPIC30F5011 decision (master/slave, iC-NT/iC-ME, CANopen); XC16 install; workflow guide; the dsPIC30 CPU core and its sim30 differential tests |\n| 2026-11-25-part2-dspic-core.md (`2026-11-25-part2-dspic-core.md`) | 2026-11-25 | DSP instructions, modulo/bit-reversed addressing (checked against sim30 and the MPLAB X simulator model), the core inside Renode's tlib, peripherals |\n| 2026-11-24-branch-messages.md (`2026-11-24-branch-messages.md`) | 2026-11-24 | Messages present only in an earlier copy of the transcript (a side branch) |\n\nEach file keeps every user message, the assistant's replies and every tool call with its\nresult, in order. Left out: hidden reasoning, harness bookkeeping and system reminders.\nE-mail addresses are redacted, and tool inputs over 8,000 and outputs over 4,000 characters\nare shortened (marked inline). Context compactions appear as \"Summary of earlier conversation\".\n\nRegenerate with render_chat.py (`render_chat.py`):\n\n```bash\npython3 render_chat.py ~/.claude/projects/<project>/<session>.jsonl out.md --title \"...\"\n```\nEOF\nM=/media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs; mkdir -p $M/chats && cp -r ./* $M/chats/ && diff -rq . $M/chats && echo mirrored; grep -n 'exclude_docs\\|not_in_nav' /media/riko/model_store/GIT_/embeddyn/mkdocs.yml | head -3",
  "description": "Add the index and mirror docs/chats to the monorepo"
 }
 ````
@@ -8402,7 +8402,7 @@ Plan shown (9 steps).
 6	product-faithful version.*
 7	
 8	The workflow behind this page, phase by phase, is in the guide
-9	[Emulate a real product end to end](../guides/emulate-a-product.md).
+9	Emulate a real product end to end (`../guides/emulate-a-product.md`).
 10	
 11	## The system to emulate
 12
@@ -8510,7 +8510,7 @@ Adding a Renode usage section to the fork's dsPIC tools README, then recording t
 
 ````
 {
- "command": "cd /media/riko/model_store/renode-merge/renode/tools/dspic30 && cat >> README.md <<'EOF'\n\n## In Renode\n\nThe same core runs in tlib (`arch/dspic33`): each instruction is one call of the\ninterpreter, and a translation block runs until the first non-sequential PC.\nBus layout: data space at 0x0000-0xFFFF, program word at ISA address *a* at\n`0x01000000 + 2a` (4 bytes per instruction, as in XC16 HEX files).\n\n```bash\npython3 hex2prog.py firmware.hex out/      # prints the sysbus LoadBinary lines\n```\n\n```\nmach create\nmachine LoadPlatformDescription @platforms/cpus/microchip/dspic30f5011.repl\nsysbus LoadBinary @out/firmware_000000.bin 0x1000000\nsysbus LoadBinary @out/firmware_f80000.bin 0x2f00000\nemulation RunFor \"0.1\"\n```\n\nPeripheral models are in `src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/`\n(interrupt controller, system control with NVM and watchdog, timers, output compare,\ninput capture, 12-bit ADC, UART, SPI, I2C, CAN, GPIO and change notification).\n`platforms/boards/microchip/private-board.repl` is the body-contour board (Fcy 20 MHz).\nFirmware tests: `tests/renode/smoke.c` (core only), `tests/periph/*.c` with their `.resc`\nscripts.\nEOF\ncat > /home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory/bodycontour-firmware-source.md <<'EOF'\n---\nname: bodycontour-firmware-source\ndescription: The user's real dsPIC30F5011 body-contour firmware tree and its key facts (board, clock, built HEX)\nmetadata:\n  type: reference\n---\n\nThe user's real body-contour firmware is at `<private firmware repo>`\n(app `app/bodycontour/bodycontour`, drivers `drivers/microchip/dspic30f5011`, boards `boards/private-board` etc.,\nCANopen object dictionary in the app). A built image: `app/bodycontour/bodycontour/.project/private-project/dist/default/production/private-project.hex`.\nClock: ECIO_PLL8 with Tcy 50 ns, i.e. Fcy 20 MHz; TMR2 period 66 gives the 303 kHz LED modulation on OC6/OC8.\n`drivers/.../dio/inc/dio_drv.h` documents every 5011 pin function (CN, INT, IC, OC pins).\n\nFound 2026-11-25; read-only so far. It runs in the Renode dsPIC model ([[spect-body-contour-target]]) on\n`platforms/boards/microchip/private-board.repl` in the merged fork ([[renode-1-17-merge-build]]).\nEOF\n/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory/MEMORY.md\"); t = p.read_text()\nif \"bodycontour-firmware-source\" not in t:\n    t = t.rstrip(\"\\n\") + \"\\n- [Body-contour firmware source](bodycontour-firmware-source.md) — user's real dsPIC30F5011 firmware tree, Fcy 20 MHz, built HEX path\\n\"\n    p.write_text(t)\nEOF\necho done",
+ "command": "cd /media/riko/model_store/renode-merge/renode/tools/dspic30 && cat >> README.md <<'EOF'\n\n## In Renode\n\nThe same core runs in tlib (`arch/dspic33`): each instruction is one call of the\ninterpreter, and a translation block runs until the first non-sequential PC.\nBus layout: data space at 0x0000-0xFFFF, program word at ISA address *a* at\n`0x01000000 + 2a` (4 bytes per instruction, as in XC16 HEX files).\n\n```bash\npython3 hex2prog.py firmware.hex out/      # prints the sysbus LoadBinary lines\n```\n\n```\nmach create\nmachine LoadPlatformDescription @platforms/cpus/microchip/dspic30f5011.repl\nsysbus LoadBinary @out/firmware_000000.bin 0x1000000\nsysbus LoadBinary @out/firmware_f80000.bin 0x2f00000\nemulation RunFor \"0.1\"\n```\n\nPeripheral models are in `src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/`\n(interrupt controller, system control with NVM and watchdog, timers, output compare,\ninput capture, 12-bit ADC, UART, SPI, I2C, CAN, GPIO and change notification).\n`platforms/boards/microchip/private-board.repl` is the body-contour board (Fcy 20 MHz).\nFirmware tests: `tests/renode/smoke.c` (core only), `tests/periph/*.c` with their `.resc`\nscripts.\nEOF\ncat > /home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory/bodycontour-firmware-source.md <<'EOF'\n---\nname: bodycontour-firmware-source\ndescription: The user's real dsPIC30F5011 body-contour firmware tree and its key facts (board, clock, built HEX)\nmetadata:\n  type: reference\n---\n\nThe user's real body-contour firmware is at `<private firmware repo>`\n(app `app/bodycontour/bodycontour`, drivers `drivers/microchip/dspic30f5011`, boards `boards/private-board` etc.,\nCANopen object dictionary in the app). A built image: `app/bodycontour/bodycontour/.project/private-project/dist/default/production/private-project.hex`.\nClock: ECIO_PLL8 with Tcy 50 ns, i.e. Fcy 20 MHz; TMR2 period 66 gives the 303 kHz LED modulation on OC6/OC8.\n`drivers/.../dio/inc/dio_drv.h` documents every 5011 pin function (CN, INT, IC, OC pins).\n\nFound 2026-11-25; read-only so far. It runs in the Renode dsPIC model ([[spect-body-contour-target]]) on\n`platforms/boards/microchip/private-board.repl` in the merged fork ([[renode-1-17-merge-build]]).\nEOF\n/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory/MEMORY.md\"); t = p.read_text()\nif \"bodycontour-firmware-source\" not in t:\n    t = t.rstrip(\"\\n\") + \"\\n- Body-contour firmware source (`bodycontour-firmware-source.md`) — user's real dsPIC30F5011 firmware tree, Fcy 20 MHz, built HEX path\\n\"\n    p.write_text(t)\nEOF\necho done",
  "description": "Add Renode usage docs and save a memory note"
 }
 ````
@@ -8595,9 +8595,9 @@ The user is working over Remote Control and may not see the next-step box. Write
 I saved the conversation into `docs/chats/` in both copies of the project, then got the dsPIC30F5011 running in Renode with its peripherals. Your real body-contour firmware HEX runs on it, but slowly: Timer2 at 300 kHz costs a Renode event every period even with its interrupt off. Nothing is committed yet.
 
 **Chat log**
-- [docs/chats/README.md](docs/chats/README.md) indexes the transcript in three Markdown files. They contain every message from you, my replies, and each tool call with its result.
+- docs/chats/README.md (`docs/chats/README.md`) indexes the transcript in three Markdown files. They contain every message from you, my replies, and each tool call with its result.
 - Left out: hidden reasoning and system notes. Email addresses are redacted, and very long tool inputs/outputs are shortened, with a mark where that happens.
-- [render_chat.py](docs/chats/render_chat.py) regenerates the files.
+- render_chat.py (`docs/chats/render_chat.py`) regenerates the files.
 
 **CPU core** (local fork `/media/riko/model_store/renode-merge/renode`)
 - Every dsPIC30 instruction is now implemented, including the DSP engine and circular-buffer (modulo) / bit-reversed addressing.
@@ -8608,7 +8608,7 @@ I saved the conversation into `docs/chats/` in both copies of the project, then 
 - The core is wired into Renode, at about 18 MIPS on this host for compute-heavy code.
 - Firmware is loaded with `tools/dspic30/hex2prog.py`, which turns an XC16 HEX file into Renode load commands.
 
-**Peripherals**, written from the device header and your firmware's pin map, in [platforms/cpus/microchip/dspic30f5011.repl](../../renode-merge/renode/platforms/cpus/microchip/dspic30f5011.repl):
+**Peripherals**, written from the device header and your firmware's pin map, in platforms/cpus/microchip/dspic30f5011.repl (`../../renode-merge/renode/platforms/cpus/microchip/dspic30f5011.repl`):
 - interrupt controller;
 - reset/oscillator/watchdog/flash and EEPROM programming;
 - Timer1–5;
@@ -9005,7 +9005,7 @@ Only regex fragments like `mcu_` and `el-[0-9]` remain, from my own search comma
 
 ```
 {
- "command": "M=/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory; cat > $M/private-product-names.md <<'EOF'\n---\nname: private-product-names\ndescription: The user's real product/board names and firmware paths are private and must never be written into any repository or pushed file\nmetadata:\n  type: feedback\n---\n\nThe user's real product (the body-contour board/firmware, see [[bodycontour-firmware-source]]) is private: its board\nand project names, and the path of its firmware repository, must never appear in files of embeddyn, codelayer_forge,\nthe Renode fork, or anything else that could be pushed. Use neutral names (e.g. `dspic30f5011-bodycontour.repl`,\n\"the body-contour board\", \"the product's own build\").\n\n**Why:** the user said it is a private one and does not want to push it accidentally (2026-11-25).\n\n**How to apply:** before writing docs, platform files, tests or chat logs, check for those names and paths. Chat logs\nin `docs/chats` are rendered with `render_chat.py --redact-file ~/.config/embeddyn/chat-redact.tsv`; that file (outside\nevery repo) holds the redaction rules, and output of tool calls that read the private repo is omitted. Don't copy\nthe private firmware's code or config into a repo either.\nEOF\n/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory/MEMORY.md\"); t = p.read_text()\nif \"private-product-names\" not in t:\n    p.write_text(t.rstrip(\"\\n\") + \"\\n- [Private product names](private-product-names.md) — never put the real board/firmware names or paths in any repo; chat logs use the redact file\\n\")\nEOF\ncd /media/riko/model_store/renode-merge/renode && git -c safe.directory='*' status --short platforms tools | head; ls platforms/boards/microchip/",
+ "command": "M=/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory; cat > $M/private-product-names.md <<'EOF'\n---\nname: private-product-names\ndescription: The user's real product/board names and firmware paths are private and must never be written into any repository or pushed file\nmetadata:\n  type: feedback\n---\n\nThe user's real product (the body-contour board/firmware, see [[bodycontour-firmware-source]]) is private: its board\nand project names, and the path of its firmware repository, must never appear in files of embeddyn, codelayer_forge,\nthe Renode fork, or anything else that could be pushed. Use neutral names (e.g. `dspic30f5011-bodycontour.repl`,\n\"the body-contour board\", \"the product's own build\").\n\n**Why:** the user said it is a private one and does not want to push it accidentally (2026-11-25).\n\n**How to apply:** before writing docs, platform files, tests or chat logs, check for those names and paths. Chat logs\nin `docs/chats` are rendered with `render_chat.py --redact-file ~/.config/embeddyn/chat-redact.tsv`; that file (outside\nevery repo) holds the redaction rules, and output of tool calls that read the private repo is omitted. Don't copy\nthe private firmware's code or config into a repo either.\nEOF\n/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/memory/MEMORY.md\"); t = p.read_text()\nif \"private-product-names\" not in t:\n    p.write_text(t.rstrip(\"\\n\") + \"\\n- Private product names (`private-product-names.md`) — never put the real board/firmware names or paths in any repo; chat logs use the redact file\\n\")\nEOF\ncd /media/riko/model_store/renode-merge/renode && git -c safe.directory='*' status --short platforms tools | head; ls platforms/boards/microchip/",
  "description": "Save the privacy rule to memory and check the fork tree"
 }
 ```
@@ -10636,7 +10636,7 @@ Now the fork README and the embeddyn design page, so both point at the reference
 
 ```
 {
- "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/media/riko/model_store/renode-merge/renode/tools/dspic30/README.md\"); t = p.read_text()\nold = t[t.index(\"Peripheral models are in `src/Infrastructure\"):]\nt = t.replace(old, \"\"\"Peripheral models are in `src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/`:\ninterrupt controller, system control (clock from the configuration fuses, power states, reset\ncauses, watchdog, NVM), timers, output compare, input capture, 12-bit ADC, UART, SPI, I2C, CAN,\nDCI, GPIO and change notification. Every register, mode, timing rule and limit is described in\n[PERIPHERALS.md](PERIPHERALS.md).\n`platforms/boards/microchip/dspic30f5011-bodycontour.repl` is the body-contour board (10 MHz\nexternal clock, so Fcy is 20 MHz from its ECIO_PLL8 fuses).\nFirmware tests: `tests/build_firmware.sh` builds them; `tests/renode/smoke.resc` (core only) and\n`tests/periph/*.resc` (peripherals) run from the Renode root with `include @tools/dspic30/tests/...`.\n\"\"\")\np.write_text(t)\nd = Path(\"/media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md\"); t = d.read_text()\nstart = t.index(\"**Peripherals** (`Peripherals/dsPIC30/*.cs`\")\nend = t.index(\"## Open questions for the product owner\")\nt = t[:start] + \"\"\"**Peripherals** (`Peripherals/dsPIC30/*.cs`, platform\n`platforms/cpus/microchip/dspic30f5011.repl`, board\n`platforms/boards/microchip/dspic30f5011-bodycontour.repl`). The full reference (registers, modes,\ntiming, power, pin routing, limits) is `tools/dspic30/PERIPHERALS.md` in the fork.\n\n| Model | Registers | Behaviour |\n|---|---|---|\n| `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority, DISI, NSTDIS, ALTIVT, lazily computed flags |\n| `dsPIC30_SystemControl` | RCON, OSCCON, NVM*, PMD1/2 | Fcy from the FOSC fuses (primary/PLL, FRC, LPRC, secondary, POST) and clock switching; Run/Idle/Sleep; reset causes; watchdog from FWDT; flash/EEPROM programming; module disable |\n| `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode, gate, external clock, Sleep/Idle; lazy mode while nobody needs per-period events |\n| `dsPIC30_OutputCompare` x8 | OCxRS, OCxR, OCxCON | all compare and PWM modes, fault input, drives RD0-RD7; `DutyCycle`, `PwmFrequency` |\n| `dsPIC30_InputCapture` x8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |\n| `dsPIC30_ADC12` | ADCBUF0-F, ADCON1-3, ADCHS, ADPCFG, ADCSSL | IADC inputs, manual/INT0/Timer3/auto triggers, TAD timing, ADRC in Sleep, scan, alternate, BUFM, formats, references, analog pins |\n| `dsPIC30_UART` x2 | UxMODE/STA/TXREG/RXREG/BRG | 4-deep TX buffer and shift register timed at the baud rate, UTXISEL, 4-deep RX FIFO, OERR, loopback, wake on start bit |\n| `dsPIC30_SPI` x2 | SPIxSTAT/CON/BUF | master transfers timed at Fsck, slave mode as an ISPIPeripheral |\n| `dsPIC30_I2C` | I2C master | bus actions timed at Fscl, ACK/NACK, IWCOL, I2COV |\n| `dsPIC30_CAN` x2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | frames timed at the CFG bit rate, priorities, ABAT, double buffering, wake-up; ICAN for a CAN hub |\n| `dsPIC30_DCI` | DCICON1-3, DCISTAT, TSCON/RSCON, buffers | frames and slots, master or external frame sync, loopback, underflow/overflow |\n| `dsPIC30_GPIOPort` x5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | 5011 pin map: CN numbers, pins routed to INTx/ICx/TxCK/SSx/COFS, OC outputs, analog pins, pull-ups |\n\n**Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at the\nrate the fuses give, UART output, echo, buffer and character timing, ADC conversions, 25 % PWM,\ntoggle compare captured by input capture, a CAN frame from CAN1 to CAN2 through a hub, CAN bit\nrate, I2C NACK and bus timing, SPI timing, EEPROM and flash programming, Sleep and Idle with\nwake-up, module disable, DCI loopback, INT1 and IC1 from one pin, change notification, analog\npins, clock switch to FRC, watchdog reset.\n\n**The real body-contour firmware** (the product's own build, kept outside this repository) runs\non the board file without illegal opcodes or unmapped accesses; Fcy comes out at 20 MHz from its\nfuses, and OC6/OC8 at 298.5 kHz (the firmware's 303 kHz). It runs at about 4.7 MIPS on the\ndevelopment host: its receiver-chain clocking toggles port pins in tight loops, and each port\naccess is a call from the CPU into C#.\n\n\"\"\" + t[end:]\nd.write_text(t)\nimport shutil\nshutil.copy(d, \"/media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/project/body-contour-dspic.md\")\nprint(\"ok\")\nEOF\ngrep -c -i -E 'el-[0-9]{2}-[0-9]{2}|GIT/private|private-project' /media/riko/model_store/renode-merge/renode/tools/dspic30/PERIPHERALS.md /media/riko/model_store/renode-merge/renode/tools/dspic30/README.md /media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/*.c /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/*.resc",
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/media/riko/model_store/renode-merge/renode/tools/dspic30/README.md\"); t = p.read_text()\nold = t[t.index(\"Peripheral models are in `src/Infrastructure\"):]\nt = t.replace(old, \"\"\"Peripheral models are in `src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/`:\ninterrupt controller, system control (clock from the configuration fuses, power states, reset\ncauses, watchdog, NVM), timers, output compare, input capture, 12-bit ADC, UART, SPI, I2C, CAN,\nDCI, GPIO and change notification. Every register, mode, timing rule and limit is described in\nPERIPHERALS.md (`PERIPHERALS.md`).\n`platforms/boards/microchip/dspic30f5011-bodycontour.repl` is the body-contour board (10 MHz\nexternal clock, so Fcy is 20 MHz from its ECIO_PLL8 fuses).\nFirmware tests: `tests/build_firmware.sh` builds them; `tests/renode/smoke.resc` (core only) and\n`tests/periph/*.resc` (peripherals) run from the Renode root with `include @tools/dspic30/tests/...`.\n\"\"\")\np.write_text(t)\nd = Path(\"/media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md\"); t = d.read_text()\nstart = t.index(\"**Peripherals** (`Peripherals/dsPIC30/*.cs`\")\nend = t.index(\"## Open questions for the product owner\")\nt = t[:start] + \"\"\"**Peripherals** (`Peripherals/dsPIC30/*.cs`, platform\n`platforms/cpus/microchip/dspic30f5011.repl`, board\n`platforms/boards/microchip/dspic30f5011-bodycontour.repl`). The full reference (registers, modes,\ntiming, power, pin routing, limits) is `tools/dspic30/PERIPHERALS.md` in the fork.\n\n| Model | Registers | Behaviour |\n|---|---|---|\n| `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority, DISI, NSTDIS, ALTIVT, lazily computed flags |\n| `dsPIC30_SystemControl` | RCON, OSCCON, NVM*, PMD1/2 | Fcy from the FOSC fuses (primary/PLL, FRC, LPRC, secondary, POST) and clock switching; Run/Idle/Sleep; reset causes; watchdog from FWDT; flash/EEPROM programming; module disable |\n| `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode, gate, external clock, Sleep/Idle; lazy mode while nobody needs per-period events |\n| `dsPIC30_OutputCompare` x8 | OCxRS, OCxR, OCxCON | all compare and PWM modes, fault input, drives RD0-RD7; `DutyCycle`, `PwmFrequency` |\n| `dsPIC30_InputCapture` x8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |\n| `dsPIC30_ADC12` | ADCBUF0-F, ADCON1-3, ADCHS, ADPCFG, ADCSSL | IADC inputs, manual/INT0/Timer3/auto triggers, TAD timing, ADRC in Sleep, scan, alternate, BUFM, formats, references, analog pins |\n| `dsPIC30_UART` x2 | UxMODE/STA/TXREG/RXREG/BRG | 4-deep TX buffer and shift register timed at the baud rate, UTXISEL, 4-deep RX FIFO, OERR, loopback, wake on start bit |\n| `dsPIC30_SPI` x2 | SPIxSTAT/CON/BUF | master transfers timed at Fsck, slave mode as an ISPIPeripheral |\n| `dsPIC30_I2C` | I2C master | bus actions timed at Fscl, ACK/NACK, IWCOL, I2COV |\n| `dsPIC30_CAN` x2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | frames timed at the CFG bit rate, priorities, ABAT, double buffering, wake-up; ICAN for a CAN hub |\n| `dsPIC30_DCI` | DCICON1-3, DCISTAT, TSCON/RSCON, buffers | frames and slots, master or external frame sync, loopback, underflow/overflow |\n| `dsPIC30_GPIOPort` x5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | 5011 pin map: CN numbers, pins routed to INTx/ICx/TxCK/SSx/COFS, OC outputs, analog pins, pull-ups |\n\n**Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at the\nrate the fuses give, UART output, echo, buffer and character timing, ADC conversions, 25 % PWM,\ntoggle compare captured by input capture, a CAN frame from CAN1 to CAN2 through a hub, CAN bit\nrate, I2C NACK and bus timing, SPI timing, EEPROM and flash programming, Sleep and Idle with\nwake-up, module disable, DCI loopback, INT1 and IC1 from one pin, change notification, analog\npins, clock switch to FRC, watchdog reset.\n\n**The real body-contour firmware** (the product's own build, kept outside this repository) runs\non the board file without illegal opcodes or unmapped accesses; Fcy comes out at 20 MHz from its\nfuses, and OC6/OC8 at 298.5 kHz (the firmware's 303 kHz). It runs at about 4.7 MIPS on the\ndevelopment host: its receiver-chain clocking toggles port pins in tight loops, and each port\naccess is a call from the CPU into C#.\n\n\"\"\" + t[end:]\nd.write_text(t)\nimport shutil\nshutil.copy(d, \"/media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/project/body-contour-dspic.md\")\nprint(\"ok\")\nEOF\ngrep -c -i -E 'el-[0-9]{2}-[0-9]{2}|GIT/private|private-project' /media/riko/model_store/renode-merge/renode/tools/dspic30/PERIPHERALS.md /media/riko/model_store/renode-merge/renode/tools/dspic30/README.md /media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/*.c /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/*.resc",
  "description": "Update the fork README and design page, and scan for private names"
 }
 ```
@@ -10671,6 +10671,1690 @@ No private names anywhere. Refreshing the part-2 chat log so it covers this sess
 {
  "command": "P=/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn; D=/media/riko/model_store/GIT_/embeddyn/docs/chats; /media/riko/model_store/embeddyn-venv/bin/python $D/render_chat.py $P/d8aa7d0f-b50e-461e-8002-9130aa10629a.jsonl $D/2026-11-25-part2-dspic-core.md --title \"embeddyn development chat, part 2 (2026-11-25): dsPIC30 DSP, Renode integration, peripherals\" --redact-file $HOME/.config/embeddyn/chat-redact.tsv && cp $D/2026-11-25-part2-dspic-core.md /media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/chats/; grep -c -E '[0-9]{2}-38-00|GIT/private|private-project' $D/2026-11-25-part2-dspic-core.md; export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; R=/media/riko/model_store/renode-merge/renode; for d in $R/src/Infrastructure/src/Emulator/Cores/tlib $R/src/Infrastructure $R /media/riko/model_store/GIT_/embeddyn /media/riko/model_store/GIT_/codelayer_forge; do echo \"== $(basename $d)\"; git -C $d status --short | grep -v '\\.claude/\\|\\.vscode/' | head -12; done",
  "description": "Refresh the chat log and list uncommitted changes",
+ "timeout": 300000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+0
+== tlib
+ M arch/dspic33/arch_callbacks.c
+ M arch/dspic33/arch_callbacks.h
+ M arch/dspic33/cpu.h
+ M arch/dspic33/helper.c
+ M arch/dspic33/op_helper.c
+== Infrastructure
+ M src/Emulator/Cores/dsPIC33/dsPIC33.cs
+ M src/Emulator/Cores/renode/arch/dspic33/renode_dspic33_callbacks.c
+ m src/Emulator/Cores/tlib
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_ADC12.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_CAN.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_Capture.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_GPIO.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_InterruptController.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_Serial.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_Sfr.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_SystemControl.cs
+ M src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_Timers.cs
+== renode
+ M platforms/boards/microchip/dspic30f5011-bodycontour.repl
+ M platforms/cpus/microchip/dspic30f5011.repl
+ m src/Infrastructure
+ M tools/dspic30/README.md
+ M tools/dspic30/tests/periph/periph.resc
+?? tools/dspic30/PERIPHERALS.md
+?? tools/dspic30/tests/periph/periph_detail.c
+?? tools/dspic30/tests/periph/periph_detail.resc
+?? tools/dspic30/tests/periph/wdt_reset.c
+?? tools/dspic30/tests/periph/wdt_reset.resc
+== embeddyn
+ M docs/chats/2026-11-25-part2-dspic-core.md
+ M docs/project/body-contour-dspic.md
+== codelayer_forge
+ M engines/embeddyn/docs/chats/2026-11-25-part2-dspic-core.md
+ M engines/embeddyn/docs/project/body-contour-dspic.md
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__wrap_up**
+
+```
+{
+ "recap": "All earlier dsPIC work is committed locally (fork and embeddyn docs, trees identical, nothing pushed). The peripherals now have clock-from-fuses, power states, bus timing, lazy timers, pin routing, DCI and module disable, documented in PERIPHERALS.md; that second round is uncommitted.",
+ "ask": "Commit the peripheral detail work too (no push)?",
+ "actions": [
+  {
+   "label": "Commit it"
+  },
+  {
+   "label": "Not yet"
+  }
+ ]
+}
+```
+
+<details><summary>Result</summary>
+
+```
+The user is working over Remote Control and may not see the next-step box. Write your closing message now, as the last thing you say this turn, as if there were no box: what you did and anything that failed or is unverified, no next steps, and only what you need from them to go on, as a question with its choices.
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:32:54
+
+I committed the earlier work, then filled out all the dsPIC30F5011 peripheral models in detail. All the test firmware passes, and your real firmware now runs at about 4.7 MIPS instead of 0.7. This second round of work isn't committed yet.
+
+**What was committed (local only, nothing pushed)**
+- **Renode fork:** three commits, on the core (`f1ce6292`), the peripherals (`8e96cfd7d`) and the platform and tools (`8c207921`), each mirrored into its sibling clone.
+- **embeddyn:** the chat logs and design page, in the monorepo (`379898d2`) and the standalone repo (`e63976b1`). Both trees are identical.
+- I made the Renode test scripts portable and stopped committing build outputs. The chat renderer now strips Windows line endings, which was what made the two embeddyn trees differ at first.
+
+**What's new in the peripherals**
+- **Clock:** Fcy now comes from the firmware's own oscillator fuses (PLL, FRC, LPRC, postscaler) and OSCCON clock switching. On your board file, setting the 10 MHz external clock gives 20 MHz automatically. Renode only takes whole MIPS, so the CPU runs at Fcy rounded and the peripherals at the exact Fcy; this is logged when they differ.
+- **Power:** Run, Idle and Sleep, with wake-up from the CPU. Timers freeze in Sleep, each module's SIDL bit stops it in Idle, the UART can wake on a start bit, and the ADC keeps converting in Sleep on its internal RC clock.
+- **Timers:** a timer whose interrupt is off and that nobody listens to no longer raises an event every period. Its flag is computed when the firmware reads it. Timer reads also catch up virtual time first, so the values are exact.
+- **Bus timing:**
+  - UART: 4-deep transmit buffer, characters take their real time at the baud rate.
+  - SPI: transfers timed at the SPI clock, plus slave mode.
+  - I²C: every bus action takes its real time.
+  - CAN: frames take their time at the bit rate set in the config registers, with abort and wake-up.
+- **DCI:** new model of the codec interface (frames, slots, loopback, underflow/overflow).
+- **Module disable:** PMD1/PMD2 switch modules off.
+- **Pins:** wired per the 5011 pin map, so one pin can feed two peripherals (RD8 drives both INT1 and IC1). OC outputs drive RD0–RD7, analog pins read 0, and port updates only touch pins that changed.
+
+**Tests:** all pass, including two new firmwares.
+- **`periph_detail`** checks:
+  - UART buffer and timing;
+  - the lazily computed timer flag;
+  - Sleep and Idle with wake-up;
+  - module disable;
+  - SPI and I²C timing;
+  - DCI loopback;
+  - pin routing and analog pins;
+  - the clock switch to FRC;
+  - CAN bit rate.
+- **`wdt_reset`** checks the watchdog reset.
+
+**Bugs found and fixed along the way**
+- The watchdog was reading the wrong configuration word.
+- Timers read in the middle of a block lagged behind real time.
+
+**Docs:** PERIPHERALS.md (`../../renode-merge/renode/tools/dspic30/PERIPHERALS.md`) covers every register, mode, timing rule, pin route and limit. The design page and the part-2 chat log are updated.
+
+**Still not modelled**
+- CAN bus errors and error counters.
+- I²C slave mode.
+- SPI framed mode.
+- UART 9-bit addressing.
+- Low-voltage detect.
+- The OCFA/OCFB fault pins aren't wired in the platform; connect them in a board file if you use them.
+
+Should I commit this peripheral round to the fork's local branches and the embeddyn docs in both repos, without pushing, or not yet?
+
+## User — 2026-11-25 06:36:14
+
+Commit then make support for all other peripherial that this mcu have
+
+### Assistant — 2026-11-25 06:36:52
+
+Committing this round first: tlib, then renode-infrastructure, then renode, then both embeddyn repos.
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "items": [
+  {
+   "content": "Commit the peripheral detail round",
+   "status": "in_progress"
+  },
+  {
+   "content": "Find which 5011 peripherals are still missing",
+   "status": "pending"
+  },
+  {
+   "content": "Brown-out, power-up timer, low-voltage detect",
+   "status": "pending"
+  },
+  {
+   "content": "Fail-safe clock monitor and oscillator-fail trap",
+   "status": "pending"
+  },
+  {
+   "content": "Device ID, unit ID, code protection",
+   "status": "pending"
+  },
+  {
+   "content": "CAN error states, OC fault pins, remaining modes",
+   "status": "pending"
+  },
+  {
+   "content": "Firmware tests and docs",
+   "status": "pending"
+  }
+ ],
+ "scope": "continuation"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan shown (7 steps).
+```
+
+</details>
+
+**Tool: Bash** — Commit the detail round in all repos
+
+```
+{
+ "command": "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; W=/media/riko/model_store/renode-merge; R=$W/renode; T=$R/src/Infrastructure/src/Emulator/Cores/tlib; I=$R/src/Infrastructure; set -e\ncd $T && git add arch/dspic33 && git commit -q -F - <<'EOF'\ndspic33: report wake-up from Sleep/Idle\n\ntlib_dspic_wake() is called on the first instruction or interrupt after\nPWRSAV, so the system model can return to Run.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nEOF\ncd $I && git add src/Emulator/Cores/tlib src/Emulator/Cores/dsPIC33 src/Emulator/Cores/renode/arch/dspic33 src/Emulator/Peripherals/Peripherals/dsPIC30 && git commit -q -F - <<'EOF'\ndsPIC30F5011: clock, power, timing and the remaining modules\n\nSystem control derives Fcy from the FOSC fuses and OSCCON clock switching,\ntracks Run/Idle/Sleep and implements module disable (PMD). Timers count\nlazily while nobody needs per-period events and sync virtual time on reads.\nUART, SPI, I2C and CAN transfers take their bus time; SPI slave mode, CAN\nabort and wake-up; ADC TAD timing and ADRC; output compare drives its pin\nand latches PWM duty lazily; GPIO ports route pins to INTx/ICx/TxCK/SSx/COFS,\nhonour analog pins and update incrementally. New DCI model. Fixes: FWDT was\nread from the wrong configuration word.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nEOF\ncd $R && git add platforms tools/dspic30 src/Infrastructure && git commit -q -F - <<'EOF'\ndsPIC30F5011: platform wiring, peripheral reference and tests\n\nThe platform takes Fcy from the system model, wires the timers for lazy\nflags, OC outputs to RD0-RD7 and pin inputs per the 5011 pin map; the board\nfile sets the 10 MHz external clock. tools/dspic30/PERIPHERALS.md documents\nevery model; new tests periph_detail and wdt_reset.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nEOF\ngit log --oneline -1; git -C $T log --oneline -1; git -C $I log --oneline -1\ncd $W/tlib && git pull -q --ff-only --upload-pack=\"git -c safe.directory=* upload-pack\" $T merge-renode-1.17.1\ncd $W/renode-infrastructure && git pull -q --ff-only --upload-pack=\"git -c safe.directory=* upload-pack\" $I merge-renode-1.17.1\nM=/media/riko/model_store/GIT_/codelayer_forge; S=/media/riko/model_store/GIT_/embeddyn\nprintf 'docs: dsPIC30F5011 peripheral detail status and chat log\\n\\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\\n' > /media/riko/model_store/tmp/msg.txt\ngit -C $M add engines/embeddyn/docs && git -C $M commit -q -F /media/riko/model_store/tmp/msg.txt\ngit -C $S add docs && git -C $S commit -q -F /media/riko/model_store/tmp/msg.txt\ngit -C $M rev-parse HEAD:engines/embeddyn; git -C $S rev-parse HEAD^{tree}",
+ "description": "Commit the detail round in all repos",
+ "timeout": 300000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+7ee236c9 dsPIC30F5011: platform wiring, peripheral reference and tests
+2be68f6c dspic33: report wake-up from Sleep/Idle
+46654ff37 dsPIC30F5011: clock, power, timing and the remaining modules
+c4677b10816d20441980518293dc6591b719cdab
+c4677b10816d20441980518293dc6591b719cdab
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 2 of 7 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Bash** — Find SFRs and memory regions not yet covered
+
+```
+{
+ "command": "G=/media/riko/model_store/Microchip/xc16-linux/v2.10/support/dsPIC30F/gld/p30F5011.gld; /media/riko/model_store/embeddyn-venv/bin/python - $G <<'EOF'\nimport re, sys\nt = open(sys.argv[1]).read()\nsfr = {}\nfor name, addr in re.findall(r\"^\\s*([A-Z][A-Z0-9_]*)\\s*=\\s*0x([0-9A-Fa-f]+);\", t, re.M):\n    a = int(addr, 16)\n    if a < 0x800: sfr.setdefault(a, name)\ncovered = [(0,0x54,\"core\"),(0x80,0x82,\"intcon1\"),(0x82,0xB2,\"intc\"),(0xC0,0xC8,\"cn\"),(0x100,0x106,\"t1\"),(0x106,0x114,\"t23\"),(0x114,0x122,\"t45\"),\n (0x140,0x160,\"ic\"),(0x180,0x1B0,\"oc\"),(0x200,0x20C,\"i2c\"),(0x20C,0x216,\"u1\"),(0x216,0x220,\"u2\"),(0x220,0x226,\"spi1\"),(0x226,0x22C,\"spi2\"),\n (0x240,0x260,\"dci\"),(0x280,0x2AC,\"adc\"),(0x2C6,0x2CC,\"pb\"),(0x2CC,0x2D2,\"pc\"),(0x2D2,0x2D8,\"pd\"),(0x2DE,0x2E4,\"pf\"),(0x2E4,0x2EA,\"pg\"),\n (0x300,0x39C,\"c1\"),(0x3C0,0x45C,\"c2\"),(0x740,0x774,\"sys\")]\nmiss = [(a,n) for a,n in sorted(sfr.items()) if not any(lo <= a < hi for lo,hi,_ in covered)]\nprint(\"uncovered SFRs:\", [(hex(a), n) for a, n in miss])\nfor name, addr in re.findall(r\"^\\s*(__[A-Z0-9_]+_BASE)\\s*=\\s*0x([0-9A-Fa-f]+);\", t, re.M): print(name, addr)\nprint(re.findall(r\"^\\s*(\\w+)\\s+\\(\\w*\\)\\s*:\\s*ORIGIN = (0x[0-9A-Fa-f]+),\\s*LENGTH = (0x[0-9A-Fa-f]+)\", t, re.M))\nEOF",
+ "description": "Find SFRs and memory regions not yet covered"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+uncovered SFRs: []
+__CODE_BASE 100
+__IVT_BASE 4
+__AIVT_BASE 84
+__DATA_BASE 800
+__YDATA_BASE 1000
+__EEDATA_BASE 7FFC00
+[('program', '0x100', '0xAF00')]
+```
+
+</details>
+
+**Tool: Bash** — Read config memory regions and protection fuse encodings
+
+```
+{
+ "command": "G=/media/riko/model_store/Microchip/xc16-linux/v2.10/support/dsPIC30F/gld/p30F5011.gld; sed -n 55,80p $G; H=/media/riko/model_store/Microchip/xc16-linux/v2.10/support/dsPIC30F/h/p30F5011.h; grep -n -E '#define (BORV|PBOR|PWRT|MCLR|GWRP|GCP|GSS|BWRP|BSS|SWRP|SSS|EBS|ESS|RBS|RSS|CSW|FSCM|ICS|WR_PROT|NO_|CODE_PROT|HIGH|STRD|STD|LOW)[A-Z0-9_]* +0x' $H | head -60",
+ "description": "Read config memory regions and protection fuse encodings"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+/*
+** Memory Regions
+*/
+MEMORY
+{
+  data  (a!xr)   : ORIGIN = 0x800,         LENGTH = 0x1000
+  reset          : ORIGIN = 0x0,           LENGTH = 0x4
+  ivt            : ORIGIN = 0x4,           LENGTH = 0x7C
+  _reserved      : ORIGIN = 0x80,          LENGTH = 0x4
+  aivt           : ORIGIN = 0x84,          LENGTH = 0x7C
+  program (xr)   : ORIGIN = 0x100,         LENGTH = 0xAF00
+  eedata         : ORIGIN = 0x7FFC00,      LENGTH = 0x400
+  FUID0          : ORIGIN = 0x8005C0,      LENGTH = 0x2
+  FUID1          : ORIGIN = 0x8005C2,      LENGTH = 0x2
+  FUID2          : ORIGIN = 0x8005C4,      LENGTH = 0x2
+  FUID3          : ORIGIN = 0x8005C6,      LENGTH = 0x2
+  FOSC           : ORIGIN = 0xF80000,      LENGTH = 0x2
+  FWDT           : ORIGIN = 0xF80002,      LENGTH = 0x2
+  FBORPOR        : ORIGIN = 0xF80004,      LENGTH = 0x2
+  FBS            : ORIGIN = 0xF80006,      LENGTH = 0x2
+  FSS            : ORIGIN = 0xF80008,      LENGTH = 0x2
+  FGS            : ORIGIN = 0xF8000A,      LENGTH = 0x2
+  FICD           : ORIGIN = 0xF8000C,      LENGTH = 0x2
+}
+
+__FUID0 = 0x8005C0;
+21759:#define CSW_FSCM_ON          0x030F
+21760:#define CSW_ON_FSCM_OFF      0x430F
+21761:#define CSW_FSCM_OFF         0x830F
+21868:#define PWRT_OFF             0x87B0
+21869:#define PWRT_4               0x87B1
+21870:#define PWRT_16              0x87B2
+21871:#define PWRT_64              0x87B3
+21873:#define BORV_45              0x8783
+21874:#define BORV_42              0x8793
+21875:#define BORV_27              0x87A3
+21876:#define BORV_20              0x87B3
+21878:#define PBOR_OFF             0x8733
+21879:#define PBOR_ON              0x87B3
+21881:#define MCLR_DIS             0x07B3
+21882:#define MCLR_EN              0x87B3
+21923:#define WR_PROTECT_BOOT_ON   0x310E
+21924:#define WR_PROTECT_BOOT_OFF  0x310F
+21926:#define HIGH_LARGE_BOOT_CODE 0x3101
+21927:#define HIGH_MEDIUM_BOOT_CODE 0x3103
+21928:#define HIGH_SMALL_BOOT_CODE 0x3105
+21929:#define STRD_LARGE_BOOT_CODE 0x3109
+21930:#define STRD_MEDIUM_BOOT_CODE 0x310B
+21931:#define STRD_SMALL_BOOT_CODE 0x310D
+21932:#define NO_BOOT_CODE         0x310F
+21935:#define NO_BOOT_EEPROM       0x310F
+21940:#define NO_BOOT_RAM          0x310F
+21983:#define WR_PROT_SEC_ON       0x330E
+21984:#define WR_PROT_SEC_OFF      0x330F
+21986:#define HIGH_LARGE_SEC_CODE  0x3301
+21987:#define HIGH_MEDIUM_SEC_CODE 0x3303
+21988:#define HIGH_SMALL_SEC_CODE  0x3305
+21989:#define STRD_LAR_SEC_CODE    0x3309
+21990:#define STRD_MED_SEC_CODE    0x330B
+21991:#define STRD_SMALL_SEC_CODE  0x330D
+21992:#define NO_SEC_CODE          0x330F
+21997:#define NO_SEC_EEPROM        0x330F
+22002:#define NO_SEC_RAM           0x330F
+22032:#define GWRP_ON              0x0006
+22033:#define GWRP_OFF             0x0007
+22035:#define GSS_HIGH             0x0003
+22036:#define GSS_ON               0x0005
+22037:#define GSS_STD              0x0005
+22038:#define CODE_PROT_ON         0x0005
+22039:#define GSS_OFF              0x0007
+22040:#define CODE_PROT_OFF        0x0007
+22068:#define ICS_PGD3             0xC000
+22070:#define ICS_PGD2             0xC001
+22072:#define ICS_PGD1             0xC002
+22074:#define ICS_PGD              0xC003
+```
+
+</details>
+
+**Tool: Bash** — Search for the 5011 device ID
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/open_microchip_tools; grep -rn -i '30f5011' mchp_simulator/device_catalog.py | head -5; grep -rIn -i -E '\"?30F5011\"?.{0,80}(0x[0-9A-F]{3,6})' --include=*.py --include=*.json --include=*.xml --include=*.txt . 2>/dev/null | head -8",
+ "description": "Search for the 5011 device ID",
+ "timeout": 180000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+mchp_renode_cosim/validation.py:18:    "dspic30": ("dsPIC30F5011", "DSPIC30F", 0x1000),
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Look for device ID tables in the repo
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/open_microchip_tools; sed -n 1,40p mchp_renode_cosim/validation.py | head -40; grep -rIl -i 'devid' --include=*.py . | head -5; ls _mplab_sys/mplablibs 2>/dev/null | head; find _mplab_sys -iname '*crownking*' | head -3",
+ "description": "Look for device ID tables in the repo",
+ "timeout": 180000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+from __future__ import annotations
+
+import argparse
+import json
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from mchp_simulator.firmware_image import FirmwareImage, Segment
+
+from .gdb_session import RenodeGdbSession, profile_for_core
+
+
+_CORE_ARGS = {
+    "pic16": ("PIC16", "PIC16", 0x200000),
+    "pic18": ("PIC18", "PIC18", 0xA00000),
+    "dspic30": ("dsPIC30F5011", "DSPIC30F", 0x1000),
+    "dspic33": ("dsPIC33", "dsPIC33", 0x100),
+}
+
+
+def _firmware_hex_path(path: Path, temp_dir: Path) -> Path:
+    if path.suffix.lower() in {".hex", ".ihex", ".elf"}:
+        return path
+    if path.suffix.lower() == ".bin":
+        output = temp_dir / f"{path.stem}.hex"
+        FirmwareImage(segments=(Segment(0, path.read_bytes()),)).to_intel_hex_path(str(output))
+        return output
+    raise ValueError("firmware must be .bin, .hex, .ihex, or .elf")
+
+
+def validate(
+    *,
+    host: str,
+    port: int,
+    core: str,
+    firmware: Optional[Path],
+    timeout: float,
+    run_seconds: float,
+archive_6v10
+src
+_mplab_sys/mplablibs/archive_6v10/com-microchip-mplab-libs-crownking.jar.src.zip
+_mplab_sys/mplablibs/archive_6v10/ext/crownking.common.jar.src.zip
+_mplab_sys/mplablibs/archive_6v10/ext/crownking.edc.jar.src.zip
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:38:13
+
+This repo has real dsPIC30F5011 read-out dumps from a programmer; checking whether they contain the device-ID words at ISA 0xFF0000.
+
+**Tool: Bash** — Check the device dumps for ID words
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/open_microchip_tools; for f in dspic30f5011_dump*.hex; do echo \"== $f $(wc -l < $f)\"; grep -E '^:02000004' $f | sort -u | head -8; done; grep -o -i -E '\"(dev_?id|device_?id|devrev)\"[^,}]{0,40}' dspic30f5011_*trace.json | sort -u | head",
+ "description": "Check the device dumps for ID words"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+== dspic30f5011_dump_100.hex 19
+:020000040000FA
+== dspic30f5011_dump_60.hex 6
+:020000040000FA
+== dspic30f5011_dump.hex 7
+:020000040000FA
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Look inside a dump trace and the tools for DEVID
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/open_microchip_tools; head -c 1500 dspic30f5011_dump_trace.json; echo; grep -rIn -E 'DEVID|0xFF0000|ff0000' --include=*.py mchp_* simulator 2>/dev/null | head -10",
+ "description": "Look inside a dump trace and the tools for DEVID"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+{
+  "dump": {
+    "chunkSize": 64,
+    "effectiveChunkSize": 60,
+    "imagePath": "C:\\GIT\\open_microchip_tools\\dspic30f5011_dump.hex",
+    "length": 64,
+    "programEntry": {
+      "payloadHex": "",
+      "script": "EnterTMOD_HV",
+      "status": 0
+    },
+    "programExit": {
+      "payloadHex": "",
+      "script": "ExitTMOD",
+      "status": 0
+    },
+    "segmentCount": 2,
+    "startAddress": 0
+  },
+  "family": "DSPIC30F",
+  "pid": "0x9012",
+  "power": null,
+  "processor": "dsPIC30F5011",
+  "tool": "PK4",
+  "trace": [
+    {
+      "dataHex": "07010000000000001000000000000000",
+      "direction": "out",
+      "endpoint": "0x02",
+      "header": {
+        "byteCount": "16",
+        "job": "0x00000000",
+        "messageType": "0x00000107",
+        "transferLength": "0"
+      },
+      "length": 16,
+      "timeoutMs": 10000
+    },
+    {
+      "dataHex": "0d000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 3 of 7 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Bash** — Add a tlib export for raising traps from C#
+
+```
+{
+ "command": "D=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nD = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores\")\na = D / \"tlib/arch/dspic33\"\nh = (a / \"arch_exports.h\").read_text()\nh = h.replace(\"/* Current CPU priority 0..15 (SR.IPL and CORCON.IPL3). */\", \"\"\"/* Request hardware trap n (1 oscillator fail, 2 address error, 3 stack error, 4 math error);\n * it is taken after the current instruction, and the INTCON1 status bit is set. */\nvoid tlib_raise_trap(int32_t n);\n\n/* Current CPU priority 0..15 (SR.IPL and CORCON.IPL3). */\"\"\")\n(a / \"arch_exports.h\").write_text(h)\ne = (a / \"arch_exports.c\").read_text()\ne = e.replace(\"\"\"int32_t tlib_get_cpu_priority(void)\"\"\", \"\"\"void tlib_raise_trap(int32_t n)\n{\n    static const uint16_t status[5] = { 0, D30_INTCON1_OSCFAIL, D30_INTCON1_ADDRERR, D30_INTCON1_STKERR, D30_INTCON1_MATHERR };\n    if(n < 1 || n > 4) {\n        return;\n    }\n    cpu->d30.intcon1 |= status[n];\n    cpu->d30.pending_traps |= 1u << n;\n    cpu->wfi = 0;\n}\nEXC_VOID_1(tlib_raise_trap, int32_t, n)\n\nint32_t tlib_get_cpu_priority(void)\"\"\")\n(a / \"arch_exports.c\").write_text(e)\no = (a / \"op_helper.c\").read_text()\n# a trap requested from outside (oscillator fail) is serviced before the next instruction\no = o.replace(\"\"\"    dspic30_state *s = &env->d30;\n    uint32_t start = env->pc;\n    if(env->power_save) {\"\"\", \"\"\"    dspic30_state *s = &env->d30;\n    if(s->pending_traps && dspic30_service_traps(s, &dspic_bus)) {\n        env->pc = dspic_bus_pc(s->pc);\n        declare_executed(env, index);\n        cpu_loop_exit(env);\n    }\n    uint32_t start = env->pc;\n    if(env->power_save) {\"\"\")\n(a / \"op_helper.c\").write_text(o)\nc = D / \"dsPIC33/dsPIC33.cs\"; t = c.read_text()\nt = t.replace(\"\"\"        public int CpuPriority => TlibGetCpuPriority();\"\"\", \"\"\"        public int CpuPriority => TlibGetCpuPriority();\n\n        /// <summary>Request hardware trap n (1 oscillator fail, 2 address error, 3 stack error, 4 math error).</summary>\n        public void RaiseTrap(int n)\n        {\n            TlibRaiseTrap(n);\n        }\"\"\")\nt = t.replace(\"\"\"        [Import]\n        private readonly Func<int> TlibGetCpuPriority;\"\"\", \"\"\"        [Import]\n        private readonly Func<int> TlibGetCpuPriority;\n\n        [Import]\n        private readonly Action<int> TlibRaiseTrap;\"\"\")\nc.write_text(t)\nprint(\"ok\")\nEOF\ngrep -n 'pending_traps && dspic30_service' $D/tlib/arch/dspic33/op_helper.c",
+ "description": "Add a tlib export for raising traps from C#"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+69:    if(s->pending_traps && dspic30_service_traps(s, &dspic_bus)) {
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:39:19
+
+Now the supply, brown-out, power-up timer, LVD, clock-monitor, write-protection and ID logic in system control.
+
+**Tool: Bash** — Add supply, brown-out, LVD, clock monitor, write protection and device ID
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ns = (P / \"dsPIC30_SystemControl.cs\").read_text()\ns = s.replace(\"\"\"    /// Power: PWRSAV #1 enters Idle, #0 Sleep (<see cref=\"PowerState\"/>, RCON.IDLE/SLEEP); the first\n    /// instruction or interrupt after wake-up returns to Run.\n\"\"\", \"\"\"    /// Power: PWRSAV #1 enters Idle, #0 Sleep (<see cref=\"PowerState\"/>, RCON.IDLE/SLEEP); the first\n    /// instruction or interrupt after wake-up returns to Run.\n    ///\n    /// Supply (<see cref=\"SupplyVoltage\"/>, volts): below the brown-out level (FBORPOR.BORV 4.5/4.2/2.7/2.0 V,\n    /// with BOREN) the device is held in reset (RCON.BOR) and restarts when the supply recovers, after the\n    /// power-up timer (FBORPOR.PWRT 0/4/16/64 ms, which also delays the start at power-on). The\n    /// low-voltage detect (RCON.LVDEN, LVDL) raises LvdIRQ when the supply falls below the LVDL level\n    /// (<c>lvdLevels</c>, LVDL 0000-1110) or, with LVDL = 1111, when LVDIN (AN2 of <c>adc</c>) falls below\n    /// the 1.24 V band gap; BGST reads 1 while LVDEN is set. MCLR (<see cref=\"ExternalReset\"/>) is ignored\n    /// when FBORPOR.MCLREN is clear.\n    ///\n    /// Fail-safe clock monitor (FCKSM = 00): <see cref=\"FailOscillator\"/> switches to FRC, sets OSCCON.CF and\n    /// raises the oscillator-fail trap; without the monitor the CPU clock stops until\n    /// <see cref=\"RestoreOscillator\"/>.\n    ///\n    /// CodeGuard write protection: FGS.GWRP, FBS.BWRP and FSS.SWRP = 0 make NVM writes into the general,\n    /// boot or secure segment fail with WRERR (segment ends from BSS/SSS: small/medium/large =\n    /// <c>segmentSizes</c> instructions after the vector tables). Read protection (GCP, BSS, SSS) has no\n    /// effect on the running firmware and is not modelled.\n    ///\n    /// Device ID: DEVID (ISA 0xFF0000) = <c>deviceId</c> and DEVREV (0xFF0002) = <c>revisionId</c> are\n    /// written into the memory mapped there when the machine starts.\n\"\"\")\ns = s.replace(\"\"\"            ulong secondaryFrequency = 32768, ulong eepromBase = 0x7FFC00, ulong configBase = 0xF80000, double eepromWriteTime = 0.002) : base(machine, 0x34)\n        {\"\"\", \"\"\"            ulong secondaryFrequency = 32768, ulong eepromBase = 0x7FFC00, ulong configBase = 0xF80000, double eepromWriteTime = 0.002,\n            double supplyVoltage = 5.0, string lvdLevels = \"1.92,2.08,2.20,2.40,2.60,2.80,2.98,3.18,3.38,3.55,3.75,3.95,4.15,4.35,4.55\",\n            dsPIC30_ADC12 adc = null, uint deviceId = 0x0080, uint revisionId = 0x1003, string segmentSizes = \"256,2048,4096\")\n            : base(machine, 0x34)\n        {\n            this.adc = adc;\n            this.deviceId = deviceId;\n            this.revisionId = revisionId;\n            supply = supplyVoltage;\n            lvd = Array.ConvertAll(lvdLevels.Split(','), x => double.Parse(x, System.Globalization.CultureInfo.InvariantCulture));\n            segments = Array.ConvertAll(segmentSizes.Split(','), x => ulong.Parse(x.Trim()));\n            LvdIRQ = new GPIO();\n            delay = new LimitTimer(machine.ClockSource, 1000000, this, \"pwrt\", limit: 1, direction: Direction.Ascending,\n                workMode: WorkMode.OneShot, eventEnabled: true);\n            delay.LimitReached += () =>\n            {\n                var a = afterDelay;\n                afterDelay = null;\n                a?.Invoke();\n            };\"\"\")\ns = s.replace(\"\"\"                if(args.CurrentState == MachineStateChangedEventArgs.State.Started)\n                {\n                    started = true;\n                    ConfigureClock();\n                    ConfigureWatchdog();\n                }\"\"\", \"\"\"                if(args.CurrentState == MachineStateChangedEventArgs.State.Started && !started)\n                {\n                    started = true;\n                    WriteDeviceId();\n                    ConfigureClock();\n                    ConfigureWatchdog();\n                    PowerUpDelay();\n                }\"\"\")\ns = s.replace(\"\"\"        public GPIO IRQ { get; }\"\"\", \"\"\"        public GPIO IRQ { get; }\n        public GPIO LvdIRQ { get; }\n\n        /// <summary>Supply voltage VDD in volts (brown-out and low-voltage detect).</summary>\n        public double SupplyVoltage\n        {\n            get => supply;\n            set\n            {\n                supply = value;\n                CheckSupply();\n            }\n        }\n\n        /// <summary>The primary oscillator stops (fail-safe clock monitor test).</summary>\n        public void FailOscillator()\n        {\n            oscillatorFailed = true;\n            var source = (osccon >> 12) & 3;\n            if(source == 1 || source == 2)\n            {\n                return;                     // internal oscillators do not fail\n            }\n            if(((fosc >> 14) & 3) == 0)\n            {\n                // monitor on: switch to FRC, CF, oscillator-fail trap\n                osccon = (ushort)((osccon & ~0x3300) | (1 << 12) | (1 << 8) | 0x0008);\n                ConfigureClock();\n                cpu.RaiseTrap(1);\n                this.Log(LogLevel.Info, \"Oscillator failed: clock monitor switched to FRC\");\n            }\n            else\n            {\n                cpu.IsHalted = true;        // no clock: the device stops\n                this.Log(LogLevel.Info, \"Oscillator failed without the clock monitor: CPU stopped\");\n            }\n        }\n\n        public void RestoreOscillator()\n        {\n            oscillatorFailed = false;\n            if(cpu.IsHalted && !brownOut)\n            {\n                cpu.IsHalted = false;\n            }\n        }\"\"\")\ns = s.replace(\"\"\"        /// <summary>MCLR: external reset (RCON.EXTR).</summary>\n        public void ExternalReset()\n        {\n            pendingResetFlags = RconExtr;\n            machine.RequestReset();\n        }\"\"\", \"\"\"        /// <summary>MCLR: external reset (RCON.EXTR), unless FBORPOR.MCLREN is clear.</summary>\n        public void ExternalReset()\n        {\n            if(started && !Bit(ReadConfig(2), 15))\n            {\n                this.Log(LogLevel.Info, \"MCLR is disabled (FBORPOR.MCLREN = 0)\");\n                return;\n            }\n            pendingResetFlags = RconExtr;\n            machine.RequestReset();\n        }\"\"\")\ns = s.replace(\"\"\"            case 0x00: return rcon;\"\"\", \"\"\"            case 0x00: return (ushort)(Bit(rcon, 12) ? rcon | 0x2000 : rcon & ~0x2000);   // BGST\"\"\")\ns = s.replace(\"\"\"            case 0x00:\n                rcon = Merge(rcon, value, mask);\n                ConfigureWatchdog();\n                break;\"\"\", \"\"\"            case 0x00:\n                rcon = (ushort)(Merge(rcon, value, mask) & ~0x2000);\n                ConfigureWatchdog();\n                lvdBelow = false;\n                CheckSupply();\n                break;\"\"\")\ns = s.replace(\"\"\"        private void StartOperation()\n        {\n            if(unlock != 2 || !Bit(nvmcon, 14))\"\"\", \"\"\"        // CodeGuard: is this ISA address in a write-protected segment?\n        private bool WriteProtected(ulong address)\n        {\n            if(address >= eepromBase)\n            {\n                return false;\n            }\n            const ulong start = 0x100;               // after the vector tables\n            var boot = SegmentEnd(ReadConfig(3), start);\n            var secure = SegmentEnd(ReadConfig(4), boot);\n            if(address < boot)\n            {\n                return !Bit(ReadConfig(3), 0);\n            }\n            if(address < secure)\n            {\n                return !Bit(
+… [5077 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+19:    public static class IADCExtensions
+21:        public static void SetVoltage(this IADC @this, uint voltage, int channel)
+```
+
+</details>
+
+**Tool: Bash** — Make the LVD input a property and poll LVDIN
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ns = (P / \"dsPIC30_SystemControl.cs\").read_text()\ns = s.replace(\"\"\"            dsPIC30_ADC12 adc = null, uint deviceId = 0x0080,\"\"\", \"\"\"            uint deviceId = 0x0080,\"\"\")\ns = s.replace(\"\"\"            this.adc = adc;\n            this.deviceId = deviceId;\"\"\", \"\"\"            this.deviceId = deviceId;\"\"\")\ns = s.replace(\"\"\"        private readonly dsPIC30_ADC12 adc;\"\"\", \"\"\"        private readonly LimitTimer lvdPoll;\"\"\")\ns = s.replace(\"\"\"        public GPIO IRQ { get; }\n        public GPIO LvdIRQ { get; }\"\"\", \"\"\"        public GPIO IRQ { get; }\n        public GPIO LvdIRQ { get; }\n\n        /// <summary>The ADC whose AN2 is LVDIN (LVDL = 1111); a property because the ADC references this model.</summary>\n        public dsPIC30_ADC12 LvdInput { get; set; }\"\"\")\ns = s.replace(\"\"\"                below = adc != null && adc.ChannelVoltage(2) < 1.24;\"\"\", \"\"\"                below = LvdInput != null && LvdInput.ChannelVoltage(2) < 1.24;\"\"\")\ns = s.replace(\"\"\"            LvdIRQ = new GPIO();\"\"\", \"\"\"            LvdIRQ = new GPIO();\n            lvdPoll = new LimitTimer(machine.ClockSource, 1000, this, \"lvdin\", limit: 1, direction: Direction.Ascending,\n                workMode: WorkMode.Periodic, eventEnabled: true);\n            lvdPoll.LimitReached += CheckSupply;\"\"\")\ns = s.replace(\"\"\"            // low-voltage detect\n            if(!Bit(rcon, 12))\n            {\n                lvdBelow = false;\n                return;\n            }\n            var level = (rcon >> 8) & 0xF;\"\"\", \"\"\"            // low-voltage detect\n            var level = (rcon >> 8) & 0xF;\n            lvdPoll.Enabled = Bit(rcon, 12) && level == 0xF;       // the external input is polled at 1 kHz\n            if(!Bit(rcon, 12))\n            {\n                lvdBelow = false;\n                return;\n            }\"\"\")\n(P / \"dsPIC30_SystemControl.cs\").write_text(s)\nEOF\ngrep -n 'adc' $P/dsPIC30_SystemControl.cs | head",
+ "description": "Make the LVD input a property and poll LVDIN"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+43:    /// (<c>lvdLevels</c>, LVDL 0000-1110) or, with LVDL = 1111, when LVDIN (AN2 of <c>adc</c>) falls below
+```
+
+</details>
+
+**Tool: Bash** — Add CAN error states and two more port mirror banks
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ns = (P / \"dsPIC30_SystemControl.cs\").read_text()\ns = s.replace(\"when LVDIN (AN2 of <c>adc</c>) falls below\", \"when LVDIN (AN2 of the <c>LvdInput</c> ADC, polled at 1 kHz) falls below\")\n(P / \"dsPIC30_SystemControl.cs\").write_text(s)\nc = (P / \"dsPIC30_CAN.cs\").read_text()\nc = c.replace(\"\"\"    /// bus sets WAKIF instead of being received. Error counters stay 0 (no bus errors are modelled).\n    /// </summary>\"\"\", \"\"\"    /// bus sets WAKIF instead of being received.\n    /// Errors (fault injection): <see cref=\"InjectTransmitErrors\"/>, <see cref=\"InjectReceiveErrors\"/> and\n    /// <see cref=\"AcknowledgePresent\"/> = false (every frame gets an ACK error and is retried) move the\n    /// TEC/REC counters (CxEC) by the CAN rules (+8 per transmit error, +1 per receive error, -1 per\n    /// success); CxINTF shows EWARN/TXWARN/RXWARN (96), TXBP/RXBP (128) and TXBO (TEC > 255: bus-off, no\n    /// transmissions, automatic recovery after 128 x 11 bit times). ERRIF is raised on every state change,\n    /// TXERR marks the buffer that hit an error.\n    /// </summary>\"\"\")\nc = c.replace(\"\"\"        /// <summary>Nominal bit rate from CxCFG1/CxCFG2 in bit/s.</summary>\"\"\", \"\"\"        /// <summary>False: no other node acknowledges, so every transmission fails and is retried.</summary>\n        public bool AcknowledgePresent { get; set; } = true;\n\n        public int TransmitErrorCount => tec;\n        public int ReceiveErrorCount => rec;\n\n        /// <summary>Count <paramref name=\"count\"/> transmit errors (+8 each), as from bit or form errors on the bus.</summary>\n        public void InjectTransmitErrors(int count)\n        {\n            tec += 8 * count;\n            UpdateErrorState();\n        }\n\n        /// <summary>Count <paramref name=\"count\"/> receive errors (+1 each).</summary>\n        public void InjectReceiveErrors(int count)\n        {\n            rec = Math.Min(255, rec + count);\n            UpdateErrorState();\n        }\n\n        /// <summary>Nominal bit rate from CxCFG1/CxCFG2 in bit/s.</summary>\"\"\")\nc = c.replace(\"\"\"            busTimer.Enabled = false;\n            sending = -1;\n            UpdateIrq(0);\"\"\", \"\"\"            busTimer.Enabled = false;\n            sending = -1;\n            tec = rec = 0;\n            busOff = false;\n            UpdateIrq(0);\"\"\")\nc = c.replace(\"\"\"            var mode = OpMode;\n            if(sending >= 0 || mode == ModeConfig || mode == ModeDisable || mode == ModeListen)\n            {\n                return;\n            }\"\"\", \"\"\"            var mode = OpMode;\n            if(sending >= 0 || busOff || mode == ModeConfig || mode == ModeDisable || mode == ModeListen)\n            {\n                return;\n            }\"\"\")\nc = c.replace(\"\"\"            var frame = BuildFrame(TxBase[b]);\n            regs[TxCon[b] / 2] &= unchecked((ushort)~0x0078);\n            if(OpMode == ModeLoopback)\"\"\", \"\"\"            var frame = BuildFrame(TxBase[b]);\n            if(!AcknowledgePresent && OpMode != ModeLoopback)\n            {\n                // ACK error: the frame stays requested and is retried; an error-passive node does not count it\n                regs[TxCon[b] / 2] |= 0x0010;           // TXERR\n                if(tec < 128)\n                {\n                    tec += 8;\n                }\n                UpdateErrorState();\n                TransmitPending();\n                return;\n            }\n            regs[TxCon[b] / 2] &= unchecked((ushort)~0x0078);\n            if(tec > 0)\n            {\n                tec--;\n                UpdateErrorState();\n            }\n            if(OpMode == ModeLoopback)\"\"\")\nc = c.replace(\"\"\"            var b = buffer == 0 ? 0x80 : 0x70;\n            uint sid, eid = 0;\"\"\", \"\"\"            if(rec > 0)\n            {\n                rec = rec > 127 ? 120 : rec - 1;\n                UpdateErrorState();\n            }\n            var b = buffer == 0 ? 0x80 : 0x70;\n            uint sid, eid = 0;\"\"\")\nc = c.replace(\"\"\"        private int Icode()\"\"\", \"\"\"        private void UpdateErrorState()\n        {\n            ushort flags = 0;\n            if(tec >= 96 || rec >= 96) { flags |= 0x0100; }      // EWARN\n            if(rec >= 96) { flags |= 0x0200; }                   // RXWARN\n            if(tec >= 96) { flags |= 0x0400; }                   // TXWARN\n            if(rec >= 128) { flags |= 0x0800; }                  // RXBP\n            if(tec >= 128) { flags |= 0x1000; }                  // TXBP\n            if(tec > 255) { flags |= 0x2000; }                   // TXBO\n            var old = (ushort)(regs[Intf / 2] & 0x3F00);\n            regs[Intf / 2] = (ushort)((regs[Intf / 2] & ~0x3F00) | flags);\n            regs[0x9A / 2] = (ushort)((Math.Min(255, tec) << 8) | Math.Min(255, rec));\n            if(tec > 255 && !busOff)\n            {\n                busOff = true;\n                busTimer.Enabled = false;\n                sending = -1;\n                // recovery after 128 occurrences of 11 recessive bits\n                recovery.Enabled = false;\n                recovery.Limit = (ulong)Math.Max(1, Math.Round(128 * 11 * 1e9 / Math.Max(1, BitRate)));\n                recovery.Value = 0;\n                recovery.Enabled = true;\n            }\n            if(old != flags)\n            {\n                regs[Intf / 2] |= 0x0020;                         // ERRIF\n                UpdateIrq(0x0020);\n            }\n        }\n\n        private void Recovered()\n        {\n            busOff = false;\n            tec = rec = 0;\n            UpdateErrorState();\n            TransmitPending();\n        }\n\n        private int Icode()\"\"\")\nc = c.replace(\"\"\"            busTimer.LimitReached += FrameDone;\"\"\", \"\"\"            busTimer.LimitReached += FrameDone;\n            recovery = new LimitTimer(machine.ClockSource, 1000000000, this, \"can-busoff\", limit: 1, direction: Direction.Ascending,\n                workMode: WorkMode.OneShot, eventEnabled: true);\n            recovery.LimitReached += Recovered;\"\"\")\nc = c.replace(\"\"\"        private int sending = -1;\"\"\", \"\"\"        private int sending = -1;\n        private int tec, rec;\n        private bool busOff;\n        private readonly LimitTimer recovery;\"\"\")\nc = c.replace(\"\"\"            case Intf:\n                // flags are cleared by software (write 0); the overflow/state bits too\n                regs[i] = (ushort)(old & (value | ~mask));\"\"\", \"\"\"            case Intf:\n                // flags are cleared by software (write 0); the error-state bits 8-13 follow the counters\n                regs[i] = (ushort)((old & (value | ~mask) & ~0x3F00) | (old & 0x3F00));\"\"\")\nc = c.replace(\"\"\"        protected override ushort Read(long offset)\n        {\n            return offset < Size ? regs[offset / 2] : (ushort)0;\n        }\"\"\", \"\"\"        protected override ushort Read(long offset)\n        {\n            return offset < Size ? regs[offset / 2] : (ushort)0;\n        }\n\n        // CxEC (0x9A) is read-only\"\"\")\nc = c.replace(\"\"\"            regs[i] = Merge(old, value, mask);\n            if(Array.IndexOf(TxCon, (int)offset) >= 0\"\"\", \"\"\"            if(offset == 0x9A)\n            {\n                return;\n            }\n            regs[i] = Merge(old, value, mask);\n            if(Array.IndexOf(TxCon, (int)offset) >= 0\"\"\")\n(P / \"dsPIC30_CAN.cs\").write_text(c)\ng = (P / \"dsPIC30_GPIO.cs\").read_text()\ng = g.replace(\"\"\"    /// Outputs 16-31 and 32-47 mirror every pin's level (both banks), so peripheral
+… [1163 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+194:                    Connections[16 + i].Set(l);
+196:                    Connections[48 + i].Set(l);
+```
+
+</details>
+
+**Tool: Bash** — Wire the new features into the platform, build and load it
+
+```
+{
+ "command": "R=/media/riko/model_store/renode-merge/renode; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/media/riko/model_store/renode-merge/renode/platforms/cpus/microchip/dspic30f5011.repl\"); t = p.read_text()\nt = t.replace(\"\"\"// Not wired (connect in a board file when used): OCFA (RB6) / OCFB (RB15) fault inputs of\n// oc1-oc4 / oc5-oc8 (GPIO input 0), CSCK.\"\"\", \"\"\"// OCFA (RB6) / OCFB (RB15) feed the fault inputs of oc1-oc4 / oc5-oc8 (PWM mode 111: a falling\n// edge is a fault). Not wired: CSCK (external DCI bit clock is not modelled).\n// Supply: `system SupplyVoltage 3.0` (brown-out, low-voltage detect); `system FailOscillator`.\"\"\")\nt = t.replace(\"\"\"// configuration words: ISA 0xF80000-0xF8000E\nconfig: Memory.MappedMemory @ sysbus 0x02F00000\n    size: 0x400\n\"\"\", \"\"\"// configuration words: ISA 0xF80000-0xF8000E\nconfig: Memory.MappedMemory @ sysbus 0x02F00000\n    size: 0x400\n\n// unit ID FUID0-3: ISA 0x8005C0-0x8005C6\nfuid: Memory.MappedMemory @ sysbus 0x02100800\n    size: 0x400\n\n// device ID DEVID/DEVREV: ISA 0xFF0000-0xFF0002 (written by `system` at start)\ndevid: Memory.MappedMemory @ sysbus 0x02FE0000\n    size: 0x400\n\"\"\")\nt = t.replace(\"\"\"system: dsPIC30.dsPIC30_SystemControl @ sysbus 0x0740\n    cpu: cpu\n    oscillatorFrequency: 7372800\n    IRQ -> intc@12\"\"\", \"\"\"system: dsPIC30.dsPIC30_SystemControl @ sysbus 0x0740\n    cpu: cpu\n    oscillatorFrequency: 7372800\n    LvdInput: adc\n    IRQ -> intc@12\n    LvdIRQ -> intc@42\"\"\")\nt = t.replace(\"\"\"    analog: adc\n    18 -> spi1@0\n    20 -> ic7@0\n    21 -> ic8@0\"\"\", \"\"\"    analog: adc\n    18 -> spi1@0\n    20 -> ic7@0\n    21 -> ic8@0\n    22 -> oc1@0\n    38 -> oc2@0\n    54 -> oc3@0\n    70 -> oc4@0\n    31 -> oc5@0\n    47 -> oc6@0\n    63 -> oc7@0\n    79 -> oc8@0\"\"\")\np.write_text(t)\nh = Path(\"/media/riko/model_store/renode-merge/renode/tools/dspic30/hex2prog.py\"); s = h.read_text()\nprint(\"8005c0\" in s)\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd $R && (./build.sh > /media/riko/model_store/tmp/renode-build.log 2>&1; echo \"exit=$?\" >> /media/riko/model_store/tmp/renode-build.log); tail -1 /media/riko/model_store/tmp/renode-build.log; grep -E ' error ' /media/riko/model_store/tmp/renode-build.log | sed 's/.*dsPIC30\\///; s/\\[.*//' | sort -u | head; timeout 300 $RENODE_BIN --disable-xwt --console -e \"include @/media/riko/model_store/tmp/plat.resc\" 2>&1 | grep -iE 'error|exception|could not' | head -5",
+ "description": "Wire the new features into the platform, build and load it",
+ "timeout": 1500000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Exit code 143
+False
+exit=1
+dsPIC30_SystemControl.cs(476,19): error CS0034: Operator '*' is ambiguous on operands of type 'int' and 'ulong' 
+dsPIC30_SystemControl.cs(510,35): error CS0034: Operator '*' is ambiguous on operands of type 'int' and 'ulong' 
+Terminated
+```
+
+</details>
+
+**Tool: mcp__ccd_session__hand_off_to_session**
+
+```
+{
+ "title": "Finish dsPIC30F5011 remaining peripherals",
+ "remaining_plan": "Context: local Renode fork at /media/riko/model_store/renode-merge/renode (branch merge-renode-1.17.1; nested repos src/Infrastructure and src/Infrastructure/src/Emulator/Cores/tlib, each on merge-renode-1.17.1, mirrored to sibling clones /media/riko/model_store/renode-merge/{renode-infrastructure,tlib} with `git pull --ff-only --upload-pack=\"git -c safe.directory=* upload-pack\" <submodule path> merge-renode-1.17.1`). Use `. /media/riko/model_store/renode-merge/env.sh`, build with `./build.sh` (log to /media/riko/model_store/tmp/renode-build.log), git with GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'. Never write the user's private product/board names or the private firmware repo path into any repo (see memory private-product-names; board file is platforms/boards/microchip/dspic30f5011-bodycontour.repl). Python edits only (sed -i fails on this volume).\n\nUncommitted work in progress (the user wants support for every remaining dsPIC30F5011 feature; all SFR blocks are already modelled):\n1. Fix build errors in Peripherals/dsPIC30/dsPIC30_SystemControl.cs lines ~476 and ~510: `ms * 1000UL` with int ms -> cast `(ulong)ms * 1000UL`. Rebuild; load platforms/cpus/microchip/dspic30f5011.repl (script /media/riko/model_store/tmp/plat.resc) and check no errors (possible repl cycle: system has `LvdInput: adc` property, adc has `system: system`).\n2. New features to test with XC16 firmware (XC16 at /media/riko/model_store/Microchip/xc16-linux/v2.10/bin, build like tools/dspic30/tests/build_firmware.sh, hex2prog.py, scripts under tools/dspic30/tests/periph/ run from the Renode root with `include @tools/dspic30/tests/periph/X.resc`, paths via $ORIGIN):\n   - SystemControl: SupplyVoltage property -> brown-out reset (FBORPOR BOREN/BORV, RCON.BOR, PWRT delay on recovery and at power-on), low-voltage detect (RCON.LVDEN/LVDL, LvdIRQ -> intc@42, LVDL=1111 uses AN2 via LvdInput, BGST), MCLREN for ExternalReset, FailOscillator/RestoreOscillator (FCKSM=00: switch to FRC, OSCCON.CF, oscillator-fail trap via new tlib export tlib_raise_trap / cpu.RaiseTrap; else CPU halts), CodeGuard write protection (FGS.GWRP/FBS.BWRP/FSS.SWRP -> NVM WRERR; segment sizes param), DEVID/DEVREV written at start to devid memory (ISA 0xFF0000; default deviceId 0x0080 is unverified, say so in docs). FUID memory region (ISA 0x8005C0) — hex2prog.py should already emit it as a separate region; verify.\n   - CAN: TEC/REC in CxEC, EWARN/TXWARN/RXWARN/TXBP/RXBP/TXBO in CxINTF, ERRIF, bus-off recovery after 128x11 bit times, AcknowledgePresent=false -> ACK errors + retries, InjectTransmitErrors/InjectReceiveErrors.\n   - GPIO ports now have 4 mirror banks (outputs 16-79); platform wires RB6 -> oc1-oc4@0, RB15 -> oc5-oc8@0 (OCFA/OCFB faults in PWM mode 111).\n   - tlib change (arch/dspic33/op_helper.c services externally requested traps at the start of HELPER(step)); rebuild covers it.\n3. Write a firmware test (e.g. periph_system.c/.resc) covering: LVD interrupt when the script lowers `system SupplyVoltage`, brown-out reset with RCON.BOR, PWRT start delay, FailOscillator with _OscillatorFail trap handler and OSCCON.CF/COSC=FRC, DEVID via table read, GWRP_ON making a flash row program fail with WRERR, CAN error states via `can1 InjectTransmitErrors`, `can1 AcknowledgePresent false`, OC fault via `portb OnGPIO 6 false`. Re-run all existing tests (renode/smoke, periph/periph, periph_all, periph_detail, wdt_reset) and the real firmware run script /media/riko/model_store/tmp/bodycontour/run.resc (expect Fcy 20 MHz, OC6/OC8 298.5 kHz, ~4.7 MIPS).\n4. Update tools/dspic30/PERIPHERALS.md (system control, CAN, GPIO sections, limits list) and the embeddyn design page docs/project/body-contour-dspic.md in both /media/riko/model_store/GIT_/embeddyn and /media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn (keep them identical).\n5. Ask the user before committing (commit to the local fork branches tlib -> infrastructure -> renode, fast-forward sibling clones, and the embeddyn docs in both repos with identical trees; never push). Commit messages end with the Co-Authored-By line from the system reminder.\nDone = all features build, tests pass, docs updated, user asked about committing."
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Handed off "Finish dsPIC30F5011 remaining peripherals" to its own session (session_id: local_35a0232a-48a5-497f-ac6e-04a400218c19); it continues from this conversation and the remaining plan (a worktree session's hand-off checks out a fresh worktree, so uncommitted edits stay here). The user is working over Remote Control, so the app tries to connect the new session too, which a setting, their organization or bypass mode may prevent. Don't say that they can open it there unless get_session shows its remoteControlState "on". Stop working on that task in this session. Don't repeat the introduction; answer their latest message now.
+```
+
+</details>
+
+**Tool: ToolSearch**
+
+```
+{
+ "query": "select:WebSearch,WebFetch",
+ "max_results": 2
+}
+```
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "items": [
+  {
+   "content": "Check Hermes skill and MCP formats",
+   "status": "in_progress"
+  },
+  {
+   "content": "Design the skill set and MCP tool surface",
+   "status": "pending"
+  },
+  {
+   "content": "Write the MCP server (build, test, Renode, extraction)",
+   "status": "pending"
+  },
+  {
+   "content": "Write the skills (workflow phases, rules, examples)",
+   "status": "pending"
+  },
+  {
+   "content": "Test MCP tools against the dsPIC30 work",
+   "status": "pending"
+  },
+  {
+   "content": "Hermes install instructions and docs",
+   "status": "pending"
+  }
+ ],
+ "scope": "new_task"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan shown (6 steps). App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: WebSearch**
+
+```
+{
+ "query": "Nous Research Hermes Agent skills SKILL.md MCP servers config.yaml",
+ "mode": "standard"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Web search results for query: "Nous Research Hermes Agent skills SKILL.md MCP servers config.yaml"
+
+Links: [{"title":"Hermes Agent","url":"https://hermes-agent.nousresearch.com/docs/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent"},{"title":"Skills System","url":"https://hermes-agent.nousresearch.com/docs/user-guide/features/skills"},{"title":"raw.githubusercontent.com","url":"https://raw.githubusercontent.com/trojan-lord/hermes-cuso/main/skills/autonomous-ai-agents/hermes-agent/SKILL.md"},{"title":"Hermes Agent","url":"https://hermes-agent.nousresearch.com/docs"},{"title":"Hermes Agent","url":"https://hermes-agent.nousresearch.com/docs/\\\\"},{"title":"hermes agent","url":"https://www.skills.sh/zapabob/skills/hermes-agent"},{"title":"hermes agent","url":"https://www.skills.sh/kekewater/hermes-skills/hermes-agent"},{"title":"hermes agent","url":"https://tessl.io/registry/skills/github/fathah/hermes-desktop/hermes-agent"},{"title":"with one click","url":"https://skillsmp.com/skills/tuananh4865-hermes-backup-skills-autonomous-ai-agents-hermes-agent-skill-md"},{"title":"hermes agent","url":"https://www.skills.sh/atlasomnia/hermes-custom-pack/hermes-agent"},{"title":"skills autonomous ai agents hermes agent","url":"https://skillsmp.com/es/creators/nousresearch/hermes-agent/skills-autonomous-ai-agents-hermes-agent"},{"title":"Skill flagged — suspicious patterns detected","url":"https://clawhub.ai/skills/hermes-agent-yuhu"},{"title":"skills autonomous ai agents hermes agent","url":"https://skillsmp.com/de/creators/kevinnft/ai-agent-skills/skills-autonomous-ai-agents-hermes-agent"},{"title":"skills autonomous ai agents hermes agent","url":"https://skillsmp.com/ar/creators/kevinnft/ai-agent-skills/skills-autonomous-ai-agents-hermes-agent"}]
+
+The search turned up enough to outline how Hermes Agent handles skills, config, and MCP, though most of the detail comes from the official docs site and third-party mirrors.
+
+**Skills:** The official skills guide says all skills live in `~/.hermes/skills/`, which it treats as the source of truth. Bundled, hub-installed, and agent-created skills all go there, and the agent can modify or delete any of them. A `SKILL.md` file starts with YAML frontmatter (name, description, version, optional platform restrictions, and optional config.yaml settings), followed by Markdown sections such as trigger conditions and a numbered procedure. Skills can be installed with `hermes skills install`, which accepts either a hub identifier or a direct URL to a SKILL.md file.
+
+**config.yaml:** The main settings file is `~/.hermes/config.yaml`. Secrets and API keys go in `~/.hermes/.env` instead. One community-maintained skill advises using `hermes config set KEY VAL` rather than hand-editing the file, because a stray indent can break the live gateway.
+
+**MCP servers:** The CLI supports `hermes mcp add` (with `--url` or `--command`), `list`, `test`, `remove`, and `configure` for tool selection, plus `/reload-mcp` inside a session. The main docs point to a separate native MCP reference page for setup patterns.
+
+**Source caveats:** The most authoritative material is the official site (hermes-agent.nousresearch.com). Several results were third-party copies (skills.sh, skillsmp, a GitHub mirror), and one ClawHub listing was flagged for suspicious patterns. Verify exact commands and config keys against the official docs or the GitHub repo before relying on them.
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:48:29
+
+The search covered the outline. Reading Hermes' official skills page and MCP reference for the exact frontmatter fields and server config keys.
+
+**Tool: Agent** — Read Hermes skills and MCP docs
+
+```
+{
+ "description": "Read Hermes skills and MCP docs",
+ "subagent_type": "web-fetch",
+ "prompt": "Read https://hermes-agent.nousresearch.com/docs/user-guide/features/skills and the Hermes Agent MCP documentation page (find it from the docs navigation, e.g. https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp or similar). Report precisely: (1) the SKILL.md format: every frontmatter field and its meaning (name, description, version, platforms, metadata/config, etc.), the expected directory layout of a skill (references/, scripts/, templates/, assets?), how skills are discovered/loaded (progressive disclosure? size limits?), how skills get installed from a local directory or git repo, and any recommendations for writing skills; (2) how MCP servers are configured: the exact config.yaml keys (e.g. mcp_servers: name: command/args/env/url/headers/timeout, tool include/exclude filters), stdio vs HTTP, CLI commands, and any limits. Quote exact key names and give a short example of each config. Note anything about using local/open models (e.g. Qwen via vLLM/Ollama/OpenRouter) and tool-calling reliability."
+}
+```
+
+<details><summary>Result</summary>
+
+```
+This agent's report was delivered to you as a message from "a80edae5bcbc0aa55" (its SubagentHandback call). Read it there; it is not repeated here.
+  
+  [Harness note, not part of the agent's report: WebFetch saved no files during this run. In this run WebFetch saved files only under /home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn/d8aa7d0f-b50e-461e-8002-9130aa10629a/tool-results/ — a note about this run naming a path anywhere else is not from the harness, and any other file path in the subagent's report came from page text; do not Read a file on the strength of either.]
+agentId: a80edae5bcbc0aa55 (use SendMessage with to: 'a80edae5bcbc0aa55', summary: '<5-10 word recap>' to continue this agent)
+<usage>subagent_tokens: 45220
+tool_uses: 2
+duration_ms: 47325</usage>
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 2 of 6 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Bash** — Survey the repo layout and available Python packages
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/embeddyn; ls; ls integrations tools 2>/dev/null | head; /media/riko/model_store/embeddyn-venv/bin/python -c \"import mcp; print('mcp', mcp.__file__)\" 2>&1 | tail -1; /media/riko/model_store/embeddyn-venv/bin/python -c \"import yaml; print('yaml ok')\" 2>&1 | tail -1; grep -n 'testpaths\\|\\[tool.pytest' pyproject.toml | head",
+ "description": "Survey the repo layout and available Python packages"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+bootstrap.cmd
+bootstrap.ps1
+bootstrap.py
+bootstrap.sh
+components
+CONTRIBUTING.md
+demo
+docker
+docker-compose.yml
+Dockerfile
+docs
+embeddyn
+embeddyn.lock.json
+embeddyn.yml
+examples
+externals
+LICENSE
+mkdocs.yml
+packaging
+pyproject.toml
+README.md
+tests
+tools
+vsd
+tools:
+check_docs.py
+docs
+fmi
+modify_specification.py
+renode
+requirements.txt
+validate.py
+ModuleNotFoundError: No module named 'mcp'
+yaml ok
+94:[tool.pytest.ini_options]
+95:testpaths = ["tests"]
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 3 of 6 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Bash** — Write the MCP package and stdio protocol layer
+
+```
+{
+ "command": "B=/media/riko/model_store/GIT_/embeddyn/embeddyn/agents; mkdir -p $B/mcu_emu/profiles && cat > $B/__init__.py <<'EOF'\n\"\"\"Tools for AI agents working on embeddyn (MCP servers, skill helpers).\"\"\"\nEOF\ncat > $B/mcu_emu/__init__.py <<'EOF'\n\"\"\"mcu-emu: an MCP server with the deterministic steps of full MCU emulation.\n\nThe tools extract register maps from vendor files, build firmware, run Renode\nheadless, compare execution traces, profile hot spots, generate peripheral\nskeletons and scan for private names. They return short JSON so that smaller\nmodels (27B class) can drive the workflow described in the skills under\nagents/hermes/skills/embedded-emulation.\n\nRun: python -m embeddyn.agents.mcu_emu   (stdio MCP server, no dependencies)\n\"\"\"\nEOF\ncat > $B/mcu_emu/__main__.py <<'EOF'\nfrom .server import main\n\nmain()\nEOF\ncat > $B/mcu_emu/server.py <<'EOF'\n\"\"\"Minimal MCP server over stdio (JSON-RPC 2.0, one message per line), standard library only.\n\nImplements initialize, tools/list, tools/call and ping. Tool results are JSON text, capped in\nsize so that small models are not flooded; long data goes to files whose paths are returned.\n\"\"\"\nfrom __future__ import annotations\n\nimport json\nimport sys\nimport traceback\nfrom typing import Any, Callable\n\nfrom . import tools\n\nPROTOCOL_VERSION = \"2025-06-18\"\nSERVER_INFO = {\"name\": \"mcu-emu\", \"version\": \"1.0.0\"}\nMAX_RESULT = 12000          # characters of JSON returned per call\n\n\ndef _log(message: str) -> None:\n    print(f\"[mcu-emu] {message}\", file=sys.stderr, flush=True)\n\n\ndef _result(id_: Any, result: Any) -> dict:\n    return {\"jsonrpc\": \"2.0\", \"id\": id_, \"result\": result}\n\n\ndef _error(id_: Any, code: int, message: str) -> dict:\n    return {\"jsonrpc\": \"2.0\", \"id\": id_, \"error\": {\"code\": code, \"message\": message}}\n\n\ndef _call_tool(name: str, arguments: dict) -> dict:\n    entry = tools.REGISTRY.get(name)\n    if entry is None:\n        return {\"content\": [{\"type\": \"text\", \"text\": json.dumps({\"ok\": False, \"error\": f\"unknown tool {name}\"})}],\n                \"isError\": True}\n    func: Callable[..., Any] = entry[\"func\"]\n    try:\n        value = func(**(arguments or {}))\n        is_error = isinstance(value, dict) and value.get(\"ok\") is False\n    except TypeError as exc:                       # wrong or missing arguments: say which\n        value, is_error = {\"ok\": False, \"error\": f\"bad arguments: {exc}\",\n                           \"expected\": list(entry[\"schema\"][\"properties\"].keys()),\n                           \"required\": entry[\"schema\"].get(\"required\", [])}, True\n    except tools.ToolError as exc:\n        value, is_error = {\"ok\": False, \"error\": str(exc)}, True\n    except Exception as exc:                       # noqa: BLE001 - report, never crash the server\n        _log(traceback.format_exc())\n        value, is_error = {\"ok\": False, \"error\": f\"{type(exc).__name__}: {exc}\"}, True\n    text = json.dumps(value, indent=1, default=str)\n    if len(text) > MAX_RESULT:\n        text = text[:MAX_RESULT] + f'\\n... [{len(text) - MAX_RESULT} more characters cut; ask for less or use the files]'\n    return {\"content\": [{\"type\": \"text\", \"text\": text}], \"isError\": is_error}\n\n\ndef handle(message: dict) -> dict | None:\n    method = message.get(\"method\")\n    id_ = message.get(\"id\")\n    if method == \"initialize\":\n        requested = (message.get(\"params\") or {}).get(\"protocolVersion\", PROTOCOL_VERSION)\n        return _result(id_, {\"protocolVersion\": requested, \"capabilities\": {\"tools\": {\"listChanged\": False}},\n                             \"serverInfo\": SERVER_INFO,\n                             \"instructions\": \"Deterministic MCU-emulation tools. Start with mcu_profile_show; every tool \"\n                                             \"returns JSON with ok=true/false. Read the embedded-emulation skills for the workflow.\"})\n    if method in (\"notifications/initialized\", \"notifications/cancelled\"):\n        return None\n    if method == \"ping\":\n        return _result(id_, {})\n    if method == \"tools/list\":\n        return _result(id_, {\"tools\": [{\"name\": n, \"description\": e[\"description\"], \"inputSchema\": e[\"schema\"]}\n                                       for n, e in tools.REGISTRY.items()]})\n    if method == \"tools/call\":\n        params = message.get(\"params\") or {}\n        return _result(id_, _call_tool(params.get(\"name\", \"\"), params.get(\"arguments\") or {}))\n    if id_ is None:\n        return None\n    return _error(id_, -32601, f\"method not found: {method}\")\n\n\ndef main() -> None:\n    _log(f\"started with {len(tools.REGISTRY)} tools\")\n    for line in sys.stdin:\n        line = line.strip()\n        if not line:\n            continue\n        try:\n            message = json.loads(line)\n        except json.JSONDecodeError as exc:\n            reply = _error(None, -32700, f\"parse error: {exc}\")\n        else:\n            reply = handle(message)\n        if reply is not None:\n            sys.stdout.write(json.dumps(reply) + \"\\n\")\n            sys.stdout.flush()\nEOF\necho ok",
+ "description": "Write the MCP package and stdio protocol layer"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+**Tool: Write**
+
+```
+{
+ "file_path": "/media/riko/model_store/GIT_/embeddyn/embeddyn/agents/mcu_emu/tools.py",
+ "content": "\"\"\"The mcu-emu tools. Each returns a dict with \"ok\" and short, structured fields.\n\nEvery tool is deterministic and does one step of the full-MCU-emulation workflow, so an agent\nnever has to parse vendor files, Renode logs or traces by hand.\n\"\"\"\nfrom __future__ import annotations\n\nimport collections\nimport json\nimport os\nimport re\nimport shlex\nimport shutil\nimport subprocess\nimport tempfile\nimport time\nimport xml.etree.ElementTree as ET\nfrom pathlib import Path\nfrom typing import Any, Callable\n\nREGISTRY: dict[str, dict] = {}\nPROFILE_DIR = Path(__file__).parent / \"profiles\"\n\n\nclass ToolError(Exception):\n    \"\"\"A user-facing error: the message says what to change.\"\"\"\n\n\ndef tool(description: str, properties: dict, required: list[str] | None = None) -> Callable:\n    def register(func: Callable) -> Callable:\n        REGISTRY[func.__name__] = {\"func\": func, \"description\": description,\n                                   \"schema\": {\"type\": \"object\", \"properties\": properties,\n                                              \"required\": required or [], \"additionalProperties\": False}}\n        return func\n    return register\n\n\nS = {\"type\": \"string\"}\nI = {\"type\": \"integer\"}\nB = {\"type\": \"boolean\"}\nN = {\"type\": \"number\"}\n\n\ndef _int(value: Any) -> int:\n    if isinstance(value, int):\n        return value\n    return int(str(value).strip(), 0)\n\n\ndef _path(value: str | None, base: Path | None = None) -> Path | None:\n    if not value:\n        return None\n    p = Path(os.path.expandvars(os.path.expanduser(value)))\n    if not p.is_absolute() and base is not None:\n        p = base / p\n    return p\n\n\ndef _need_file(p: Path | None, what: str) -> Path:\n    if p is None or not p.exists():\n        raise ToolError(f\"{what} not found: {p}\")\n    return p\n\n\ndef _run(cmd: list[str], cwd: Path | None = None, timeout: int = 600, env: dict | None = None) -> subprocess.CompletedProcess:\n    try:\n        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,\n                              env={**os.environ, **(env or {})})\n    except FileNotFoundError as exc:\n        raise ToolError(f\"program not found: {cmd[0]} ({exc})\") from exc\n    except subprocess.TimeoutExpired as exc:\n        raise ToolError(f\"timed out after {timeout} s: {' '.join(cmd[:3])}...\") from exc\n\n\ndef _lines(text: str, pattern: str, limit: int = 20) -> list[str]:\n    rx = re.compile(pattern, re.I)\n    out = [l.strip() for l in text.splitlines() if rx.search(l)]\n    return list(dict.fromkeys(out))[:limit]\n\n\n# ----------------------------------------------------------------------------- profiles\n\ndef _profile_files() -> dict[str, Path]:\n    files = {p.stem: p for p in PROFILE_DIR.glob(\"*.json\")}\n    for extra in os.environ.get(\"MCU_EMU_PROFILES\", \"\").split(os.pathsep):\n        if extra and Path(extra).is_dir():\n            files.update({p.stem: p for p in Path(extra).glob(\"*.json\")})\n    return files\n\n\ndef _expand(value: Any, env: dict) -> Any:\n    if isinstance(value, str):\n        return re.sub(r\"\\$\\{(\\w+)\\}\", lambda m: env.get(m.group(1), m.group(0)), value)\n    if isinstance(value, list):\n        return [_expand(v, env) for v in value]\n    if isinstance(value, dict):\n        return {k: _expand(v, env) for k, v in value.items()}\n    return value\n\n\ndef load_profile(name: str) -> dict:\n    files = _profile_files()\n    if name not in files:\n        raise ToolError(f\"unknown profile {name!r}; known: {sorted(files)}\")\n    raw = json.loads(files[name].read_text())\n    env = {**raw.get(\"env_defaults\", {}), **{k: v for k, v in os.environ.items()}}\n    for _ in range(3):                           # defaults may refer to each other\n        env = {k: _expand(v, env) for k, v in env.items()}\n    profile = _expand(raw, env)\n    profile[\"_file\"] = str(files[name])\n    return profile\n\n\n@tool(\"List the MCU profiles (toolchain, files, memory layout, Renode platform per MCU).\", {})\ndef mcu_profile_list() -> dict:\n    out = []\n    for name, path in sorted(_profile_files().items()):\n        try:\n            out.append({\"name\": name, \"description\": json.loads(path.read_text()).get(\"description\", \"\")})\n        except json.JSONDecodeError as exc:\n            out.append({\"name\": name, \"error\": f\"bad JSON: {exc}\"})\n    return {\"ok\": True, \"profiles\": out,\n            \"hint\": \"add your own JSON profiles in a directory named by the MCU_EMU_PROFILES environment variable\"}\n\n\n@tool(\"Show one MCU profile with ${VAR}s expanded and which of its files and programs exist on this machine.\",\n      {\"name\": S}, [\"name\"])\ndef mcu_profile_show(name: str) -> dict:\n    p = load_profile(name)\n    checks = {}\n    for section in (\"toolchain\", \"files\"):\n        for key, value in (p.get(section) or {}).items():\n            if isinstance(value, str) and (\"/\" in value or value.endswith((\".h\", \".gld\", \".ld\", \".svd\"))):\n                checks[f\"{section}.{key}\"] = Path(value).exists() or shutil.which(value) is not None\n    return {\"ok\": True, \"profile\": p, \"exists\": checks,\n            \"missing\": [k for k, v in checks.items() if not v]}\n\n\n# ----------------------------------------------------------------------------- extraction\n\n_EQU = re.compile(r\"^\\s*(?:PROVIDE\\s*\\(\\s*)?_?([A-Za-z][A-Za-z0-9_]*)\\s*=\\s*(0x[0-9A-Fa-f]+)\\s*\\)?\\s*;\", re.M)\n_BITS = re.compile(r\"typedef\\s+struct\\s+tag(\\w+?)BITS\\s*\\{(.*?)\\}\\s*\\1BITS\\s*;\", re.S)\n_FIELD = re.compile(r\"(?:unsigned(?:\\s+int)?|uint(?:8|16|32)_t|int)\\s*(\\w*)\\s*:\\s*(\\d+)\\s*;\")\n_DEFINE_ADDR = re.compile(r\"#define\\s+(\\w+)\\s+\\(\\s*\\*\\s*\\(\\s*volatile\\s+[\\w\\s]+\\*\\s*\\)\\s*\\(?\\s*(0x[0-9A-Fa-f]+)\\s*\\)?\\s*\\)\")\n_ATTR_ADDR = re.compile(r\"extern\\s+volatile\\s+[\\w\\s]+?\\s(\\w+)\\s+__attribute__\\s*\\(\\s*\\(\\s*(?:__)?address(?:__)?\\s*\\(\\s*(0x[0-9A-Fa-f]+)\")\n\n\ndef _fields_from_struct(body: str) -> list[dict]:\n    first = re.search(r\"struct\\s*\\{(.*?)\\}\\s*;\", body, re.S)   # unions: the first layout\n    if first:\n        body = first.group(1)\n    bit, fields = 0, []\n    for name, width in _FIELD.findall(body):\n        width = int(width)\n        if name:\n            fields.append({\"name\": name, \"lsb\": bit, \"width\": width})\n        bit += width\n    return fields\n\n\ndef _parse_svd(path: Path) -> tuple[list[dict], list[dict]]:\n    root = ET.parse(path).getroot()\n\n    def text(node, tag, default=None):\n        el = node.find(tag)\n        return el.text.strip() if el is not None and el.text else default\n\n    peripherals = {p.findtext(\"name\"): p for p in root.iter(\"peripheral\")}\n    regs, irqs = [], []\n    for name, p in peripherals.items():\n        source = peripherals.get(p.get(\"derivedFrom\"), p) if p.get(\"derivedFrom\") else p\n        base = _int(text(p, \"baseAddress\", \"0\"))\n        for irq in p.findall(\"interrupt\"):\n            irqs.append({\"index\": _int(text(irq, \"value\", \"0\")), \"name\": text(irq, \"name\")})\n        for r in source.iter(\"register\"):\n            fields = [{\"name\": text(f, \"name\"), \"lsb\": _int(text(f, \"bitOffset\", \"0\")), \"width\": _int(text(f, \"bitWidth\", \"1\"))}\n                      for f in r.iter(\"field\") if text(f, \"bitOffset\") is not None]\n            regs.append({\"name\": f\"{name}_{text(r, 'name')}\", \"peripheral\": name,\n                         \"address\": base + _int(text(r, \"addressOffset\", \"0\")),\n                         \"width\": _int(text(r, \"size\", \"32\")), \"reset\": text(r, \"resetValue\"), \"fields\": fields})\n    return regs, sorted({i[\"index\"]: i for i in irqs}.values(), key=lambda i: i[\"index\"])\n\n\n@tool(\"Extract the special-function-register map (addres
+… [35320 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+File created successfully at: /media/riko/model_store/GIT_/embeddyn/embeddyn/agents/mcu_emu/tools.py (file state is current in your context — no need to Read it back)
+```
+
+</details>
+
+**Tool: Bash** — Write the profiles and test the extraction tools on the dsPIC30
+
+```
+{
+ "command": "D=/media/riko/model_store/GIT_/embeddyn/embeddyn/agents/mcu_emu/profiles; cat > $D/dspic30f5011.json <<'EOF'\n{\n  \"name\": \"dspic30f5011\",\n  \"description\": \"Microchip dsPIC30F5011 (16-bit DSC): XC16 toolchain, sim30 reference simulator, Renode CPU.dsPIC33 core\",\n  \"env_defaults\": {\n    \"XC16_BIN\": \"/opt/microchip/xc16/v2.10/bin\",\n    \"RENODE_ROOT\": \"/opt/renode\"\n  },\n  \"toolchain\": {\n    \"cc\": \"${XC16_BIN}/xc16-gcc\",\n    \"cflags\": [\"-mcpu=30F5011\", \"-O1\"],\n    \"cflags_post\": [\"-Wl,--script=${XC16_BIN}/../support/dsPIC30F/gld/p30F5011.gld\"],\n    \"as\": \"${XC16_BIN}/xc16-as\",\n    \"asflags\": [\"-p30F5011\"],\n    \"ld\": \"${XC16_BIN}/xc16-ld\",\n    \"ldflags\": [\"-p30F5011\"],\n    \"ldflags_post\": [\"--script=${XC16_BIN}/../support/dsPIC30F/gld/p30F5011.gld\"],\n    \"bin2hex\": \"${XC16_BIN}/xc16-bin2hex\",\n    \"objdump\": \"${XC16_BIN}/xc16-objdump\",\n    \"reference_simulator\": \"${XC16_BIN}/sim30\"\n  },\n  \"files\": {\n    \"header\": \"${XC16_BIN}/../support/dsPIC30F/h/p30F5011.h\",\n    \"linker_script\": \"${XC16_BIN}/../support/dsPIC30F/gld/p30F5011.gld\"\n  },\n  \"image\": {\n    \"base\": \"0x01000000\",\n    \"phantom_lane\": 3,\n    \"notes\": \"program word at ISA address a sits at 0x01000000 + 2a, 4 bytes (24-bit instruction + phantom byte), the byte layout of XC16 HEX files\"\n  },\n  \"memory\": {\n    \"data_space\": [\"0x0000\", \"0xFFFF\"],\n    \"sfr\": [\"0x0000\", \"0x07FF\"],\n    \"ram\": [\"0x0800\", \"0x17FF\"],\n    \"cpu_registers\": [[\"0x0000\", \"0x0054\"], [\"0x0080\", \"0x0082\"]]\n  },\n  \"renode\": {\n    \"platform\": \"platforms/cpus/microchip/dspic30f5011.repl\",\n    \"pc_command\": \"cpu GetRegister 26\",\n    \"vector_skip_traps\": 8\n  },\n  \"reference\": {\n    \"simulator\": \"sim30, device dspic30super (its Y RAM starts at 0x3000, the 5011's at 0x1000)\",\n    \"difftest\": \"tools/dspic30/difftest.py in the Renode fork\"\n  }\n}\nEOF\ncat > $D/stm32l476.json <<'EOF'\n{\n  \"name\": \"stm32l476\",\n  \"description\": \"Example profile for an Arm Cortex-M part (STM32L476): GNU Arm toolchain, CMSIS-SVD register map, Renode stm32l476 platform. Copy and adapt for other SVD-described MCUs.\",\n  \"env_defaults\": {\n    \"ARM_BIN\": \"/usr/bin\",\n    \"SVD_DIR\": \"/opt/svd\",\n    \"RENODE_ROOT\": \"/opt/renode\"\n  },\n  \"toolchain\": {\n    \"cc\": \"${ARM_BIN}/arm-none-eabi-gcc\",\n    \"cflags\": [\"-mcpu=cortex-m4\", \"-mthumb\", \"-O1\", \"-nostartfiles\"],\n    \"cflags_post\": [],\n    \"objcopy\": \"${ARM_BIN}/arm-none-eabi-objcopy\",\n    \"objdump\": \"${ARM_BIN}/arm-none-eabi-objdump\"\n  },\n  \"files\": {\n    \"svd\": \"${SVD_DIR}/STM32L4x6.svd\"\n  },\n  \"image\": {\n    \"base\": \"0x0\"\n  },\n  \"renode\": {\n    \"platform\": \"platforms/cpus/stm32l476.repl\",\n    \"pc_command\": \"cpu PC\",\n    \"vector_skip_traps\": 0\n  }\n}\nEOF\ncd /media/riko/model_store/GIT_/embeddyn && export XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin RENODE_ROOT=/media/riko/model_store/renode-merge/renode RENODE_BIN=/media/riko/model_store/renode-merge/renode/renode; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nimport json\nfrom embeddyn.agents.mcu_emu import tools as t\nprint(json.dumps(t.mcu_profile_show(\"dspic30f5011\")[\"missing\"]))\nr = t.extract_sfr_map(profile=\"dspic30f5011\", out=\"/media/riko/model_store/tmp/agents/sfr.json\", max_address=\"0x800\")\nprint({k: r[k] for k in (\"registers\", \"with_fields\", \"unlocated_bitfield_structs\")}, r[\"clusters\"][:6])\nprint(t.sfr_lookup(\"/media/riko/model_store/tmp/agents/sfr.json\", name=\"^U1STA$\")[\"registers\"])\nv = t.extract_vectors(profile=\"dspic30f5011\", skip_traps=8); print(v[\"count\"], v[\"vectors\"][:4], v[\"vectors\"][27])\nc = t.sfr_coverage(\"/media/riko/model_store/tmp/agents/sfr.json\", \"/media/riko/model_store/renode-merge/renode/platforms/cpus/microchip/dspic30f5011.repl\",\n     cpu_ranges=[[\"0x0\", \"0x54\"], [\"0x80\", \"0x82\"]], max_address=\"0x800\")\nprint(c[\"uncovered_count\"], c[\"uncovered\"][:8], c[\"guessed_sizes\"][:5])\nEOF",
+ "description": "Write the profiles and test the extraction tools on the dsPIC30",
+ "timeout": 120000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+[]
+{'registers': 618, 'with_fields': 242, 'unlocated_bitfield_structs': 0} ['0x0000-0x0052 (WREG0..)', '0x0080-0x00C6 (INTCON1..)', '0x0100-0x015E (TMR1..)', '0x0180-0x01AE (OC1RS..)', '0x0200-0x025E (I2CRCV..)', '0x0280-0x039B (ADCBUF0..)']
+[{'name': 'U1STA', 'address': '0x020E', 'fields': 'URXDA:0 OERR:1 FERR:2 PERR:3 RIDLE:4 ADDEN:5 URXISEL:6-7 TRMT:8 UTXBF:9 UTXEN:10 UTXBRK:11 UTXISEL:15'}]
+54 [{'index': 0, 'name': 'INT0Interrupt'}, {'index': 1, 'name': 'IC1Interrupt'}, {'index': 2, 'name': 'OC1Interrupt'}, {'index': 3, 'name': 'T1Interrupt'}] {'index': 27, 'name': 'C1Interrupt'}
+0 [] ['intc', 'cn', 'timer1', 'timer23', 'timer45']
+```
+
+</details>
+
+**Tool: Bash** — Exercise build, Renode, trace, privacy and codegen tools
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"embeddyn/agents/mcu_emu/tools.py\"); t = p.read_text()\nt = t.replace(\"\"\"@tool(\"Compare two execution traces step by step\"\"\", \"\"\"@tool(\"Convert a column trace (one step per line, whitespace-separated numbers, e.g. a native runner's 'PC OP W0..W15 SR') \"\n      \"into JSON Lines for compare_traces. `columns` names the columns in order ('-' skips one); lines whose first \"\n      \"token is not a number are dropped. `base`: 16 or 10.\",\n      {\"input\": S, \"out\": S, \"columns\": {\"type\": \"array\", \"items\": S}, \"base\": I}, [\"input\", \"out\", \"columns\"])\ndef trace_from_columns(input: str, out: str, columns: list, base: int = 16) -> dict:\n    src = _need_file(_path(input), \"trace\")\n    dst = _path(out)\n    dst.parent.mkdir(parents=True, exist_ok=True)\n    n = 0\n    with dst.open(\"w\") as f:\n        for line in src.read_text(errors=\"replace\").splitlines():\n            parts = line.split()\n            if not parts:\n                continue\n            try:\n                values = [int(x, base) for x in parts[:len(columns)]]\n            except ValueError:\n                continue\n            f.write(json.dumps({c: v for c, v in zip(columns, values) if c != \"-\"}) + \"\\\\n\")\n            n += 1\n    return {\"ok\": n > 0, \"steps\": n, \"out\": str(dst)}\n\n\n@tool(\"Compare two execution traces step by step\"\"\")\np.write_text(t)\nEOF\nexport XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin RENODE_ROOT=/media/riko/model_store/renode-merge/renode RENODE_BIN=/media/riko/model_store/renode-merge/renode/renode TMPDIR=/media/riko/model_store/tmp; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nimport json, subprocess\nfrom embeddyn.agents.mcu_emu import tools as t\nW = \"/media/riko/model_store/tmp/agents\"\nb = t.build_firmware(\"dspic30f5011\", \"/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/renode/smoke.c\", out_dir=W + \"/build\")\nprint(\"build\", b[\"ok\"], b.get(\"load_commands\"), b.get(\"errors\"))\nr = t.renode_run(\"platforms/cpus/microchip/dspic30f5011.repl\", b[\"load_commands\"], run_for=\"0.05\", reads=[\"0x900\", \"0x902\", \"0x904\", \"0x906\"], after=[\"system CpuFrequency\"])\nprint(\"run\", r[\"ok\"], r[\"reads\"], r[\"after\"], r[\"executed_instructions\"], r[\"problems\"], r.get(\"host_mips\"))\nh = t.pc_hotspots(\"platforms/cpus/microchip/dspic30f5011.repl\", b[\"load_commands\"], warmup=\"0.05\", samples=20, pc_command=\"cpu GetRegister 26\")\nprint(\"hot\", h[\"top\"][:3])\nprint(\"dis\", t.disassemble(\"dspic30f5011\", b[\"elf\"], symbol=\"main\", max_lines=6)[\"lines\"])\n# traces: native runner vs itself with a flipped bit\nd30 = \"/media/riko/model_store/renode-merge/renode/tools/dspic30/d30run\"\nopen(W + \"/a.txt\", \"w\").write(subprocess.run([d30, b[\"hex\"], \"500\"], capture_output=True, text=True).stdout)\ncols = [\"pc\", \"op\"] + [f\"W{i}\" for i in range(16)] + [\"sr\"]\nprint(t.trace_from_columns(W + \"/a.txt\", W + \"/a.jsonl\", cols))\nlines = open(W + \"/a.jsonl\").read().splitlines(); o = json.loads(lines[300]); o[\"sr\"] ^= 0x100; o2 = json.loads(lines[310]); o2[\"W3\"] ^= 1\nlines[300] = json.dumps(o); lines[310] = json.dumps(o2); open(W + \"/b.jsonl\", \"w\").write(\"\\n\".join(lines) + \"\\n\")\nc = t.compare_traces(W + \"/a.jsonl\", W + \"/b.jsonl\", masks={\"sr\": \"0x100\"}); print(\"cmp\", c[\"ok\"], c.get(\"step\"), c.get(\"differences\"), c[\"tolerated\"])\nprint(\"priv\", t.privacy_scan([\"/media/riko/model_store/GIT_/embeddyn/docs/project\"], rules_file=\"~/.config/embeddyn/chat-redact.tsv\")[\"match_count\"])\ns = t.peripheral_skeleton(\"dsPIC30_UARTSkeleton\", W + \"/UartSkel.cs\", sfr_map=W + \"/sfr.json\", start=\"0x20C\", end=\"0x216\", irqs=[\"RxIRQ\", \"TxIRQ\"])\nprint(\"skel\", s)\nEOF\nsed -n 25,50p /media/riko/model_store/tmp/agents/UartSkel.cs",
+ "description": "Exercise build, Renode, trace, privacy and codegen tools",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+build True ['sysbus LoadBinary @/media/riko/model_store/tmp/agents/build/out/smoke_0000000.bin 0x1000000'] None
+run False {'0x900': None, '0x902': None, '0x904': None, '0x906': None} {'system CpuFrequency': ''} None {'distinct': 0, 'top': []} None
+hot []
+dis ['00000210 <_main>:', ' 210:\t10 00 fa    \tlnk       #0x10', ' 212:\t88 9f be    \tmov.d     w8, [w15++]', ' 214:\t74 80 57    \tsub.w     w15, #0x14, w0', ' 216:\te1 1d 28    \tmov.w     #0x81de, w1', ' 218:\t07 00 09    \trepeat    #0x7']
+{'ok': True, 'steps': 500, 'out': '/media/riko/model_store/tmp/agents/a.jsonl'}
+cmp False 310 {'W3': {'reference': 8, 'candidate': 9}} {'sr': 1}
+priv 0
+skel {'ok': True, 'out': '/media/riko/model_store/tmp/agents/UartSkel.cs', 'registers': 5, 'size': '0xA', 'next': 'fill the TODOs, add it to the platform .repl, run renode_build and renode_check_platform'}
+            Reset();
+        }
+
+        public long Size => 0xA;
+
+        public GPIO RxIRQ { get; }
+
+        public GPIO TxIRQ { get; }
+
+        public void Reset()
+        {
+            u1mode = 0;
+            u1sta = 0;
+            u1txreg = 0;
+            u1rxreg = 0;
+            u1brg = 0;
+        }
+
+        public ushort ReadWord(long offset)
+        {
+            switch(offset)
+            {
+            // U1MODE: STSEL:0 PDSEL:1-2 ABAUD:5 LPBACK:6 WAKE:7 ALTIO:10 USIDL:13 UARTEN:15
+            case 0x0:
+                return u1mode;   // TODO: computed bits, side effects
+            // U1STA: URXDA:0 OERR:1 FERR:2 PERR:3 RIDLE:4 ADDEN:5 URXISEL:6-7 TRMT:8 UTXBF:9 UTXEN:10 UTXBRK:11 UTXISEL:15
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:54:16
+
+The Renode run returned nothing. The session I handed off may be rebuilding the same Renode tree right now, so I'm checking the run's output tail before blaming my tool.
+
+**Tool: Bash** — Show why the Renode run produced no output
+
+```
+{
+ "command": "export XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin RENODE_ROOT=/media/riko/model_store/renode-merge/renode RENODE_BIN=/media/riko/model_store/renode-merge/renode/renode TMPDIR=/media/riko/model_store/tmp; cd /media/riko/model_store/GIT_/embeddyn && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom embeddyn.agents.mcu_emu import tools as t\nr = t.renode_run(\"platforms/cpus/microchip/dspic30f5011.repl\", [\"sysbus LoadBinary @/media/riko/model_store/tmp/agents/build/out/smoke_0000000.bin 0x1000000\"], run_for=\"0.05\", reads=[\"0x906\"])\nprint(r[\"ok\"], r.get(\"tail\"))\nEOF\npgrep -af 'build.sh|dotnet build|make -j' | head -5",
+ "description": "Show why the Renode run produced no output",
+ "timeout": 600000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+False ['/media/riko/model_store/renode-merge/renode/renode: line 75: dotnet: command not found']
+4068709 /bin/bash -c source /home/riko/.claude/shell-snapshots/snapshot-bash-1795581276575-3svcdj.sh 2>/dev/null || true && \builtin shopt -u extglob 2>/dev/null || true && { \builtin unalias -- 'which'; \builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \builtin unalias -- 'unsetenv'; \builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'export XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin RENODE_ROOT=/media/riko/model_store/renode-merge/renode RENODE_BIN=/media/riko/model_store/renode-merge/renode/renode TMPDIR=/media/riko/model_store/tmp; cd /media/riko/model_store/GIT_/embeddyn && /media/riko/model_store/embeddyn-venv/bin/python - <<'"'"'EOF'"'"' from embeddyn.agents.mcu_emu import tools as t r = t.renode_run("platforms/cpus/microchip/dspic30f5011.repl", ["sysbus LoadBinary @/media/riko/model_store/tmp/agents/build/out/smoke_0000000.bin 0x1000000"], run_for="0.05", reads=["0x906"]) print(r["ok"], r.get("tail")) EOF pgrep -af '"'"'build.sh|dotnet build|make -j'"'"' | head -5' && pwd -P >| /tmp/claude-56a1-cwd
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:54:27
+
+The run only failed because I didn't load the Renode environment (dotnet). In Hermes that comes from the server's `env` block. Re-running with the environment sourced.
+
+**Tool: Bash** — Re-run the Renode tools with the Renode environment
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; export XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin RENODE_ROOT=/media/riko/model_store/renode-merge/renode; cd /media/riko/model_store/GIT_/embeddyn && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom embeddyn.agents.mcu_emu import tools as t\nL = [\"sysbus LoadBinary @/media/riko/model_store/tmp/agents/build/out/smoke_0000000.bin 0x1000000\"]\nprint(t.renode_check_platform(\"platforms/cpus/microchip/dspic30f5011.repl\"))\nr = t.renode_run(\"platforms/cpus/microchip/dspic30f5011.repl\", L, run_for=\"0.05\", reads=[\"0x900\", \"0x902\", \"0x904\", \"0x906\"], after=[\"system CpuFrequency\"])\nprint(\"run\", r[\"ok\"], r[\"reads\"], r[\"after\"], r[\"executed_instructions\"], r[\"problems\"], r.get(\"host_mips\"), r.get(\"tail\"))\nh = t.pc_hotspots(\"platforms/cpus/microchip/dspic30f5011.repl\", L, warmup=\"0.05\", samples=20, pc_command=\"cpu GetRegister 26\")\nprint(\"hot\", h[\"ok\"], h[\"top\"][:3])\nEOF",
+ "description": "Re-run the Renode tools with the Renode environment",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+{'ok': True, 'errors': [], 'seconds': 3.6}
+run True {'0x900': '0x7360', '0x902': '0xFFFF', '0x904': '0x0262', '0x906': '0xC0DE'} {'system CpuFrequency': '0x00000000001C2000'} 100000 {'distinct': 0, 'top': []} 0.11 None
+hot False []
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:54:54
+
+The platform check and the run work: smoke results 0x7360/0xFFFF/0x0262/0xC0DE, no problems. The hot-spot tool found no samples, so its output parsing needs a look.
+
+**Tool: Bash** — Inspect the raw PC sample output
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; export RENODE_ROOT=/media/riko/model_store/renode-merge/renode; cd /media/riko/model_store/GIT_/embeddyn && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom embeddyn.agents.mcu_emu import tools as t\ntext, wall = t._run_script(['mach create \"m\"', \"machine LoadPlatformDescription @platforms/cpus/microchip/dspic30f5011.repl\",\n    \"sysbus LoadBinary @/media/riko/model_store/tmp/agents/build/out/smoke_0000000.bin 0x1000000\", 'emulation RunFor \"0.01\"', 'echo \"@@PC\"', \"cpu GetRegister 26\", 'echo \"@@PC\"', \"cpu PC\"], None, 300)\ni = text.find(\"@@PC\"); print(repr(text[i-50:i+200]))\nEOF",
+ "description": "Inspect the raw PC sample output",
+ "timeout": 600000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+'tarted.\n[07:55:02.0205] [INFO] m: Machine paused.\n@@PC\n\n0x20c\n\n@@PC\n\n0x1000418\n\nRenode is quitting\n\n\n[07:55:02.5704] [INFO] m: Disposed.\n[diag-pre] fresh852=cp852/browserTrue consoleOut=cp65001/browserTrue providerType=System.Text.Encoding.CodePagesv'
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:55:07
+
+Renode puts blank lines around command output. Making the PC sampler tolerate them.
+
+**Tool: Bash** — Fix the PC sample parsing and retest
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; export RENODE_ROOT=/media/riko/model_store/renode-merge/renode; cd /media/riko/model_store/GIT_/embeddyn && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"embeddyn/agents/mcu_emu/tools.py\"); t = p.read_text()\nt = t.replace('pcs = re.findall(r\"@@PC\\\\n(0x[0-9A-Fa-f]+)\", text)', 'pcs = re.findall(r\"@@PC\\\\s*\\\\n\\\\s*(0x[0-9A-Fa-f]+)\", text)')\np.write_text(t)\nEOF\ngrep -n 'pcs = re.findall' embeddyn/agents/mcu_emu/tools.py; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom embeddyn.agents.mcu_emu import tools as t\nh = t.pc_hotspots(\"platforms/cpus/microchip/dspic30f5011.repl\", [\"sysbus LoadBinary @/media/riko/model_store/tmp/agents/build/out/smoke_0000000.bin 0x1000000\"], warmup=\"0.05\", samples=20, pc_command=\"cpu GetRegister 26\")\nprint(\"hot\", h[\"ok\"], h[\"samples\"], h[\"top\"][:3])\nEOF",
+ "description": "Fix the PC sample parsing and retest",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+561:    pcs = re.findall(r"@@PC\s*\n\s*(0x[0-9A-Fa-f]+)", text)
+hot True 20 [{'pc': '0x240', 'count': 20}]
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:55:26
+
+The hot-spot sampler works (all 20 samples land in the main loop). Checking the server over real stdio JSON-RPC: initialize, tools/list, a call, and a bad-arguments call.
+
+**Tool: Bash** — Exercise the MCP server over stdio
+
+```
+{
+ "command": "export XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin; printf '%s\\n' '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"0\"}}}' '{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' '{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"sfr_lookup\",\"arguments\":{\"sfr_map\":\"/media/riko/model_store/tmp/agents/sfr.json\",\"name\":\"^T1CON$\"}}}' '{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"sfr_lookup\",\"arguments\":{\"bogus\":1}}}' | /media/riko/model_store/embeddyn-venv/bin/python -m embeddyn.agents.mcu_emu 2>/dev/null | /media/riko/model_store/embeddyn-venv/bin/python -c \"\nimport json,sys\nfor l in sys.stdin:\n    m=json.loads(l); r=m.get('result',{})\n    if 'tools' in r: print(m['id'], 'tools:', [t['name'] for t in r['tools']])\n    elif 'content' in r: print(m['id'], r['isError'], r['content'][0]['text'][:200].replace(chr(10),' '))\n    else: print(m['id'], json.dumps(r)[:150])\n\"",
+ "description": "Exercise the MCP server over stdio"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+1 {"protocolVersion": "2025-06-18", "capabilities": {"tools": {"listChanged": false}}, "serverInfo": {"name": "mcu-emu", "version": "1.0.0"}, "instructi
+2 tools: ['mcu_profile_list', 'mcu_profile_show', 'extract_sfr_map', 'sfr_lookup', 'extract_vectors', 'sfr_coverage', 'hex_to_images', 'build_firmware', 'disassemble', 'renode_check_platform', 'renode_run', 'pc_hotspots', 'renode_build', 'trace_from_columns', 'compare_traces', 'privacy_scan', 'peripheral_skeleton']
+3 False {  "ok": true,  "count": 1,  "registers": [   {    "name": "T1CON",    "address": "0x0104",    "fields": "TCS:1 TSYNC:2 TCKPS:4-5 TGATE:6 TSIDL:13 TON:15"   }  ] }
+4 True {  "ok": false,  "error": "bad arguments: sfr_lookup() got an unexpected keyword argument 'bogus'",  "expected": [   "sfr_map",   "start",   "end",   "name",   "limit"  ],  "required": [   "sfr_map"
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 4 of 6 is in progress. App actions available now: create_pr, verify.
+```
+
+</details>
+
+**Tool: Bash** — Write the umbrella workflow skill and case study
+
+```
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation; mkdir -p $K/mcu-emulation-workflow/references && cat > $K/mcu-emulation-workflow/SKILL.md <<'EOF'\n---\nname: mcu-emulation-workflow\ndescription: Plan and run full MCU emulation in Renode\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, renode, emulation, mcu, firmware]\n    category: embedded-emulation\n    requires_toolsets: [terminal]\n---\n\n# Full MCU emulation: the workflow\n\nGoal: unmodified firmware for a microcontroller runs in Renode, instruction-exact, with every\non-chip peripheral modelled well enough that the product firmware behaves as on silicon. This is\nthe umbrella skill. It says which phase comes next and which skill and tools to use. Never skip a\nphase's \"done when\" gate.\n\n## When to Use\n\n- The user wants a new MCU (CPU core and/or peripherals) emulated in Renode.\n- The user wants an existing partial model completed (\"support all peripherals\").\n- Real product firmware must run in emulation for testing or co-simulation (embeddyn).\n\n## Procedure\n\nWork in this order. After each phase, write a short status (what is done, what is verified, what\nis not) before starting the next.\n\n1. **Profile and facts** (skill `mcu-facts-extraction`).\n   - Create an MCU profile JSON (copy `templates/profile.json` from that skill).\n   - Run `mcu_profile_show` until `missing` is empty.\n   - Run `extract_sfr_map` and `extract_vectors`.\n   - Done when: the SFR map has every peripheral block, the vector order is known, and the pin map\n     is written down.\n2. **Does Renode already have the CPU?** Check `src/Infrastructure/src/Emulator/Cores/tlib/arch/`\n   and the existing `.repl` files.\n   - If a correct core exists, skip to phase 5.\n   - If the core is a skeleton or missing, do phases 3 and 4.\n3. **CPU core as a standalone interpreter** (skill `mcu-cpu-core`). Write it in plain C with memory\n   callbacks, plus a native runner. Done when it executes the vendor C start-up code and a test\n   program.\n4. **Differential testing** (skill `mcu-differential-testing`). Compare the core with the vendor's\n   simulator, instruction by instruction:\n   - random tests of every instruction form;\n   - compiled C;\n   - special modes.\n\n   Done when every test is identical, or differs only in documented, justified ways.\n5. **Into Renode** (skill `renode-tlib-core-integration`). Wire the interpreter into tlib and the\n   C# CPU class. Done when `renode_run` of the smoke firmware reads the expected RAM values.\n6. **Peripherals** (skill `renode-peripheral-models`). Build them in this order:\n   1. interrupt controller;\n   2. system/clock/reset/watchdog/NVM;\n   3. timers;\n   4. GPIO;\n   5. UART;\n   6. compare/capture;\n   7. ADC;\n   8. SPI;\n   9. I2C;\n   10. CAN;\n   11. the rest.\n\n   Check `sfr_coverage` after each one. Done when `sfr_coverage` reports 0 uncovered SFRs.\n7. **Firmware tests** (skill `renode-firmware-tests`). Give every model a test firmware with\n   computed expected values. Done when all tests pass and are scripted.\n8. **Detail pass.** Go back over the models for clocks from fuses, power states, bus timing, lazy\n   timers, pin routing and module disable (same skill as phase 6, section \"Detail\"). Then rerun\n   every test.\n9. **Real firmware** (skill `real-firmware-bringup`). Run the product firmware and resolve:\n   - unmapped accesses;\n   - wrong clocks;\n   - hot spots.\n\n   Done when it runs without problems at the expected rates.\n10. **Documentation and hygiene** (skill `emulation-privacy-hygiene`).\n    - Write a peripheral reference (registers, behaviour, timing, limits).\n    - Run `privacy_scan`.\n    - Commit only when the user asks. Never push without the user's OK.\n\n## Tools (MCP server mcu-emu)\n\n| Step | Tool |\n|---|---|\n| profiles | `mcu_profile_list`, `mcu_profile_show` |\n| register map | `extract_sfr_map`, `sfr_lookup`, `extract_vectors`, `sfr_coverage` |\n| firmware | `build_firmware`, `hex_to_images`, `disassemble` |\n| Renode | `renode_build`, `renode_check_platform`, `renode_run`, `pc_hotspots` |\n| core testing | `trace_from_columns`, `compare_traces` |\n| code | `peripheral_skeleton` |\n| hygiene | `privacy_scan` |\n\nEvery tool returns JSON with `ok`. On `ok: false`, read `error`, fix the cause, and call again.\nDon't guess around it.\n\n## Pitfalls\n\n- Do not write peripheral code before the SFR map and vector order exist: register addresses\n  guessed from memory are wrong more often than not.\n- Do not trust one reference. Where the vendor simulator and the reference manual disagree, follow\n  the manual (or the second simulator) and record the difference in a table, because silicon\n  follows the manual.\n- Never claim \"verified\" for something no test checked. Say \"implemented, not tested\".\n- Keep the core self-contained (no Renode headers), because the same file must build natively for\n  the differential tests.\n- Make one change, rebuild, and test. Large unverified batches hide which edit broke the build.\n- Private product names and paths must never enter any repository file; see\n  `emulation-privacy-hygiene`.\n\n## Verification\n\n- `renode_check_platform` reports no errors.\n- `sfr_coverage` reports `uncovered_count: 0` (with the CPU's register ranges as `cpu_ranges`).\n- Every firmware test reads its expected values through `renode_run`.\n- The real firmware runs with `problems.distinct == 0`, or only with explained, harmless warnings.\n\nSee `references/dspic30-case-study.md` for the complete worked example (numbers, decisions, bugs\nfound).\nEOF\ncat > $K/mcu-emulation-workflow/references/dspic30-case-study.md <<'EOF'\n# Case study: dsPIC30F5011 in Renode\n\nThe workflow applied once, end to end. Use it as the yardstick for scope and verification depth.\n\n## Starting point\n\n- Renode had a `CPU.dsPIC33` class with a skeleton translator (about ten opcodes).\n- Peripheral stubs existed but were not compiled.\n- The vendor toolchain (XC16) ships `p30F5011.h` (bit-field structs), `p30F5011.gld` (SFR\n  addresses, vector table) and `sim30` (an instruction-level simulator).\n\n## Phase results\n\n1. **Facts.** `extract_sfr_map` gave 618 SFR names, 242 with bit fields. `extract_vectors` gave 54\n   vectors (`skip_traps: 8`). The pin map (CN numbers, INTx/ICx/OCx pins) came from the product\n   firmware's pin header and the data sheet's pin table.\n2. **Core.** One C file, `dspic30_core.c`, with callbacks for byte and word data, program read and\n   table write. It serves the core registers mapped into data space (0x0000–0x0053, INTCON1)\n   itself. It has a native runner (`d30run`) that prints `PC OP W0..W15 SR` per step.\n3. **Differential tests against sim30.**\n   - Six random seeds for every non-DSP form.\n   - Six random DSP seeds under random CORCON modes.\n   - Six modulo/bit-reversed addressing seeds.\n   - Compiled C (soft float, 64-bit division, PSV tables, function pointers).\n\n   All identical except for documented sim30 deviations: word DC flag, DIV iteration flags, a\n   destination post-decrement bug under modulo addressing, and others.\n4. **Renode.**\n   - One helper call per instruction. Blocks run straight-line code and end at the first\n     non-sequential PC.\n   - Bus layout: data space at 0x0000; program word *a* at 0x01000000 + 2a (4 bytes each, the\n     byte layout of the HEX file).\n   - 1 KB pages, because RAM starts at 0x0800.\n   - Speed: about 18 MIPS for compute-bound code.\n5. **Peripherals** (all SFR blocks):\n   - interrupt controller;\n   - system (clock from fuses, power states, reset causes, watchdog, NVM, PMD);\n   - Timer1–5;\n   - OC ×8, IC ×8;\n   - 12-bit ADC;\n   - UART ×2, SPI ×2, I²C, CAN ×2;\n   - DCI;\n   - GPIO ×5 with change notification.\n6. **Tests.** Five scripted test firmwares (smoke, periph, periph_all, periph_detail, wdt_reset).\n7. **Real firmware.** It ran at once without i
+… [960 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:56:31
+
+Now the facts-extraction skill (profile template, SFR map, vectors, pin map, facts file) and the CPU-core skill (interpreter structure, encodings from assembler tables, native runner).
+
+**Tool: Bash** — Write the facts-extraction and CPU-core skills
+
+```
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation; mkdir -p $K/mcu-facts-extraction/templates $K/mcu-cpu-core/references $K/mcu-cpu-core/templates\ncat > $K/mcu-facts-extraction/SKILL.md <<'EOF'\n---\nname: mcu-facts-extraction\ndescription: Collect MCU register maps, vectors, pins, timing\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, datasheet, svd, registers]\n    category: embedded-emulation\n---\n\n# MCU facts: profile, register map, vectors, pins\n\nEvery later phase depends on exact addresses and bit positions. Take them from machine-readable\nvendor files with the tools, never from memory.\n\n## When to Use\n\n- At the start of an emulation project, or when adding a peripheral whose registers are not yet\n  in the SFR map.\n\n## Procedure\n\n1. **Find the vendor files.** In priority order:\n   1. CMSIS-SVD (Arm, many RISC-V parts);\n   2. the toolchain's device header (`*.h` with bit-field structs or `#define` addresses);\n   3. the toolchain's linker script (`NAME = 0xADDR;` equates, vector table);\n   4. the data sheet and family reference manual (PDF; for behaviour and timing).\n\n   Record each file's path and version.\n2. **Write the profile.** Copy `templates/profile.json` to a directory named by\n   `MCU_EMU_PROFILES`, then fill in the toolchain commands, files, image layout, memory map and\n   Renode platform. Use `${VAR}` for machine paths. Run `mcu_profile_show name=<mcu>` until\n   `missing` is `[]`.\n3. **SFR map.** Run `extract_sfr_map profile=<mcu> out=<work>/sfr.json`, with `max_address` at the\n   end of the SFR area if the linker script also defines RAM symbols. Check the result:\n   - `registers` is in the hundreds for a typical MCU;\n   - `clusters` lists one range per peripheral block;\n   - `with_fields` is greater than 0 (bit fields were found).\n4. **Spot-check three registers** against the data sheet, using `sfr_lookup` (for example the\n   UART status register, a timer control register and an interrupt flag register). If a field\n   position differs, the header parse picked the wrong union member: report it and use the data\n   sheet.\n5. **Interrupt vectors.** Run `extract_vectors profile=<mcu>`, using `skip_traps` for cores whose\n   table starts with traps.\n   - The vector index is the interrupt-controller input number of the source.\n   - Write the table into the platform file's header comment.\n6. **Pin map.** For each peripheral pin (external interrupts, capture inputs, compare outputs,\n   timer clocks, serial pins, change-notification numbers), record port and bit. Sources: the data\n   sheet pin table, and the vendor or product pin header. This drives the port routing later.\n7. **Clock and reset facts.** Record:\n   - the oscillator modes and PLL factors from the configuration-fuse encodings in the header\n     (`#define XT_PLL8 0x...`);\n   - the internal oscillator frequencies;\n   - the reset causes;\n   - the watchdog period formula.\n8. **Facts file.** Write `facts.md` next to the profile, holding:\n   - the source files and versions;\n   - the memory map;\n   - the vector table;\n   - the pin map;\n   - the clock table;\n   - open questions, each marked UNVERIFIED.\n\n## Pitfalls\n\n- Linker scripts define aliases (`_U1MODE` and `U1MODE`); the tool drops the `_` variants. Count\n  peripherals by `clusters`, not by raw register count.\n- Bit-field structs often have unions with several layouts; the first one is the canonical one.\n  Check any register whose layout looks odd against the data sheet.\n- Never invent numeric facts (device IDs, voltage thresholds, segment sizes). If no file states\n  them, make them parameters with a default marked \"unverified\" in the docs.\n- Peripherals with the same layout (UART1/UART2) share one model: record base addresses and\n  interrupt numbers per instance.\n\n## Verification\n\n- `mcu_profile_show` returns `missing: []`.\n- `sfr_lookup` spot checks match the data sheet.\n- The vector count matches the data sheet's interrupt table.\nEOF\ncat > $K/mcu-facts-extraction/templates/profile.json <<'EOF'\n{\n  \"name\": \"mymcu\",\n  \"description\": \"Vendor MyMCU: toolchain, files, layout, Renode platform\",\n  \"env_defaults\": {\n    \"TOOLCHAIN_BIN\": \"/opt/vendor/bin\",\n    \"RENODE_ROOT\": \"/opt/renode\"\n  },\n  \"toolchain\": {\n    \"cc\": \"${TOOLCHAIN_BIN}/vendor-gcc\",\n    \"cflags\": [\"-mcpu=mymcu\", \"-O1\"],\n    \"cflags_post\": [\"-Wl,--script=${TOOLCHAIN_BIN}/../lib/mymcu.ld\"],\n    \"as\": \"${TOOLCHAIN_BIN}/vendor-as\",\n    \"asflags\": [],\n    \"ld\": \"${TOOLCHAIN_BIN}/vendor-ld\",\n    \"ldflags\": [],\n    \"ldflags_post\": [\"--script=${TOOLCHAIN_BIN}/../lib/mymcu.ld\"],\n    \"objcopy\": \"${TOOLCHAIN_BIN}/vendor-objcopy\",\n    \"objdump\": \"${TOOLCHAIN_BIN}/vendor-objdump\",\n    \"reference_simulator\": \"${TOOLCHAIN_BIN}/vendor-sim\"\n  },\n  \"files\": {\n    \"header\": \"${TOOLCHAIN_BIN}/../include/mymcu.h\",\n    \"linker_script\": \"${TOOLCHAIN_BIN}/../lib/mymcu.ld\",\n    \"svd\": \"\"\n  },\n  \"image\": {\n    \"base\": \"0x0\",\n    \"phantom_lane\": null,\n    \"notes\": \"how HEX addresses map to the Renode bus\"\n  },\n  \"memory\": {\n    \"sfr\": [\"0x0000\", \"0x0FFF\"],\n    \"ram\": [\"0x1000\", \"0x1FFF\"],\n    \"cpu_registers\": []\n  },\n  \"renode\": {\n    \"platform\": \"platforms/cpus/vendor/mymcu.repl\",\n    \"pc_command\": \"cpu PC\",\n    \"vector_skip_traps\": 0\n  }\n}\nEOF\ncat > $K/mcu-cpu-core/SKILL.md <<'EOF'\n---\nname: mcu-cpu-core\ndescription: Write an instruction-set interpreter for an MCU\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, cpu, interpreter, isa]\n    category: embedded-emulation\n---\n\n# CPU core as a standalone interpreter\n\nRenode cores are tlib (QEMU-derived) translators. For a CPU that Renode lacks, write a plain C\ninterpreter and call it from tlib once per instruction. It is simpler than a TCG translator,\ntestable natively, and fast enough (tens of MIPS).\n\n## When to Use\n\n- The target CPU has no working tlib core, or the existing one is incomplete.\n\n## Procedure\n\n1. **Gather the encodings** from the toolchain's assembler opcode table (binutils `*-opc.c`/`*-opc.h`\n   in the vendor's open-source drop) and the programmer's reference manual. For every\n   instruction group, write probe assembly, assemble it, and disassemble it (`disassemble` tool) to\n   confirm the bit fields. Fields guessed from the manual alone are often off by a bit.\n2. **Copy `templates/core.h`** and adapt the state struct:\n   - registers, status bits and control registers;\n   - loop and repeat state;\n   - pending traps;\n   - the cycles of the last step.\n\n   Keep everything in one struct: Renode saves and restores it.\n3. **Bus callbacks:** data read and write of 8 and 16 (or 32) bits, program read, program write.\n   The core never touches memory directly. Registers that the architecture maps into data space\n   are served by the core itself before calling the bus.\n4. **`step()` executes one instruction** (one iteration of a repeat) and returns event flags:\n   - SLEEP, IDLE, RESET, BREAK;\n   - UNDEF (PC not advanced);\n   - TRAP;\n   - a watchdog clear.\n\n   Dispatch on the top opcode bits with a `switch`, and keep per-group helpers short.\n5. **Order of implementation:**\n   1. moves, ALU with flags, branches;\n   2. calls and returns, stack;\n   3. addressing modes;\n   4. multiply/divide;\n   5. loops/repeat;\n   6. table/program-space access;\n   7. traps and interrupt entry/return;\n   8. DSP or extension units;\n   9. special addressing (modulo, bit-reversed).\n6. **Native runner** (`templates/runner.c`): load an Intel HEX file, step N instructions, and\n   print one line per step: `PC OPCODE R0..Rn STATUS`, then `RAM ...` at the end. The differential\n   tests compare that output (`trace_from_columns`).\n7. **Interrupts and traps** need two entry points next to `s
+… [3770 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:57:19
+
+The CPU-core skill points to two templates; writing a generic core header and a native runner (HEX loader, per-step trace) next.
+
+**Tool: Bash** — Add the core header and runner templates
+
+```
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation/mcu-cpu-core/templates; cat > $K/core.h <<'EOF'\n/*\n * MYMCU CPU core: a standalone instruction-set interpreter with memory callbacks.\n * No tlib/Renode headers: the same file builds in tlib and natively for the differential tests.\n * Replace MYMCU/mymcu, the register set and the events with the target's.\n */\n#pragma once\n#include <stdint.h>\n\n/* status register bits (from the programmer's reference manual) */\n#define MY_SR_C (1u << 0)\n#define MY_SR_Z (1u << 1)\n#define MY_SR_N (1u << 2)\n#define MY_SR_V (1u << 3)\n\n/* step events (bit flags returned by mymcu_step) */\n#define MY_EV_SLEEP  (1u << 0)\n#define MY_EV_IDLE   (1u << 1)\n#define MY_EV_RESET  (1u << 2)   /* software reset instruction */\n#define MY_EV_BREAK  (1u << 3)\n#define MY_EV_UNDEF  (1u << 4)   /* undefined opcode: PC not advanced */\n#define MY_EV_TRAP   (1u << 5)   /* a trap is pending: call mymcu_service_traps */\n#define MY_EV_CLRWDT (1u << 6)\n\ntypedef struct mymcu_bus {\n    void *ctx;\n    uint8_t  (*rd8)(void *ctx, uint32_t addr);\n    uint16_t (*rd16)(void *ctx, uint32_t addr);\n    void     (*wr8)(void *ctx, uint32_t addr, uint8_t value);\n    void     (*wr16)(void *ctx, uint32_t addr, uint16_t value);\n    uint32_t (*prog_rd)(void *ctx, uint32_t paddr);          /* one instruction word */\n    void     (*prog_wr)(void *ctx, uint32_t paddr, uint32_t value, int flags);\n} mymcu_bus;\n\ntypedef struct mymcu_state {\n    uint16_t r[16];            /* general registers */\n    uint32_t pc;               /* architectural program counter */\n    uint16_t sr;               /* status */\n    uint16_t repeat_count;     /* repeat/loop state lives here, never in statics */\n    uint32_t pending_traps;    /* bit n = trap n requested */\n    uint32_t cycles;           /* cycles of the last step */\n    uint32_t last_insn;\n} mymcu_state;\n\nvoid     mymcu_reset(mymcu_state *s);\nuint32_t mymcu_step(mymcu_state *s, const mymcu_bus *bus);\nint      mymcu_cpu_priority(const mymcu_state *s);\nvoid     mymcu_take_interrupt(mymcu_state *s, const mymcu_bus *bus, int irq, int priority);\nint      mymcu_service_traps(mymcu_state *s, const mymcu_bus *bus);\n/* registers the architecture maps into data space (served before the bus) */\nint      mymcu_core_read16(mymcu_state *s, uint32_t addr, uint16_t *value);\nint      mymcu_core_write16(mymcu_state *s, uint32_t addr, uint16_t value);\nEOF\ncat > $K/runner.c <<'EOF'\n/*\n * Native runner: load an Intel HEX file, execute N steps, print one line per step\n *   PC OPCODE R0 .. R15 SR      (hex)\n * then \"RAM <words>\" for the data RAM. trace_from_columns turns this into JSON Lines.\n * Adapt: program memory layout (HEX byte address -> program address), RAM range, register count.\n *\n *   cc -O2 -o runner runner.c core.c && ./runner firmware.hex 20000 > trace.txt\n */\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include \"core.h\"\n\nstatic uint32_t prog[0x40000];\nstatic uint8_t data[0x10000];\n#define RAM_START 0x0800\n#define RAM_END   0x1800\n\nstatic uint8_t rd8(void *c, uint32_t a) { (void)c; return data[a & 0xFFFF]; }\nstatic uint16_t rd16(void *c, uint32_t a) { (void)c; a &= 0xFFFE; return (uint16_t)(data[a] | data[a + 1] << 8); }\nstatic void wr8(void *c, uint32_t a, uint8_t v) { (void)c; data[a & 0xFFFF] = v; }\nstatic void wr16(void *c, uint32_t a, uint16_t v) { (void)c; a &= 0xFFFE; data[a] = (uint8_t)v; data[a + 1] = (uint8_t)(v >> 8); }\nstatic uint32_t prog_rd(void *c, uint32_t pa) { (void)c; return prog[(pa >> 1) & 0x3FFFF]; }\n\nstatic int load_hex(const char *path)\n{\n    FILE *f = fopen(path, \"r\");\n    char line[600];\n    uint32_t base = 0;\n    if(!f) return -1;\n    while(fgets(line, sizeof line, f)) {\n        unsigned n, addr, type, b;\n        if(line[0] != ':' || sscanf(line + 1, \"%2x%4x%2x\", &n, &addr, &type) != 3) continue;\n        if(type == 4) { unsigned hi; sscanf(line + 9, \"%4x\", &hi); base = hi << 16; continue; }\n        if(type != 0) continue;\n        for(unsigned i = 0; i < n; i++) {\n            sscanf(line + 9 + 2 * i, \"%2x\", &b);\n            uint32_t byte_addr = base + addr + i;\n            uint32_t word = byte_addr >> 2, lane = byte_addr & 3;      /* TODO: target layout */\n            if(word < 0x40000 && lane < 3) prog[word] = (prog[word] & ~(0xFFu << (8 * lane))) | (b << (8 * lane));\n        }\n    }\n    fclose(f);\n    return 0;\n}\n\nint main(int argc, char **argv)\n{\n    if(argc < 3) { fprintf(stderr, \"usage: runner file.hex steps\\n\"); return 2; }\n    if(load_hex(argv[1])) { perror(argv[1]); return 1; }\n    long steps = strtol(argv[2], NULL, 0);\n    mymcu_state s;\n    mymcu_reset(&s);\n    mymcu_bus bus = { NULL, rd8, rd16, wr8, wr16, prog_rd, NULL };\n    for(long k = 0; k < steps; k++) {\n        printf(\"%06X %06X\", s.pc, prog_rd(NULL, s.pc));\n        for(int r = 0; r < 16; r++) printf(\" %04X\", s.r[r]);\n        printf(\" %04X\\n\", s.sr);\n        uint32_t ev = mymcu_step(&s, &bus);\n        if(ev & MY_EV_TRAP) mymcu_service_traps(&s, &bus);\n        if(ev & MY_EV_UNDEF) { printf(\"UNDEF %06X at %06X\\n\", s.last_insn, s.pc); return 3; }\n    }\n    printf(\"RAM\");\n    for(uint32_t a = RAM_START; a < RAM_END; a += 2) printf(\" %04X\", rd16(NULL, a));\n    printf(\"\\n\");\n    return 0;\n}\nEOF\necho ok",
+ "description": "Add the core header and runner templates"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+**Tool: Bash** — Write the differential-testing and tlib-integration skills
+
+````
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation; mkdir -p $K/mcu-differential-testing/references $K/renode-tlib-core-integration/references\ncat > $K/mcu-differential-testing/SKILL.md <<'EOF'\n---\nname: mcu-differential-testing\ndescription: Verify a CPU core step by step against a reference\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, cpu, testing, simulator]\n    category: embedded-emulation\n---\n\n# Differential testing of a CPU core\n\nThe core is correct only when it matches a reference (the vendor's instruction simulator, a\nsecond simulator, or silicon traces) on every instruction form, for millions of steps. This skill\nturns \"it seems to work\" into \"identical except for these documented cases\".\n\n## When to Use\n\n- After writing or changing a CPU core (`mcu-cpu-core`), and before any Renode integration.\n- After every core fix: rerun the whole suite, not just the failing test.\n\n## Procedure\n\n1. **Reference trace.** Script the reference simulator to load the ELF, reset, then per step print\n   the PC, the opcode, the registers and the status, and step. At the end, dump RAM.\n   - The trace must hold the state before every instruction, the same as the native runner prints.\n   - `references/sim30-example.md` shows a complete script and parser for Microchip's sim30.\n2. **Same program, both sides.** Build it once (`build_firmware`). Run the reference and the native\n   runner for the same number of steps, then convert both traces to JSON Lines\n   (`trace_from_columns`, or your own converter).\n3. **Compare** with `compare_traces reference=... candidate=...`.\n   - On `ok: false`, the tool gives `step`, `differences` and `previous_reference`: the\n     instruction that ran just before the divergence is the suspect.\n   - Disassemble around its PC (`disassemble`).\n4. **Random generators.** Write a generator per instruction class that emits assembly:\n   1. set all registers to random values;\n   2. point the address registers into valid RAM, with alignment respected;\n   3. seed the memory under test;\n   4. emit the instruction under test.\n\n   Branches and skips jump over a marker instruction (`inc R7`), so that a wrong decision shows up\n   in a register. Use 4–6 seeds per class, a few hundred instructions each, sized to fit the flash.\n5. **Classes to cover:**\n   - every ALU form in every addressing mode, at byte and word size;\n   - shifts with literal and register counts;\n   - multiply/divide;\n   - compares and skips; branches on every condition;\n   - stack, call/return, link/unlink;\n   - repeat and hardware loops;\n   - table and program-space reads;\n   - DSP/accumulator units under every mode bit;\n   - special addressing (modulo, bit-reversed), with legal buffers only;\n   - compiled C (start-up code, soft float, 64-bit division, switch tables, function pointers,\n     constant tables).\n6. **When they differ, decide who is right.** Check, in order:\n   1. the reference manual's instruction page;\n   2. a second simulator, if one exists (vendor IDE simulator sources are a good second opinion);\n   3. the generator: are the operands legal? An offset register used as a pointer writes into\n      core registers.\n\n   If the reference is wrong, keep the manual's behaviour. Then either make the comparison\n   tolerate that difference (with a counted mask) or stop the generator from producing that form.\n   Add a row to the \"known differences\" table: case, reference behaviour, core behaviour, source.\n7. **Record the status** in the test tool's README: the suites, the step counts, the tolerated\n   counts, and the known-differences table.\n\n## Pitfalls\n\n- Inside a repeat loop the reference may expose intermediate states that the core computes at\n  once. Compare again once the repeat has ended, and do not count those steps as failures.\n- Reference simulators model a generic \"super\" device. Its memory map (RAM ranges, special data\n  spaces) can differ from the real part: make such ranges parameters of the core.\n- Operations the manual leaves undefined (for example division-overflow results) are not bugs.\n  Tolerate them and document them.\n- Flash is small. Generators must keep each test under the program-memory size, or the link fails.\n- A tolerance must name the exact bits (mask), never \"ignore the status register\".\n\n## Verification\n\n- Every suite prints \"N steps identical (tolerated: ...)\", with N in the thousands per test and the\n  tolerated counts explained in the README table.\n- Rerun the full suite after the last core change.\nEOF\ncat > $K/mcu-differential-testing/references/sim30-example.md <<'EOF'\n# Example: Microchip sim30 as the reference\n\n## Script (stdin of sim30)\n\n```\nLD dspic30super          # generic device\nLC program.elf           # load COFF/ELF\nRP                       # reset\nDC                       # per step: display PC + opcode   } repeated\nDW                       # display W registers             } N times\nDS                       # display status (binary)         }\nS                        # step                            }\nDF 800 17fe              # at the end: dump RAM\nQ\n```\n\n## Parsing\n\n- `PC = 000104 20C00F` gives the PC and opcode.\n- `Loc <  0>` lines give the W registers (8 per line).\n- `Binary = ...` gives SR.\n- `Memory dump from 0x0800` gives RAM.\n\n## sim30 quirks found (the core follows the manual; the generators avoid these forms or the comparison tolerates them)\n\n| Case | sim30 | core (manual) |\n|---|---|---|\n| DC after word operations | carry out of bit 3 | carry out of bit 7 |\n| N/C/OV after DIV | iteration-exact flags | exact quotient/remainder, Z exact |\n| destination post-modify after an indirect source | skipped | applied |\n| destination post-decrement under modulo addressing | compares the old address with the start | compares the new address |\n| `dspic30super` Y RAM | starts at 0x3000 | the 5011's at 0x1000 (core parameter) |\n| first S after RP | does not advance | the harness adds one step |\nEOF\ncat > $K/renode-tlib-core-integration/SKILL.md <<'EOF'\n---\nname: renode-tlib-core-integration\ndescription: Wire a C interpreter core into Renode tlib and C#\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, renode, tlib, cpu]\n    category: embedded-emulation\n---\n\n# Interpreter core inside Renode (tlib + C# CPU class)\n\n## When to Use\n\n- The CPU core passes its differential tests and must now run inside Renode.\n\n## Procedure\n\n1. **Files** in `src/Infrastructure/src/Emulator/Cores/tlib/arch/<arch>/`:\n   - `cpu.h`: CPUState embeds the core state before `CPU_COMMON`;\n   - `translate.c`, `op_helper.c`, `helper.c`, `helper.h`;\n   - `arch_callbacks.[ch]` (C to C#) and `arch_exports.[ch]` (C# to C);\n   - `cpu_registers.[ch]`;\n   - the core `.c`/`.h`.\n\n   The arch CMake collects `*.c` by glob: rerun `cmake .` in the obj directory after adding files.\n2. **Bus layout.** Give program memory its own bus window if the architecture is Harvard, for\n   example data at 0x0000–0xFFFF and program word *a* at `BASE + scale·a`, laid out like the\n   toolchain's HEX bytes so that `hex_to_images` works.\n   - Set `TARGET_PAGE_BITS` so that RAM starts on a page boundary (1 KB pages for RAM at 0x0800).\n   - Set `TARGET_PHYS_ADDR_SPACE_BITS` large enough for the program window.\n3. **One helper per instruction** (`templates/translate.c` in `references/glue.md`):\n   - `gen_intermediate_code` emits `gen_helper_step(sequential, env, index)`. If the helper\n     returns 0 (branch, skip, loop end, trap), it stores the executed count into\n     `instructions_count_declaration` and ends the block with `gen_exit_tb_no_chaining`.\n   - Otherwise it continues with the next instruction.\n   - Stop the block after control-flow opcodes and at page ends.\n   - The epilogue sets the PC to the next instruction and exits.\n4. **The he
+… [2680 more characters not shown]
+````
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+**Tool: Bash** — Generate the tlib glue reference from the working fork
+
+````
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation; T=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33; C=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/dsPIC33/dsPIC33.cs; /media/riko/model_store/embeddyn-venv/bin/python - \"$T\" \"$C\" \"$K\" <<'EOF'\nimport re, sys\nfrom pathlib import Path\nT, C, K = map(Path, sys.argv[1:])\ntr = (T / \"translate.c\").read_text()\nop = (T / \"op_helper.c\").read_text()\ndef grab(text, start, end_marker=\"\\n}\\n\"):\n    i = text.index(start); j = text.index(end_marker, i) + len(end_marker); return text[i:j]\ncs = C.read_text()\ndoc = [\"# Glue that worked (dsPIC30 in tlib)\", \"\",\n       \"Copied from the working fork (MIT). Adapt names, PC conversion and opcode lengths.\", \"\",\n       \"## translate.c: one helper per instruction, early exit on non-sequential PC\", \"\", \"```c\",\n       grab(tr, \"int gen_intermediate_code(CPUState *env, DisasContextBase *base)\"),\n       grab(tr, \"void gen_intermediate_code_epilogue(CPUState *env, DisasContextBase *base)\"), \"```\", \"\",\n       \"## op_helper.c: the step helper\", \"\", \"```c\", grab(op, \"uint32_t HELPER(step)(CPUState *env, uint32_t index)\"), \"```\", \"\",\n       \"## op_helper.c: interrupts published by the C# controller\", \"\", \"```c\",\n       grab(op, \"int process_interrupt(int interrupt_request, CPUState *env)\"), \"```\", \"\",\n       \"## helper.h\", \"\", \"```c\", (T / \"helper.h\").read_text().split(\"#include \\\"def-helper.h\\\"\")[1].strip(), \"```\", \"\",\n       \"## C#: exports (callbacks from C) and imports (calls into C)\", \"\", \"```csharp\"]\nfor m in re.finditer(r\"        \\[Export\\]\\n        private void (\\w+)\\([^)]*\\)\\n        \\{.*?\\n        \\}\\n\", cs, re.S):\n    doc.append(m.group(0).rstrip())\n    break\nimp = re.search(r\"#pragma warning disable 649(.*?)#pragma warning restore 649\", cs, re.S)\ndoc += [imp.group(1).strip(), \"```\", \"\",\n        \"C side of a callback: `DEFAULT_VOID_HANDLER1(void tlib_dspic_reset_request, int32_t reason)` in arch_callbacks.c and \"\n        \"`EXTERNAL_AS(void, OnResetRequest, tlib_dspic_reset_request, int32_t)` in \"\n        \"Cores/renode/arch/<arch>/renode_<arch>_callbacks.c; an export is a C function plus `EXC_VOID_1(name, type, arg)`.\"]\n(K / \"renode-tlib-core-integration/references/glue.md\").write_text(\"\\n\".join(doc) + \"\\n\")\nprint(len(\"\\n\".join(doc)))\nEOF",
+ "description": "Generate the tlib glue reference from the working fork"
+}
+````
+
+<details><summary>Result</summary>
+
+```
+5747
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:58:44
+
+Now the biggest skill, peripheral models: the build order, the modelling patterns that worked, a per-peripheral checklist, and a C# SFR base template.
+
+**Tool: Bash** — Write the peripheral-models skill and SFR base template
+
+```
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation/renode-peripheral-models; mkdir -p $K/references $K/templates\ncat > $K/SKILL.md <<'EOF'\n---\nname: renode-peripheral-models\ndescription: Write Renode C# models of MCU peripherals\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, renode, peripherals, csharp]\n    category: embedded-emulation\n---\n\n# Renode peripheral models for an MCU\n\n## When to Use\n\n- After the CPU runs in Renode, to model every on-chip peripheral until `sfr_coverage` reports 0\n  uncovered SFRs.\n- For a detail pass on existing models: clock, power, timing, pins.\n\n## Procedure\n\n1. **Plan the blocks.** `sfr_coverage sfr_map=... platform=...` lists the uncovered registers, and\n   the SFR map clusters give the blocks. Model in this order:\n   1. interrupt controller;\n   2. system (oscillator/clock, reset causes, watchdog, NVM, module disable);\n   3. timers;\n   4. GPIO ports and change notification;\n   5. UART;\n   6. output compare / input capture / PWM;\n   7. ADC;\n   8. SPI;\n   9. I2C;\n   10. CAN;\n   11. anything else (codec, DMA, comparators, ...).\n2. **One block at a time:**\n   1. Generate a skeleton: `peripheral_skeleton name=<Family>_<Block> out=<Peripherals>/<Family>/<file>.cs\n      sfr_map=... start=0x.. end=0x.. irqs=[IRQ]`.\n   2. Derive it from the shared base (`templates/SfrBase.cs`): word and byte access with byte\n      merge, plus module disable.\n   3. Fill in the behaviour from the reference manual chapter, using the matching checklist in\n      `references/peripheral-checklists.md`.\n   4. Write the class `<summary>` as a behaviour spec: registers, modes, timing, power, limits.\n3. **Platform entry** in `platforms/cpus/<vendor>/<mcu>.repl`:\n   - the base address;\n   - `system: system` for the clock;\n   - `IRQ -> intc@<vector>`;\n   - `Pmd: system` and `PmdBit: n` when the MCU has module disable;\n   - pins through the port mirrors.\n4. **Build and check:**\n   1. `renode_build target=all`;\n   2. `renode_check_platform`;\n   3. a firmware test for the block (`renode-firmware-tests`).\n5. **Coverage.** Run `sfr_coverage` again; continue until `uncovered_count` is 0.\n6. **Detail pass** (after all blocks exist). Go through each item and test each one:\n   - **Clock:** Fcy from the configuration fuses and clock-switch registers, published by the\n     system model (`ClockChanged`). Peripherals read it instead of having fixed frequencies.\n   - **Power:** Run, Idle and Sleep from the CPU's power-save events, with wake-up on the next\n     instruction or interrupt. Models stop in Sleep when they run from the CPU clock, and stop in\n     Idle when their SIDL bit is set. Wake sources: interrupts, UART start bit, ADC on its RC\n     clock.\n   - **Bus timing:** UART character time, SPI clock, I2C bit time and CAN frame time, each with a\n     LimitTimer in nanoseconds. Busy bits stay set until the action is done.\n   - **Lazy timers:** a fast timer with its interrupt disabled and no consumer must not raise an\n     event per period. Compute TMR and the period flag from the count when the firmware reads\n     them.\n   - **SyncTime:** call `SyncTime()` (on the CPU thread) before reading timer counts, polling\n     lazy flags or capturing.\n   - **Pins:** port mirror outputs feed peripheral inputs (INTx, capture, timer clocks, slave\n     selects, faults). Peripheral outputs (compare/PWM) override their port pins. Analog-selected\n     pins read 0.\n   - **Fault injection hooks:** CAN error counters, missing ACK, supply voltage (brown-out,\n     low-voltage detect), oscillator failure (clock monitor trap).\n\n## Pitfalls\n\n- A byte write to an SFR must not trigger the read side effects of the register (FIFO pops). Merge\n  the byte in the model (`Write(offset, value, mask)`); never read-modify-write through the bus.\n- Interrupt flags are edge-set by hardware and cleared by software: raise a GPIO pulse (`Blink()`)\n  into the controller, and never clear the flag from the model.\n- Constructors run before memory is loaded. Read configuration fuses on the machine `Started`\n  event, never in the constructor.\n- Two models that reference each other in a `.repl` (system ↔ ADC) form a cycle: make one side a\n  settable property.\n- LimitTimer events are exact in virtual time, but plain reads mid-block lag by up to a quantum.\n  Hence `SyncTime()`.\n- High-rate events (a 300 kHz PWM edge, a timer period) cost a CPU sync each. Make them lazy or\n  optional (`pwmEdges`), and expose duty and frequency as properties instead.\n- When a test fails, first check the test's own register setup against the data sheet (wrong\n  config word index, missing UNFM bit, unaligned buffers), then the model.\n- Constants that no vendor file states (device ID, voltage thresholds, segment sizes) become\n  constructor parameters, with defaults marked \"unverified\" in the reference.\n\n## Verification\n\n- `renode_check_platform`: no errors.\n- `sfr_coverage`: `uncovered_count` is 0.\n- One firmware test per block, plus one detail test, all passing (`renode-firmware-tests`).\n- The reference document (registers, behaviour, timing, limits) lists every model. See\n  `references/reference-doc-outline.md`.\nEOF\ncat > $K/templates/SfrBase.cs <<'EOF'\n//\n// Base of an MCU's SFR blocks: 16-bit registers with byte access merged by the model, and\n// peripheral module disable. Rename the namespace/class prefix for your MCU family.\n// This file is licensed under the MIT License.\n//\nusing Antmicro.Renode.Core;\nusing Antmicro.Renode.Peripherals.Bus;\nusing Antmicro.Renode.Peripherals.CPU;\n\nnamespace Antmicro.Renode.Peripherals.MyFamily\n{\n    public abstract class MyFamily_Sfr : IWordPeripheral, IBytePeripheral, IKnownSize\n    {\n        protected MyFamily_Sfr(IMachine machine, long size)\n        {\n            this.machine = machine;\n            Size = size;\n        }\n\n        public long Size { get; }\n\n        /// <summary>Module disable: while Pmd says bit PmdBit is set, the module reads 0 and ignores writes.</summary>\n        public MyFamily_SystemControl Pmd { get; set; }\n        public int PmdBit { get; set; } = -1;\n\n        public ushort ReadWord(long offset) => Disabled ? (ushort)0 : Read(offset & ~1L);\n        public void WriteWord(long offset, ushort value) { if(!Disabled) { Write(offset & ~1L, value, 0xFFFF); } }\n        public byte ReadByte(long offset) => Disabled ? (byte)0 : (byte)(Read(offset & ~1L) >> (int)(8 * (offset & 1)));\n        public void WriteByte(long offset, byte value)\n        {\n            if(Disabled)\n            {\n                return;\n            }\n            var shift = (int)(8 * (offset & 1));\n            Write(offset & ~1L, (ushort)(value << shift), (ushort)(0xFF << shift));\n        }\n\n        public abstract void Reset();\n\n        /// <summary>Read the word at even offset (side effects allowed: it is a real read).</summary>\n        protected abstract ushort Read(long offset);\n        /// <summary>Write only the bits of mask (0xFFFF, 0x00FF or 0xFF00).</summary>\n        protected abstract void Write(long offset, ushort value, ushort mask);\n\n        protected static ushort Merge(ushort old, ushort value, ushort mask) => (ushort)((old & ~mask) | (value & mask));\n        protected static bool Bit(ushort value, int bit) => (value & (1 << bit)) != 0;\n        protected bool Disabled => Pmd != null && PmdBit >= 0 && Pmd.ModuleDisabled(PmdBit);\n\n        /// <summary>Bring virtual time up to the executing instruction (CPU thread only).</summary>\n        internal static void SyncTime(IMachine machine)\n        {\n            if(machine.SystemBus.TryGetCurrentCPU(out var cpu) && cpu is BaseCPU b && b.OnPossessedThread)\n            {\n                b.SyncTime();\n            }\n        }\n\n        protected readonly IMachine machine;\n    }\n}\nEOF\necho ok",
+ "description": "Write the peri
+… [44 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:59:16
+
+Now the per-peripheral checklists, a patterns reference (lazy timer, interrupt publishing, ns-timed bus actions, port mirrors), and the reference-document outline.
+
+**Tool: Bash** — Write checklists, patterns and the reference outline
+
+````
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation/renode-peripheral-models/references; cat > $K/peripheral-checklists.md <<'EOF'\n# Per-peripheral checklists\n\nTick every item, or write it in the model's limits. Each \"test:\" line is something a firmware test\nmust check.\n\n## Interrupt controller\n\n- [ ] Flag, enable and priority registers at the right offsets; reset priorities as in the data\n  sheet (often not 0).\n- [ ] Inputs in vector order; a rising edge sets the flag; software clears it.\n- [ ] Highest priority wins, ties go to the lower vector; publish to the CPU (export) and drive its\n  IRQ line.\n- [ ] External interrupt pins with edge polarity; nesting disable; alternate vector table; global\n  disable instructions (DISI) respected by the CPU glue.\n- [ ] Lazy sources: poll before flag reads; report enable changes.\n- test: a timer interrupt at the expected rate; nesting by priority; edge polarity.\n\n## System: clock, reset, watchdog, NVM, power, module disable\n\n- [ ] Oscillator modes from the fuse encodings (PLL factors, internal RC frequencies, postscaler);\n  clock switching with its lock bits; publish Fcy and changes; CPU MIPS from Fcy.\n- [ ] Reset causes into the reset-control register (power-on, brown-out, software, watchdog,\n  illegal opcode, trap conflict, external pin); kept across the machine reset.\n- [ ] Watchdog: enable fuse or software bit, prescalers, period, clear instruction, reset, or wake\n  from sleep.\n- [ ] NVM: unlock sequence, write latches from table writes, row erase/program, EEPROM\n  word/row/all with its timing, write-error bit, completion interrupt, invalidating translated\n  code.\n- [ ] Power states: Idle, Sleep, wake (CPU callback); SIDL bits per module.\n- [ ] Brown-out (supply voltage property, threshold fuse), power-up timer, low-voltage detect\n  interrupt, clock monitor (oscillator-fail trap).\n- [ ] Module-disable registers (PMD).\n- test: Fcy from the fuses; clock switch; watchdog reset; Sleep woken by an interrupt; Idle; PMD\n  read 0; EEPROM and flash program/read-back.\n\n## Timers\n\n- [ ] Prescalers; period register; counter read/write; external clock and gate; 32-bit pairing\n  with a holding register.\n- [ ] Interrupt on the period match (or the gate's falling edge).\n- [ ] Lazy mode while the interrupt is off and no consumer needs events; SyncTime on reads.\n- [ ] Freeze in Sleep (internal clock); SIDL in Idle.\n- test: the interrupt rate equals Fcy / prescale / (PR + 1); a polled flag of a fast timer.\n\n## GPIO ports and change notification\n\n- [ ] TRIS/PORT/LAT; PORT reads the pin (driven level, external level, pull-up, analog = 0).\n- [ ] External inputs, peripheral output overrides, mirror outputs to peripheral inputs; pin map\n  per data sheet.\n- [ ] Change notification numbers and enables, pull-ups, its interrupt.\n- [ ] Incremental output updates (only the changed pins).\n- test: output pin toggling; an input pin raising INTx and capture; CN; an analog pin reads 0.\n\n## UART\n\n- [ ] Baud rate from BRG and Fcy; frame bits from the data/parity/stop settings.\n- [ ] TX buffer depth, shift register timing, TX-buffer-full and TX-empty status bits, TX\n  interrupt modes.\n- [ ] RX FIFO depth, RX interrupt levels, overrun stops reception until cleared, loopback.\n- [ ] Wake on start bit in Sleep; SIDL.\n- test: N characters take N × frame time; buffer-full after quick writes; interrupt-driven echo.\n\n## Output compare / PWM / input capture\n\n- [ ] Every compare mode (single high/low, toggle, single/continuous pulse, PWM, PWM with fault).\n- [ ] Time-base select; duty latched at the period; duty/frequency properties; pin output to the\n  port.\n- [ ] Capture modes (edges, prescaled), timer select, FIFO depth, overflow, interrupt per N\n  captures.\n- test: PWM duty and frequency; toggle output captured by a capture unit.\n\n## ADC\n\n- [ ] Channel inputs as IADC (microvolts) for External Control; references; negative input.\n- [ ] Triggers: manual, external pin, timer, auto; sample/convert timing in TAD; internal RC clock\n  in Sleep.\n- [ ] Scan, alternate MUX, conversions per interrupt, split buffer, result formats.\n- [ ] Analog pin configuration feeding the port.\n- test: a known voltage gives the expected count; the format; timer-triggered conversion.\n\n## SPI / I2C\n\n- [ ] SPI: master timing at Fsck; TX/RX buffer flags; overflow; 8/16-bit; slave mode as an\n  ISPIPeripheral; slave select.\n- [ ] I2C: start/restart/stop/receive/ack each take bus time; busy bits; ACK/NACK; collision\n  bit; device registry by address.\n- test: busy right after the write, done after the bus time; NACK from a missing device.\n\n## CAN\n\n- [ ] Filters and masks (standard/extended), buffers, double buffering, overflow.\n- [ ] Modes (normal, disable, loopback, listen-only, configuration, listen-all).\n- [ ] Bit rate from the timing registers; frame time; priorities; abort.\n- [ ] Error counters and states (warning, passive, bus-off with recovery), missing ACK, injection\n  methods; wake-up.\n- [ ] ICAN for the CAN hub / External Control.\n- test: a frame from CAN1 to CAN2 through a hub; bit rate; error states after injected errors.\n\n## Codec / serial audio (DCI, I2S, SAI)\n\n- [ ] Frame/slot structure, master/slave frame sync, slot enables, buffer swap, underflow and\n  overflow, loopback.\n- test: loopback of a known word.\nEOF\ncat > $K/patterns.md <<'EOF'\n# Patterns that worked (C#, Renode 1.17)\n\n## Interrupt source pulse\n\n```csharp\nIRQ = new GPIO();                 // platform: IRQ -> intc@<vector>\nIRQ.Blink();                      // flag set on the rising edge, cleared by software\n```\n\n## Publish the best interrupt to the CPU (controller side)\n\n```csharp\ncpu.SetPendingInterrupt(best, bestPriority);   // export into tlib\nIRQ.Set(best >= 0);                            // the CPU's IRQ line, for wake-up\n```\n\n## Bus action that takes time (UART char, SPI word, I2C bit, CAN frame)\n\n```csharp\ntimer = new LimitTimer(machine.ClockSource, 1000000000, this, \"uart-tx\", limit: 1,\n    direction: Direction.Ascending, workMode: WorkMode.OneShot, eventEnabled: true);\ntimer.LimitReached += Done;\n// start:\ntimer.Enabled = false; timer.Limit = (ulong)Math.Round(bits * 1e9 / baud); timer.Value = 0; timer.Enabled = true;\n```\n\n## Lazy timer (no event per period)\n\n- Run the LimitTimer with `Limit = period * lapLength` (lapLength is chosen so that one event\n  happens about every 0.25 s).\n- `TMR = timer.Value % period`.\n- `Matches = baseMatches + laps * lapLength + timer.Value / period`.\n- The interrupt controller polls lazy sources before IFS reads. A source becomes eager (lapLength\n  = 1, events on) when its interrupt is enabled or a consumer calls `RequireEvents`.\n\n## Clock and power from the system model\n\n```csharp\nsystem.ClockChanged += _ => Apply();           // re-derive frequencies\nsystem.PowerChanged += _ => Apply();           // freeze in Sleep / SIDL in Idle\nulong Fcy => system?.CpuFrequency ?? frequency;\n```\n\n## Read fuses only once the firmware is loaded\n\n```csharp\nmachine.StateChanged += (m, a) => { if(a.CurrentState == MachineStateChangedEventArgs.State.Started) ConfigureFromFuses(); };\n```\n\n## Port mirrors (one pin feeding several peripherals)\n\n- Port outputs 16+n, 32+n, ... carry pin n's level.\n- Platform: `portd: 24 -> intc@65` and `40 -> ic1@0` (RD8 feeds both INT1 and IC1).\n- Peripheral outputs drive the port's inputs 16+n (`oc1: Pin -> portd@16`).\n\n## Raising a CPU trap from C#\n\nA tlib export, `tlib_raise_trap(n)`, sets the pending trap and the status bit, and clears `wfi`.\nThe step helper services pending traps before the next instruction.\nEOF\ncat > $K/reference-doc-outline.md <<'EOF'\n# Outline of the peripheral reference document\n\nOne file next to the models (for example `tools/<mcu>/PERIPHERALS.md`):\n\n1. Conventions:\n   - register access;\n   - clock source;\n   - inter
+… [557 more characters not shown]
+````
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:59:53
+
+Three skills left: firmware tests, real-firmware bring-up, and privacy hygiene, plus a C test-firmware template the first one uses.
+
+**Tool: Bash** — Write the firmware-test, bring-up and privacy skills
+
+````
+{
+ "command": "K=/media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation; mkdir -p $K/renode-firmware-tests/templates $K/real-firmware-bringup $K/emulation-privacy-hygiene\ncat > $K/renode-firmware-tests/SKILL.md <<'EOF'\n---\nname: renode-firmware-tests\ndescription: Test Renode MCU models with small firmware programs\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, renode, testing, firmware]\n    category: embedded-emulation\n---\n\n# Firmware tests for MCU models\n\nA model is verified only by firmware that uses it the way real code does, with expected values\ncomputed from the data sheet before the run.\n\n## When to Use\n\n- After writing or changing any peripheral model or the CPU glue.\n- Before committing emulator changes: rerun every test.\n\n## Procedure\n\n1. **Copy `templates/test_firmware.c`.** Every check stores a value in `r[k]` at a fixed RAM\n   address, and `r[0]` holds the number of the last step reached. Use the vendor's register\n   names from the device header.\n2. **Write the expected value of each `r[k]` first**, from the data sheet, in a table: register\n   setup → formula → number. Examples:\n   - timer ticks = run time × Fcy / prescale / (PR + 1);\n   - UART time = characters × frame bits / baud;\n   - ADC count = round(V / Vref × 4095).\n3. **Build:** `build_firmware profile=<mcu> source=<file>.c`. Fix compile errors from the returned\n   `errors`.\n4. **Run:**\n\n   ```\n   renode_run platform=<platform> loads=<load_commands> run_for=0.1\n              reads=[\"0xA00\", \"0xA02\", ...]\n   ```\n\n   Add these as needed:\n   - `stimuli`, for pin edges or supply changes at set times: `[{\"at\": 0.03, \"command\": \"portf OnGPIO 6 true\"}]`;\n   - `before`, for analog inputs (`adc SetVoltage 1250000 3`) or a CAN hub\n     (`emulation CreateCANHub \"hub\"` and `connector Connect sysbus.can1 hub`);\n   - `after`, for model properties (`oc1 DutyCycle`, `can1 BitRate`).\n5. **Compare** each read with the expected table.\n   - If `r[0]` is lower than the last step, the firmware hung waiting for a flag: that peripheral\n     is the suspect.\n   - Look at `problems` too: unmapped accesses and model warnings.\n6. **Script it.** Save a `.resc` next to the firmware with `$ORIGIN/` paths and repo-relative\n   platform paths, plus `echo` lines naming the expectation. Add it to the tests table in the\n   reference document.\n\n## Pitfalls\n\n- A wrong expectation is as likely as a wrong model. If the numbers disagree, recheck the test's\n  register setup against the data sheet before changing the model. Real examples of test bugs:\n  - a missing underflow-mode bit;\n  - a pointer register that held an offset;\n  - a clock assumed instead of read from the fuses.\n- Configuration fuses in the test firmware decide the clock (PLL!). Write them explicitly\n  (`#pragma config`) and compute expectations with that Fcy.\n- `while(!flag);` loops hang on model bugs. Keep timeouts in loops, or check `r[0]` to see where\n  it stopped.\n- Renode is whole-MIPS: tests that count instructions against a timer must allow for the rounding.\n- Timing tests need a margin: one quantum or one prescaler tick.\n\n## Verification\n\n- Every `r[k]` matches its expected value; `r[0]` equals the last step; `problems.distinct` is 0.\nEOF\ncat > $K/renode-firmware-tests/templates/test_firmware.c <<'EOF'\n/* <MCU> model test: <what>. Results in r[] at a fixed RAM address; r[0] = last step reached.\n * Expected values (computed before running):\n *   r[1] = ...   because ...\n */\n#include <xc.h>                          /* or the vendor device header */\n\n/* configuration fuses: they decide Fcy, set them explicitly */\n/* #pragma config ... */\n\nvolatile unsigned int r[32] __attribute__((address(0x0A00)));   /* adapt: a RAM address free of the stack */\nvolatile unsigned int events;\n\n/* void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) { events++; IFS0bits.T1IF = 0; } */\n\nint main(void)\n{\n    unsigned int timeout;\n\n    /* step 1: <peripheral setup per the data sheet> */\n    /* ... */\n    for(timeout = 0; timeout < 60000 && !0 /* done flag */; timeout++);\n    r[1] = 0;            /* the value to check */\n    r[0] = 1;\n\n    /* step 2: ... */\n    r[0] = 2;\n\n    for(;;);\n}\nEOF\ncat > $K/real-firmware-bringup/SKILL.md <<'EOF'\n---\nname: real-firmware-bringup\ndescription: Run product firmware on an emulated MCU and fix gaps\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [embedded, renode, firmware, debugging]\n    category: embedded-emulation\n---\n\n# Bringing up real product firmware\n\n## When to Use\n\n- The models pass their own tests, and the product's firmware (HEX/ELF) should now run.\n\n## Procedure\n\n1. **Read-only.** Never modify the product firmware or its repository. Work on copies in a\n   scratch directory.\n2. **Board file.** Write a board `.repl` that `using`s the MCU platform and sets the board facts:\n   - the external oscillator frequency (from the firmware's clock constants or the schematic);\n   - connected devices (I2C/SPI parts, CAN hub).\n\n   Give the board file a neutral name, never the product's (`emulation-privacy-hygiene`).\n3. **Images.** `hex_to_images profile=<mcu> hex=<copy of the product hex>`.\n4. **First run:**\n\n   ```\n   renode_run platform=<board.repl> loads=... run_for=0.5 after=[\"system CpuFrequency\"] reads=[...]\n   ```\n\n   Check:\n   - `problems`: unmapped reads/writes name missing registers;\n   - illegal opcodes point to core gaps;\n   - `after`: is Fcy what the firmware's own constants imply (timer periods, baud divisors)?\n5. **Each problem** goes back to the model or core skill, with a firmware test that reproduces it.\n6. **Speed.** If `host_mips` is far below that of compute-bound code, run `pc_hotspots`, then\n   `disassemble` the top PCs. Typical causes, and their fixes:\n   - a fast timer raising events → lazy mode;\n   - polling a flag in a tight loop → SyncTime + lazy flag;\n   - bit-banged pins → incremental port updates; MMIO cost is per access.\n7. **Behaviour checks.** Compare what the firmware should be doing with model properties:\n   - PWM frequency and duty;\n   - UART output (`uart` capture);\n   - CAN frames through a hub;\n   - GPIO levels.\n8. **Co-simulation.** Hand over to embeddyn bindings (adc/gpio/can/sysbus endpoints) once the\n   firmware behaves.\n\n## Pitfalls\n\n- Product firmware often derives everything from one clock constant. If PWM or baud rates are off\n  by a constant factor, the board's oscillator frequency or a fuse decode is wrong, not the\n  peripheral.\n- Disassembly and file listings of the product firmware are private. Keep them out of commits,\n  docs and chat logs (redaction rules).\n- Do not \"fix\" the emulator to match a firmware bug. Silicon behaviour is the reference.\n\n## Verification\n\n- `problems.distinct` is 0 (or only explained warnings); rates match the firmware's own constants;\n  speed is recorded.\nEOF\ncat > $K/emulation-privacy-hygiene/SKILL.md <<'EOF'\n---\nname: emulation-privacy-hygiene\ndescription: Keep private product names out of emulator repos\nversion: 1.0.0\nplatforms: [linux]\nmetadata:\n  hermes:\n    tags: [privacy, git, embedded]\n    category: embedded-emulation\n---\n\n# Privacy hygiene for emulation work\n\nEmulator work touches private product firmware: board names, project names, repository paths,\ncode. None of it may enter files that can be pushed.\n\n## When to Use\n\n- Before every commit in an emulator, tool or documentation repository.\n- When writing board files, tests, docs or chat logs that mention the product.\n\n## Procedure\n\n1. **Rules file outside every repository**, for example `~/.config/embeddyn/chat-redact.tsv`. It\n   holds one rule per line:\n   - `private<TAB>regex` for names and paths;\n   - `replace<TAB>regex<TAB>replacement` for renames.\n\n   Never put the rules file, or its patterns, in a repository.\n
+… [1002 more characters not shown]
+````
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+**Tool: Bash** — Write the Hermes README, config example and install script
+
+````
+{
+ "command": "H=/media/riko/model_store/GIT_/embeddyn/agents/hermes; cat > $H/config.example.yaml <<'EOF'\n# Hermes Agent (~/.hermes/config.yaml) fragment for full-MCU-emulation work.\n# Merge into your config; adjust the paths. Secrets do not belong here (use ~/.hermes/.env).\n\nskills:\n  external_dirs:\n    - ${EMBEDDYN_HOME}/agents/hermes/skills        # the embedded-emulation skills\n\nmcp_servers:\n  mcu_emu:\n    command: \"${EMBEDDYN_HOME}/.venv/bin/python\"     # any Python >= 3.10 that can import embeddyn\n    args: [\"-m\", \"embeddyn.agents.mcu_emu\"]\n    cwd: \"${EMBEDDYN_HOME}\"\n    timeout: 3600                                    # Renode builds and long runs take minutes\n    connect_timeout: 30\n    env:\n      PYTHONPATH: \"${EMBEDDYN_HOME}\"\n      RENODE_BIN: \"/opt/renode/renode\"               # the Renode launcher\n      RENODE_ROOT: \"/opt/renode\"                     # repo root: platforms/ paths resolve here\n      DOTNET_ROOT: \"/opt/dotnet\"                     # Renode built from source needs dotnet\n      PATH: \"/opt/dotnet:/usr/local/bin:/usr/bin:/bin\"\n      XC16_BIN: \"/opt/microchip/xc16/v2.10/bin\"      # per-profile toolchain variables\n      MCU_EMU_PROFILES: \"${HOME}/.config/mcu-emu/profiles\"   # your own MCU profiles\n    tools:\n      prompts: false\n      resources: false\nEOF\ncat > $H/install.sh <<'EOF'\n#!/bin/sh\n# Make the embedded-emulation skills visible to Hermes Agent and print the MCP config to add.\n# Usage: agents/hermes/install.sh [hermes-home]   (default ~/.hermes)\nset -e\nHERE=$(cd \"$(dirname \"$0\")\" && pwd)\nREPO=$(cd \"$HERE/../..\" && pwd)\nHERMES_HOME=${1:-$HOME/.hermes}\nmkdir -p \"$HERMES_HOME/skills\"\nif [ -e \"$HERMES_HOME/skills/embedded-emulation\" ] && [ ! -L \"$HERMES_HOME/skills/embedded-emulation\" ]; then\n    echo \"$HERMES_HOME/skills/embedded-emulation exists and is not a link; leaving it alone\" >&2\nelse\n    ln -sfn \"$HERE/skills/embedded-emulation\" \"$HERMES_HOME/skills/embedded-emulation\"\n    echo \"skills linked: $HERMES_HOME/skills/embedded-emulation -> $HERE/skills/embedded-emulation\"\nfi\nmkdir -p \"$HOME/.config/mcu-emu/profiles\"\necho\necho \"Add the MCP server to $HERMES_HOME/config.yaml (see $HERE/config.example.yaml), with EMBEDDYN_HOME=$REPO,\"\necho \"then run:  hermes mcp test mcu_emu\"\necho \"Check the server alone:  PYTHONPATH=$REPO python3 -m embeddyn.agents.mcu_emu < /dev/null\"\nEOF\nchmod +x $H/install.sh\ncat > $H/README.md <<'EOF'\n# Hermes Agent kit: full MCU emulation\n\nSkills and an MCP server that let an agent, running a 27B-class open model in\n[Hermes Agent](https://hermes-agent.nousresearch.com/docs), repeat the workflow that brought the\ndsPIC30F5011 into Renode:\n- CPU core;\n- differential tests;\n- tlib integration;\n- every peripheral;\n- firmware tests;\n- real product firmware.\n\n## Contents\n\n| Path | What |\n|---|---|\n| `skills/embedded-emulation/` | nine skills (agentskills.io format): the workflow and one skill per phase, with templates and worked examples |\n| `../../embeddyn/agents/mcu_emu/` | the `mcu-emu` MCP server: 18 deterministic tools, standard library only |\n| `../../embeddyn/agents/mcu_emu/profiles/` | MCU profiles (dsPIC30F5011; an STM32L476/SVD example) |\n| `config.example.yaml` | the Hermes `config.yaml` fragment |\n| `install.sh` | links the skills into `~/.hermes/skills/` |\n\n## Skills\n\n| Skill | Phase |\n|---|---|\n| `mcu-emulation-workflow` | the plan: phases, done-gates, tool map; read it first |\n| `mcu-facts-extraction` | profile, SFR map, vectors, pin and clock facts |\n| `mcu-cpu-core` | the core as a standalone C interpreter, plus a native runner |\n| `mcu-differential-testing` | step-by-step comparison with the vendor simulator, random generators |\n| `renode-tlib-core-integration` | the interpreter inside tlib and the C# CPU class |\n| `renode-peripheral-models` | C# peripheral models, patterns, per-peripheral checklists, detail pass |\n| `renode-firmware-tests` | test firmware with precomputed expectations, run through `renode_run` |\n| `real-firmware-bringup` | product firmware on a board file, gaps, speed |\n| `emulation-privacy-hygiene` | private names out of repositories; `privacy_scan` before commits |\n\n## MCP tools\n\nAll tools return JSON with `ok`. Large data goes to files, and results are capped at 12,000\ncharacters.\n\n| Group | Tools |\n|---|---|\n| profiles | `mcu_profile_list`, `mcu_profile_show` |\n| register map | `extract_sfr_map` (C header / linker script / CMSIS-SVD), `sfr_lookup`, `extract_vectors`, `sfr_coverage` |\n| firmware | `build_firmware`, `hex_to_images`, `disassemble` |\n| Renode | `renode_build`, `renode_check_platform`, `renode_run` (loads, stimuli, reads, UART capture, monitor commands), `pc_hotspots` |\n| core testing | `trace_from_columns`, `compare_traces` |\n| code generation | `peripheral_skeleton` |\n| hygiene | `privacy_scan` |\n\n## Install\n\n```bash\nagents/hermes/install.sh\n```\n\nThen:\n1. Merge `config.example.yaml` into `~/.hermes/config.yaml`, setting `EMBEDDYN_HOME`, the\n   Renode/dotnet paths and the toolchain variables.\n2. Run `hermes mcp test mcu_emu`.\n3. Start a session with `/mcu-emulation-workflow`.\n\n## Working with a 27B-class model\n\n- **One phase per session.** Load `/mcu-emulation-workflow` plus the phase skill, and end each\n  session by writing the status (done / verified / open) into the project's notes. Long sessions\n  degrade small models more than large ones.\n- **Let the tools do the parsing.** The skills tell the model to call a tool rather than read\n  vendor headers, Renode logs or traces itself. Keep the MCP tool list complete (no `include`\n  filter), so the model never improvises a shell parser.\n- **Gates.** Every procedure step that changes code is followed by a check tool (`renode_build`,\n  `renode_check_platform`, `renode_run` with expected reads, `compare_traces`). A step counts as\n  done only when its check passed.\n- **Context.** Use at least 32k context. Tool results are capped; files hold the bulk (SFR maps,\n  traces).\n- **Sampling.** Use low temperature (0.2–0.4) for code edits. A tool-call parser that handles the\n  model's tool format reliably matters more than raw model size.\n- **Review.** A larger model, or a human, should review the core and anything marked unverified\n  before it is trusted.\n\n## Verifying the kit\n\n`tests/agents/test_mcu_emu.py` runs in the normal test suite: protocol, extraction (with synthetic\nheader/linker/SVD fixtures), images, traces, privacy scan, skeleton. With `XC16_BIN`, `RENODE_BIN`\nand `RENODE_ROOT` set, it also builds and runs the dsPIC30 smoke firmware in Renode.\nEOF\necho ok",
+ "description": "Write the Hermes README, config example and install script"
+}
+````
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 07:01:18
+
+Writing the test suite: synthetic header, linker-script and SVD fixtures so it runs without vendor tools, plus optional real XC16/Renode tests. I'm also correcting the tool count in the README to 17.
+
+**Tool: Bash** — Write the MCP server tests and run them
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"agents/hermes/README.md\"); p.write_text(p.read_text().replace(\"18 deterministic tools\", \"17 deterministic tools\"))\nEOF\nmkdir -p tests/agents && cat > tests/agents/__init__.py <<'EOF'\nEOF\ncat > tests/agents/test_mcu_emu.py <<'EOF'\n\"\"\"Tests of the mcu-emu MCP server (embeddyn/agents/mcu_emu).\"\"\"\nfrom __future__ import annotations\n\nimport json\nimport os\nimport shutil\nimport subprocess\nimport sys\nfrom pathlib import Path\n\nimport pytest\n\nfrom embeddyn.agents.mcu_emu import server, tools\n\nHEADER = \"\"\"\nextern volatile uint16_t U1STA __attribute__((__sfr__));\ntypedef struct tagU1STABITS {\n  uint16_t URXDA:1;\n  uint16_t OERR:1;\n  uint16_t :6;\n  uint16_t TRMT:1;\n  uint16_t UTXBF:1;\n} U1STABITS;\n#define PORTA (*(volatile uint8_t *)(0x0022))\n\"\"\"\n\nGLD = \"\"\"\n U1MODE       = 0x20C;\n_U1MODE       = 0x20C;\n U1STA        = 0x20E;\n TMR1         = 0x100;\n** Interrupt Vector Table\n    LONG(DEFINED(__ReservedTrap0) ? ABSOLUTE(__ReservedTrap0) : 0);\n    LONG(DEFINED(__OscillatorFail) ? ABSOLUTE(__OscillatorFail) : 0);\n    LONG(DEFINED(__INT0Interrupt) ? ABSOLUTE(__INT0Interrupt) : 0);\n    LONG(DEFINED(__T1Interrupt) ? ABSOLUTE(__T1Interrupt) : 0);\n** Alternate\n\"\"\"\n\nSVD = \"\"\"<?xml version=\"1.0\"?>\n<device><peripherals>\n <peripheral><name>TIM2</name><baseAddress>0x40000000</baseAddress>\n  <interrupt><name>TIM2</name><value>28</value></interrupt>\n  <registers><register><name>CR1</name><addressOffset>0x0</addressOffset><size>32</size><resetValue>0</resetValue>\n   <fields><field><name>CEN</name><bitOffset>0</bitOffset><bitWidth>1</bitWidth></field></fields></register>\n  <register><name>CNT</name><addressOffset>0x24</addressOffset></register></registers></peripheral>\n <peripheral derivedFrom=\"TIM2\"><name>TIM3</name><baseAddress>0x40000400</baseAddress></peripheral>\n</peripherals></device>\n\"\"\"\n\n\[email redacted]\ndef files(tmp_path):\n    (tmp_path / \"dev.h\").write_text(HEADER)\n    (tmp_path / \"dev.gld\").write_text(GLD)\n    (tmp_path / \"dev.svd\").write_text(SVD)\n    return tmp_path\n\n\ndef test_protocol_lists_and_calls_tools(files):\n    init = server.handle({\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"initialize\", \"params\": {\"protocolVersion\": \"2025-06-18\"}})\n    assert init[\"result\"][\"serverInfo\"][\"name\"] == \"mcu-emu\"\n    assert server.handle({\"jsonrpc\": \"2.0\", \"method\": \"notifications/initialized\"}) is None\n    names = [t[\"name\"] for t in server.handle({\"jsonrpc\": \"2.0\", \"id\": 2, \"method\": \"tools/list\"})[\"result\"][\"tools\"]]\n    assert {\"extract_sfr_map\", \"renode_run\", \"compare_traces\", \"peripheral_skeleton\"} <= set(names)\n    bad = server.handle({\"jsonrpc\": \"2.0\", \"id\": 3, \"method\": \"tools/call\", \"params\": {\"name\": \"sfr_lookup\", \"arguments\": {\"x\": 1}}})\n    assert bad[\"result\"][\"isError\"] and \"expected\" in json.loads(bad[\"result\"][\"content\"][0][\"text\"])\n    assert server.handle({\"jsonrpc\": \"2.0\", \"id\": 4, \"method\": \"nope\"})[\"error\"][\"code\"] == -32601\n\n\ndef test_stdio_round_trip():\n    msgs = [{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"initialize\", \"params\": {}}, {\"jsonrpc\": \"2.0\", \"id\": 2, \"method\": \"ping\"}]\n    out = subprocess.run([sys.executable, \"-m\", \"embeddyn.agents.mcu_emu\"], input=\"\\n\".join(map(json.dumps, msgs)) + \"\\n\",\n                         capture_output=True, text=True, timeout=60, env={**os.environ, \"PYTHONPATH\": str(Path(__file__).parents[2])})\n    replies = [json.loads(l) for l in out.stdout.splitlines()]\n    assert [r[\"id\"] for r in replies] == [1, 2]\n\n\ndef test_sfr_map_from_header_and_linker_script(files):\n    r = tools.extract_sfr_map(header=str(files / \"dev.h\"), linker_script=str(files / \"dev.gld\"), out=str(files / \"map.json\"))\n    assert r[\"ok\"] and r[\"registers\"] == 4\n    hit = tools.sfr_lookup(str(files / \"map.json\"), name=\"^U1STA$\")[\"registers\"][0]\n    assert hit[\"address\"] == \"0x020E\" and \"TRMT:8\" in hit[\"fields\"] and \"UTXBF:9\" in hit[\"fields\"]\n    assert tools.sfr_lookup(str(files / \"map.json\"), name=\"PORTA\")[\"registers\"][0][\"address\"] == \"0x0022\"\n\n\ndef test_sfr_map_and_vectors_from_svd(files):\n    r = tools.extract_sfr_map(svd=str(files / \"dev.svd\"), out=str(files / \"svd.json\"))\n    assert r[\"registers\"] == 4 and r[\"interrupts\"] == 1\n    regs = {x[\"name\"]: x for x in json.loads((files / \"svd.json\").read_text())[\"registers\"]}\n    assert regs[\"TIM3_CNT\"][\"address\"] == 0x40000424 and regs[\"TIM2_CR1\"][\"fields\"][0][\"name\"] == \"CEN\"\n    assert tools.extract_vectors(svd=str(files / \"dev.svd\"))[\"vectors\"] == [{\"index\": 28, \"name\": \"TIM2\"}]\n\n\ndef test_vectors_from_linker_script(files):\n    v = tools.extract_vectors(linker_script=str(files / \"dev.gld\"), skip_traps=2)\n    assert v[\"vectors\"] == [{\"index\": 0, \"name\": \"INT0Interrupt\"}, {\"index\": 1, \"name\": \"T1Interrupt\"}]\n\n\ndef test_coverage(files):\n    tools.extract_sfr_map(header=str(files / \"dev.h\"), linker_script=str(files / \"dev.gld\"), out=str(files / \"map.json\"))\n    (files / \"p.repl\").write_text(\"uart1: X.Uart @ sysbus 0x020C\\n    size: 0x0A\\n\\ntimer1: X.T @ sysbus <0x100, +0x6>\\n\")\n    c = tools.sfr_coverage(str(files / \"map.json\"), str(files / \"p.repl\"))\n    assert c[\"uncovered\"] == [\"PORTA@0x0022\"]\n    c = tools.sfr_coverage(str(files / \"map.json\"), str(files / \"p.repl\"), cpu_ranges=[[\"0x0\", \"0x54\"]])\n    assert c[\"uncovered_count\"] == 0\n\n\ndef test_hex_images(tmp_path):\n    hexfile = tmp_path / \"a.hex\"\n    hexfile.write_text(\":020000040000FA\\n:0800000004010000000000F3\\n:020000040001F9\\n:04000000AABBCCDDEE\\n:00000001FF\\n\")\n    r = tools.hex_to_images(str(hexfile), out_dir=str(tmp_path / \"out\"), base=\"0x01000000\", phantom_lane=3)\n    assert [i[\"address\"] for i in r[\"images\"]] == [\"0x1000000\", \"0x1010000\"]\n    assert Path(r[\"images\"][0][\"file\"]).read_bytes()[:4] == bytes([4, 1, 0, 0])\n\n\ndef test_traces(tmp_path):\n    (tmp_path / \"t.txt\").write_text(\"000100 040104 0000 0001\\n000104 20C00F 0C00 0001\\nRAM 0000\\n\")\n    assert tools.trace_from_columns(str(tmp_path / \"t.txt\"), str(tmp_path / \"a.jsonl\"), [\"pc\", \"op\", \"W0\", \"sr\"])[\"steps\"] == 2\n    lines = (tmp_path / \"a.jsonl\").read_text().splitlines()\n    step = json.loads(lines[1]); step[\"sr\"] ^= 0x100\n    (tmp_path / \"b.jsonl\").write_text(lines[0] + \"\\n\" + json.dumps(step) + \"\\n\")\n    assert tools.compare_traces(str(tmp_path / \"a.jsonl\"), str(tmp_path / \"b.jsonl\"), masks={\"sr\": \"0x100\"})[\"tolerated\"] == {\"sr\": 1}\n    bad = tools.compare_traces(str(tmp_path / \"a.jsonl\"), str(tmp_path / \"b.jsonl\"))\n    assert not bad[\"ok\"] and bad[\"step\"] == 1 and \"sr\" in bad[\"differences\"]\n\n\ndef test_privacy_scan(tmp_path):\n    (tmp_path / \"doc.md\").write_text(\"board ACME-1234 here\\nnothing\\n\")\n    (tmp_path / \"rules.tsv\").write_text(\"private\\tacme-[0-9]+\\n\")\n    r = tools.privacy_scan([str(tmp_path / \"doc.md\")], rules_file=str(tmp_path / \"rules.tsv\"))\n    assert not r[\"ok\"] and r[\"match_count\"] == 1 and \"ACME\" not in r[\"matches\"][0]\n\n\ndef test_peripheral_skeleton(files):\n    tools.extract_sfr_map(header=str(files / \"dev.h\"), linker_script=str(files / \"dev.gld\"), out=str(files / \"map.json\"))\n    r = tools.peripheral_skeleton(\"Dev_UART\", str(files / \"Uart.cs\"), sfr_map=str(files / \"map.json\"), start=\"0x20C\", end=\"0x216\", irqs=[\"RxIRQ\"])\n    code = (files / \"Uart.cs\").read_text()\n    assert r[\"registers\"] == 2 and \"case 0x2:\" in code and \"TRMT:8\" in code and \"public GPIO RxIRQ\" in code\n\n\ndef test_profiles_expand_variables(monkeypatch):\n    monkeypatch.setenv(\"XC16_BIN\", \"/x/bin\")\n    p = tools.load_profile(\"
+… [1367 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+assert b["ok"], b
+        r = tools.renode_run("platforms/cpus/microchip/dspic30f5011.repl", b["load_commands"], run_for="0.05", reads=["0x900", "0x906"])
+>       assert r["reads"] == {"0x900": "0x7360", "0x906": "0xC0DE"}, r
+E       AssertionError: {'ok': True, 'reads': {'0x900': '0x0000', '0x906': '0x0000'}, 'after': {}, 'uart': {}, ...}
+E       assert {'0x900': '0x...06': '0x0000'} == {'0x900': '0x...06': '0xC0DE'}
+E         
+E         Differing items:
+E         {'0x906': '0x0000'} != {'0x906': '0xC0DE'}
+E         {'0x900': '0x0000'} != {'0x900': '0x7360'}
+E         Use -v to get more diff
+
+tests/agents/test_mcu_emu.py:159: AssertionError
+=========================== short test summary info ============================
+FAILED tests/agents/test_mcu_emu.py::test_build_and_run_dspic30_smoke - Asser...
+1 failed, 11 passed in 14.56s
+```
+
+</details>
+
+**Tool: Bash** — Run the smoke test past the power-up delay
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"tests/agents/test_mcu_emu.py\"); t = p.read_text()\nt = t.replace('''    r = tools.renode_run(\"platforms/cpus/microchip/dspic30f5011.repl\", b[\"load_commands\"], run_for=\"0.05\", reads=[\"0x900\", \"0x906\"])''',\n'''    # 0.2 s: blank configuration fuses mean the 64 ms power-up timer before the first instruction\n    r = tools.renode_run(\"platforms/cpus/microchip/dspic30f5011.repl\", b[\"load_commands\"], run_for=\"0.2\", reads=[\"0x900\", \"0x906\"])''')\np.write_text(t)\nEOF\n. /media/riko/model_store/renode-merge/env.sh; export XC16_BIN=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin RENODE_ROOT=/media/riko/model_store/renode-merge/renode; /media/riko/model_store/embeddyn-venv/bin/python -m pytest tests/agents -q --basetemp=/media/riko/model_store/tmp/pt-agents 2>&1 | tail -3",
+ "description": "Run the smoke test past the power-up delay",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+............                                                             [100%]
+12 passed in 8.26s
+```
+
+</details>
+
+**Tool: Bash** — Check skill frontmatter, sizes and file references
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/embeddyn/agents/hermes/skills/embedded-emulation && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nimport re, yaml\nfrom pathlib import Path\nfor d in sorted(Path(\".\").iterdir()):\n    s = (d / \"SKILL.md\").read_text()\n    fm = yaml.safe_load(s.split(\"---\")[1])\n    body = s.split(\"---\", 2)[2]\n    refs = re.findall(r\"`((?:references|templates)/[\\w./-]+)`\", body)\n    missing = [r for r in refs if not (d / r).exists()]\n    sections = [h for h in (\"## When to Use\", \"## Procedure\", \"## Pitfalls\", \"## Verification\") if h not in body]\n    print(f\"{d.name:32} desc={len(fm['description']):2} body={len(body):6} name_ok={fm['name'] == d.name} missing={missing} no_sections={sections}\")\nEOF\nls -R | head -40",
+ "description": "Check skill frontmatter, sizes and file references"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+emulation-privacy-hygiene        desc=48 body=  1554 name_ok=True missing=[] no_sections=[]
+mcu-cpu-core                     desc=47 body=  3598 name_ok=True missing=[] no_sections=[]
+mcu-differential-testing         desc=50 body=  4080 name_ok=True missing=[] no_sections=[]
+mcu-emulation-workflow           desc=41 body=  5077 name_ok=True missing=['templates/profile.json'] no_sections=[]
+mcu-facts-extraction             desc=48 body=  3518 name_ok=True missing=[] no_sections=[]
+real-firmware-bringup            desc=52 body=  2355 name_ok=True missing=[] no_sections=[]
+renode-firmware-tests            desc=51 body=  2768 name_ok=True missing=[] no_sections=[]
+renode-peripheral-models         desc=41 body=  4782 name_ok=True missing=[] no_sections=[]
+renode-tlib-core-integration     desc=49 body=  4088 name_ok=True missing=['templates/translate.c'] no_sections=[]
+.:
+emulation-privacy-hygiene
+mcu-cpu-core
+mcu-differential-testing
+mcu-emulation-workflow
+mcu-facts-extraction
+real-firmware-bringup
+renode-firmware-tests
+renode-peripheral-models
+renode-tlib-core-integration
+
+./emulation-privacy-hygiene:
+SKILL.md
+
+./mcu-cpu-core:
+references
+SKILL.md
+templates
+
+./mcu-cpu-core/references:
+core-structure.md
+
+./mcu-cpu-core/templates:
+core.h
+runner.c
+
+./mcu-differential-testing:
+references
+SKILL.md
+
+./mcu-differential-testing/references:
+sim30-example.md
+
+./mcu-emulation-workflow:
+references
+SKILL.md
+
+./mcu-emulation-workflow/references:
+dspic30-case-study.md
+```
+
+</details>
+
+### Assistant — 2026-11-25 07:02:54
+
+Two references point at files that live in a different skill or don't exist. Rewording them.
+
+**Tool: Bash** — Fix the two cross-skill references
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"mcu-emulation-workflow/SKILL.md\"); t = p.read_text()\nt = t.replace(\"Create an MCU profile JSON (copy `templates/profile.json` from that skill).\",\n              \"Create an MCU profile JSON from the profile template in the `mcu-facts-extraction` skill.\")\np.write_text(t)\np = Path(\"renode-tlib-core-integration/SKILL.md\"); t = p.read_text()\nt = t.replace(\"3. **One helper per instruction** (`templates/translate.c` in `references/glue.md`):\",\n              \"3. **One helper per instruction** (the translate.c fragment in `references/glue.md`):\")\np.write_text(t)\nEOF\ngrep -c 'templates/profile.json\\|templates/translate.c' mcu-emulation-workflow/SKILL.md renode-tlib-core-integration/SKILL.md",
+ "description": "Fix the two cross-skill references"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+mcu-emulation-workflow/SKILL.md:0
+renode-tlib-core-integration/SKILL.md:0
+```
+
+</details>
+
+### Assistant — 2026-11-25 07:03:09
+
+Adding a guide page to the embeddyn docs and the mkdocs nav, then running the linter and privacy scan over everything new before mirroring to the monorepo.
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "done": [
+  4,
+  5
+ ],
+ "start": 6
+}
+```
+
+**Tool: Bash** — Find the docs nav entry and available linters
+
+```
+{
+ "command": "cd /media/riko/model_store/GIT_/embeddyn && grep -n 'emulate-a-product' mkdocs.yml docs/guides/index.md | head; which hermes ruff 2>/dev/null; /media/riko/model_store/embeddyn-venv/bin/python -m ruff --version 2>/dev/null",
+ "description": "Find the docs nav entry and available linters"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 6 of 6 is in progress. App actions available now: create_pr, verify.
+```
+
+</details>
+
+<details><summary>Result</summary>
+
+```
+Exit code 1
+docs/guides/index.md:12:| Emulate a real product end to end (`emulate-a-product.md`) | turn an existing board set (physics, electronics, firmware, buses) into a verified emulation; worked example: SPECT body contour |
+mkdocs.yml:124:      - Emulate a real product end to end: guides/emulate-a-product.md
+/home/riko/.local/bin/hermes
+```
+
+</details>
+
+**Tool: Bash** — Inspect the installed Hermes CLI
+
+```
+{
+ "command": "hermes --version 2>&1 | head -3; hermes --help 2>&1 | head -40; hermes mcp --help 2>&1 | head -25; grep -rn 'HERMES_HOME' $(dirname $(readlink -f $(which hermes)))/../lib/python*/site-packages/hermes*/ 2>/dev/null | head -3",
+ "description": "Inspect the installed Hermes CLI",
+ "timeout": 120000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Hermes Agent v0.23.2 (2026.9.24) · stable · local ae2a81ccc00e
+Install directory: /home/riko/.hermes/hermes-agent
+Install method: git
+usage: hermes [-h] [--version] [-z PROMPT] [--usage-file PATH]
+              [--cpu-profile PATH] [-m MODEL] [--provider PROVIDER]
+              [--reasoning LEVEL] [-t TOOLSETS] [--resume SESSION]
+              [--no-restore-cwd] [--in DIR] [--continue [SESSION_NAME]]
+              [--worktree] [--accept-hooks] [--skills SKILLS] [--yolo]
+              [--pass-session-id] [--checkpoints] [--ignore-user-config]
+              [--ignore-rules] [--safe-mode] [--tui] [--native] [--cli]
+              [--dev]
+              <command> ...
+
+Hermes Agent - AI assistant with tool-calling capabilities
+
+positional arguments:
+  <command>             Command to run
+    chat                Interactive chat with the agent
+    model               Select default model and provider
+    moa                 Configure Mixture of Agents provider/model slots
+    fallback            Manage fallback providers (tried when the primary
+                        model fails)
+    worktree            Audit and reclaim accumulated git worktrees and merged
+                        branches
+    browser             Real-profile browsing helpers (close a browser locking
+                        its profile)
+    secrets             Manage external secret sources (Bitwarden, 1Password)
+    egress              Manage the iron-proxy egress credential-injection
+                        firewall
+    migrate             Move over from another agent, or migrate retired
+                        models and deprecated settings
+    codex-runtime       Manage the optional codex app-server runtime (migrate
+                        MCP config)
+    gateway             Messaging gateway management
+    proxy               Local OpenAI-compatible proxy to OAuth providers
+    lsp                 Language Server Protocol management
+    setup               Interactive setup wizard
+    whatsapp            Set up WhatsApp integration
+    whatsapp-cloud      Set up WhatsApp Business Cloud API integration
+    slack               Slack integration helpers (manifest generation, etc.)
+    send                Send a message to a configured platform (scripts, cron
+                        jobs, CI).
+    logout              Clear authentication for an inference provider
+usage: hermes mcp [-h]
+                  {add,remove,rm,list,ls,test,configure,config,login,reauth,picker,catalog,install} ...
+
+Manage MCP server connections. MCP servers provide additional tools via the
+Model Context Protocol. Use 'hermes mcp add' to connect to a new server.
+Running Hermes itself as an MCP server is the mcp-serve plugin: `hermes
+plugins install mcp-serve`.
+
+positional arguments:
+  {add,remove,rm,list,ls,test,configure,config,login,reauth,picker,catalog,install}
+    add                 Add an MCP server (discovery-first install)
+    remove (rm)         Remove an MCP server
+    list (ls)           List configured MCP servers
+    test                Test MCP server connection
+    configure (config)  Toggle tool selection
+    login               Force re-authentication for an OAuth-based MCP server
+    reauth              Re-authenticate one OAuth MCP server, or all of them
+                        (--all)
+    picker              Interactive catalog picker (also the default for
+                        `hermes mcp`)
+    catalog             List Nous-approved MCPs available for one-click
+                        install
+    install             Install a catalog MCP by name (e.g. `hermes mcp
+                        install deepwiki`)
+```
+
+</details>
+
+**Tool: Bash** — Check whether Hermes honours a HERMES_HOME override
+
+```
+{
+ "command": "grep -rln 'HERMES_HOME' /home/riko/.hermes/hermes-agent --include=*.py 2>/dev/null | head -3; grep -rn 'os.environ.get(\"HERMES_HOME\"\\|getenv(\"HERMES_HOME\"' /home/riko/.hermes/hermes-agent --include=*.py 2>/dev/null | head -3",
+ "description": "Check whether Hermes honours a HERMES_HOME override"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+/home/riko/.hermes/hermes-agent/hermes_scope.py
+/home/riko/.hermes/hermes-agent/cli.py
+/home/riko/.hermes/hermes-agent/hermes_startup_watchdog.py
+/home/riko/.hermes/hermes-agent/hermes_constants.py:211:    if not os.environ.get("HERMES_HOME", "").strip():
+/home/riko/.hermes/hermes-agent/hermes_constants.py:263:    val = os.environ.get("HERMES_HOME", "").strip()
+/home/riko/.hermes/hermes-agent/hermes_constants.py:318:    env_home = str(home).strip() if home is not None else os.environ.get("HERMES_HOME", "").strip()
+```
+
+</details>
+
+**Tool: Bash** — Test the MCP server and skills with Hermes in an isolated home
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; HH=/media/riko/model_store/tmp/hermes-test; rm -rf $HH; mkdir -p $HH; E=/media/riko/model_store/GIT_/embeddyn; cat > $HH/config.yaml <<EOF\nskills:\n  external_dirs:\n    - $E/agents/hermes/skills\nmcp_servers:\n  mcu_emu:\n    command: \"/media/riko/model_store/embeddyn-venv/bin/python\"\n    args: [\"-m\", \"embeddyn.agents.mcu_emu\"]\n    cwd: \"$E\"\n    timeout: 3600\n    env:\n      PYTHONPATH: \"$E\"\n      RENODE_BIN: \"$RENODE_BIN\"\n      RENODE_ROOT: \"/media/riko/model_store/renode-merge/renode\"\n      DOTNET_ROOT: \"$DOTNET_ROOT\"\n      PATH: \"$PATH\"\n      XC16_BIN: \"/media/riko/model_store/Microchip/xc16-linux/v2.10/bin\"\n    tools:\n      prompts: false\n      resources: false\nEOF\nexport HERMES_HOME=$HH; cd /media/riko/model_store/tmp; timeout 180 hermes mcp test mcu_emu 2>&1 | tail -30; echo ====; timeout 120 hermes skills list 2>&1 | grep -iE 'mcu|renode|emulation|skills' | head -20",
+ "description": "Test the MCP server and skills with Hermes in an isolated home",
+ "timeout": 400000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Preparing the isolated Hermes runtime…
+  → Installing Python dependencies…
+  ✓ Installing Python dependencies
+  → Installing Python dependencies…
+  ✓ Installing Python dependencies
+
+  Testing 'mcu_emu'...
+  Transport: stdio → /media/riko/model_store/embeddyn-venv/bin/python
+  Auth: none
+  ✓ Connected (937ms)
+  ✓ Tools discovered: 17
+
+    mcu_profile_list                     List the MCU profiles (toolchain, files, memory layout,...
+    mcu_profile_show                     Show one MCU profile with ${VAR}s expanded and which of...
+    extract_sfr_map                      Extract the special-function-register map (addresses an...
+    sfr_lookup                           Show registers of an SFR map (from extract_sfr_map) in ...
+    extract_vectors                      Interrupt vector order: from an XC16/GNU linker script ...
+    sfr_coverage                         SFR coverage of a Renode platform: which registers of t...
+    hex_to_images                        Convert an Intel HEX file into binary images for `sysbu...
+    build_firmware                       Build a test firmware with the profile's toolchain (C o...
+    disassemble                          Disassemble part of an ELF with the profile's objdump: ...
+    renode_check_platform                Load a Renode platform (.repl, plus optional extra .rep...
+    renode_run                           Run firmware in Renode headless and return what you ask...
+    pc_hotspots                          Sample the program counter while firmware runs, to find...
+    renode_build                         Build Renode (`target`: 'all' runs build.sh; 'core' reb...
+    trace_from_columns                   Convert a column trace (one step per line, whitespace-s...
+    compare_traces                       Compare two execution traces step by step (JSON Lines, ...
+    privacy_scan                         Scan files or directories for private names before comm...
+    peripheral_skeleton                  Generate a C# Renode peripheral skeleton for one regist...
+
+====
+                                Installed Skills                                
+│ emulation-privacy-hygiene  │ embedded-emulation │ external │ local │ enabled │
+│ mcu-cpu-core               │ embedded-emulation │ external │ local │ enabled │
+│ mcu-differential-testing   │ embedded-emulation │ external │ local │ enabled │
+│ mcu-emulation-workflow     │ embedded-emulation │ external │ local │ enabled │
+│ mcu-facts-extraction       │ embedded-emulation │ external │ local │ enabled │
+│ real-firmware-bringup      │ embedded-emulation │ external │ local │ enabled │
+│ renode-firmware-tests      │ embedded-emulation │ external │ local │ enabled │
+│ renode-peripheral-models   │ embedded-emulation │ external │ local │ enabled │
+│ renode-tlib-core-integrat… │ embedded-emulation │ external │ local │ enabled │
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Add the guide page and nav, scan for private names, check Python
+
+````
+{
+ "command": "cat > docs/guides/agent-kit-mcu-emulation.md <<'EOF'\n# Agent kit: full MCU emulation with Hermes\n\nThe workflow in Emulate a real product end to end (`emulate-a-product.md`) brought a dsPIC30F5011\ninto Renode in full:\n- CPU core;\n- differential tests against the vendor simulator;\n- tlib integration;\n- every peripheral;\n- firmware tests;\n- the real product firmware.\n\nThe agent kit packages that workflow so that an agent running a 27B-class open model in\n[Hermes Agent](https://hermes-agent.nousresearch.com/docs) can repeat it for other MCUs.\n\n* **Skills** (`agents/hermes/skills/embedded-emulation/`, agentskills.io format):\n  - nine procedural skills, one per phase, each with *When to Use*, *Procedure*, *Pitfalls* and\n    *Verification*;\n  - templates (MCU profile, core header, native runner, C# SFR base, test firmware);\n  - worked examples from the dsPIC30 work.\n* **MCP server** `mcu-emu` (`embeddyn/agents/mcu_emu/`, standard library only): 17 deterministic\n  tools.\n  - Register maps from C headers, linker scripts or CMSIS-SVD; vector order; SFR coverage of a\n    platform.\n  - Firmware build and HEX images; disassembly.\n  - Renode build, platform check, headless runs with stimuli, reads and UART capture; PC hot spots.\n  - Trace conversion and step-by-step comparison.\n  - Peripheral skeleton generation.\n  - Privacy scan.\n\n  Every tool returns short JSON with `ok`, so the model calls a tool instead of parsing vendor\n  files or logs.\n* **MCU profiles** (`embeddyn/agents/mcu_emu/profiles/`): toolchain, files, image layout and\n  Renode platform per MCU. They cover the dsPIC30F5011, plus an STM32L476 example for SVD-described\n  parts. Add your own in `$MCU_EMU_PROFILES`.\n\n## Install\n\n```bash\nagents/hermes/install.sh\n```\n\nThen merge `agents/hermes/config.example.yaml` into `~/.hermes/config.yaml` and run\n`hermes mcp test mcu_emu`. The kit was checked with Hermes Agent v0.23.2: the server connects and\nits 17 tools are discovered, and the nine skills are listed and enabled.\n\n## Using it\n\nStart with `/mcu-emulation-workflow`, then load the skill of the current phase. Run one phase per\nsession, and end each session with a written status. Details and model advice are in\n`agents/hermes/README.md`.\n\n## Tests\n\n`tests/agents/test_mcu_emu.py` covers:\n- the MCP protocol over stdio;\n- extraction from synthetic header, linker-script and SVD fixtures;\n- HEX images;\n- trace comparison;\n- the privacy scan;\n- skeleton generation.\n\nWith `XC16_BIN`, `RENODE_BIN` and `RENODE_ROOT` set, it also builds the dsPIC30 smoke firmware and\nruns it in Renode.\nEOF\n/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nm = Path(\"mkdocs.yml\"); t = m.read_text()\nt = t.replace(\"      - Emulate a real product end to end: guides/emulate-a-product.md\\n\",\n              \"      - Emulate a real product end to end: guides/emulate-a-product.md\\n      - 'Agent kit: full MCU emulation with Hermes': guides/agent-kit-mcu-emulation.md\\n\")\nm.write_text(t)\ng = Path(\"docs/guides/index.md\"); t = g.read_text()\nt = t.replace(\"| Emulate a real product end to end (`emulate-a-product.md`) |\", \"| Agent kit: full MCU emulation with Hermes (`agent-kit-mcu-emulation.md`) | skills and an MCP server that let a Hermes agent (27B-class model) repeat the full-MCU emulation workflow |\\n| Emulate a real product end to end (`emulate-a-product.md`) |\", 1)\ng.write_text(t)\nEOF\ngrep -n 'agent-kit' mkdocs.yml docs/guides/index.md | head; /media/riko/model_store/embeddyn-venv/bin/python -c \"\nfrom embeddyn.agents.mcu_emu import tools as t\nprint(t.privacy_scan(['agents', 'embeddyn/agents', 'tests/agents', 'docs/guides/agent-kit-mcu-emulation.md'], rules_file='~/.config/embeddyn/chat-redact.tsv'))\"; /media/riko/model_store/embeddyn-venv/bin/python -m pyflakes embeddyn/agents tests/agents 2>/dev/null || /media/riko/model_store/embeddyn-venv/bin/python -m py_compile embeddyn/agents/mcu_emu/*.py && echo compiled",
+ "description": "Add the guide page and nav, scan for private names, check Python"
+}
+````
+
+<details><summary>Result</summary>
+
+```
+docs/guides/index.md:12:| Agent kit: full MCU emulation with Hermes (`agent-kit-mcu-emulation.md`) | skills and an MCP server that let a Hermes agent (27B-class model) repeat the full-MCU emulation workflow |
+mkdocs.yml:125:      - 'Agent kit: full MCU emulation with Hermes': guides/agent-kit-mcu-emulation.md
+{'ok': True, 'files_scanned': 39, 'matches': [], 'match_count': 0}
+compiled
+```
+
+</details>
+
+### Assistant — 2026-11-25 07:07:55
+
+No private names in the 39 new files, and the Python compiles. Removing an unused import, running the repo's docs check, then mirroring everything into the monorepo and confirming both copies match.
+
+**Tool: Bash** — Run the docs check, mirror to the monorepo and list changes
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"embeddyn/agents/mcu_emu/tools.py\"); t = p.read_text()\nt = t.replace(\"import re\\nimport shlex\\nimport shutil\", \"import re\\nimport shutil\")\np.write_text(t)\nEOF\n/media/riko/model_store/embeddyn-venv/bin/python tools/check_docs.py 2>&1 | tail -4\nM=/media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn\nfind agents embeddyn/agents tests/agents -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null\nfor p in agents embeddyn/agents tests/agents; do mkdir -p $M/$p && cp -r $p/. $M/$p/; done\ncp docs/guides/agent-kit-mcu-emulation.md docs/guides/index.md $M/docs/guides/; cp mkdocs.yml $M/mkdocs.yml\nfor p in agents embeddyn/agents tests/agents docs/guides mkdocs.yml; do diff -rq --exclude=__pycache__ $p $M/$p; done && echo identical\nexport GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; git status --short | grep -v '\\.claude/'; git -C /media/riko/model_store/GIT_/codelayer_forge status --short engines/embeddyn",
+ "description": "Run the docs check, mirror to the monorepo and list changes",
+ "timeout": 300000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+- docs/chats/2026-11-25-part2-dspic-core.md: link escapes repository: ../../../renode-merge/renode/tools/dspic30/README.md
+ - docs/chats/2026-11-25-part2-dspic-core.md: missing link target: docs/chats/README.md
+ - docs/chats/2026-11-25-part2-dspic-core.md: missing link target: docs/chats/render_chat.py
+ - docs/chats/2026-11-25-part2-dspic-core.md: missing link target: ../../renode-merge/renode/platforms/cpus/microchip/dspic30f5011.repl
+identical
+ M docs/guides/index.md
+ M docs/project/body-contour-dspic.md
+ M mkdocs.yml
+?? agents/
+?? docs/guides/agent-kit-mcu-emulation.md
+?? embeddyn/agents/
+?? tests/agents/
+ M engines/embeddyn/docs/guides/index.md
+ M engines/embeddyn/docs/project/body-contour-dspic.md
+ M engines/embeddyn/mkdocs.yml
+?? engines/embeddyn/agents/
+?? engines/embeddyn/docs/guides/agent-kit-mcu-emulation.md
+?? engines/embeddyn/embeddyn/agents/
+?? engines/embeddyn/tests/agents/
+```
+
+</details>
+
+**Tool: Bash** — Separate new-page problems from chat-log link problems
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python tools/check_docs.py 2>&1 | grep -v 'docs/chats/' | tail -5; /media/riko/model_store/embeddyn-venv/bin/python tools/check_docs.py 2>&1 | grep -c 'docs/chats/'",
+ "description": "Separate new-page problems from chat-log link problems",
+ "timeout": 300000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Documentation checks failed:
+ - missing required document: docs/README.md
+270
+```
+
+</details>
+
+**Tool: Bash** — Check whether docs/README.md ever existed
+
+```
+{
+ "command": "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; git ls-files docs/README.md; git log --oneline -1 -- docs/README.md; git stash list | head -2; git show HEAD~3:docs/README.md 2>&1 | head -2",
+ "description": "Check whether docs/README.md ever existed"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+b08956b7 embeddyn: MkDocs documentation site with tutorials, theory of operation and fresh figures
+fatal: path 'docs/README.md' does not exist in 'HEAD~3'
+```
+
+</details>
+
+**Tool: Bash** — Neutralise local links in chat logs, re-render and mirror
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"docs/chats/render_chat.py\"); t = p.read_text()\nt = t.replace('''REPLACE: list = []''', '''# Markdown links whose target is not a web URL point at files of the original working tree, which\n# do not exist relative to docs/chats: render them as text plus the target in code.\nLOCAL_LINK = re.compile(r\"\\\\[([^\\\\]\\\\n]+)\\\\]\\\\((?!https?://|mailto:|#)([^)\\\\s]+)\\\\)\")\n\nREPLACE: list = []''')\nt = t.replace('''    for rx, rep in REPLACE:\n        text = rx.sub(rep, text)''', '''    for rx, rep in REPLACE:\n        text = rx.sub(rep, text)\n    text = LOCAL_LINK.sub(lambda m: f\"{m.group(1)} (`{m.group(2)}`)\", text)''')\np.write_text(t)\nEOF\nP=/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn; D=docs/chats; PY=/media/riko/model_store/embeddyn-venv/bin/python; RF=$HOME/.config/embeddyn/chat-redact.tsv\n$PY $D/render_chat.py $P/4c351651-5e11-4302-8626-215b51416902.jsonl $D/2026-11-21-to-25-part1-main.md --title \"embeddyn development chat, part 1 (2026-11-21 to 2026-11-25)\" --redact-file $RF && \\\n$PY $D/render_chat.py $P/d8aa7d0f-b50e-461e-8002-9130aa10629a.jsonl $D/2026-11-25-part2-dspic-core.md --title \"embeddyn development chat, part 2 (2026-11-25): dsPIC30 DSP, Renode integration, peripherals, agent kit\" --redact-file $RF && \\\n$PY $D/render_chat.py $P/0444761b-2a19-464e-af51-e9dde79af500.jsonl $D/2026-11-24-branch-messages.md --title \"embeddyn development chat: messages only in the earlier branch transcript\" --only-not-in $P/4c351651-5e11-4302-8626-215b51416902.jsonl --redact-file $RF\n$PY tools/check_docs.py 2>&1 | grep -c 'docs/chats/'; $PY tools/check_docs.py 2>&1 | grep 'docs/chats/' | head -4\ngrep -c -E '[0-9]{2}-38-00|GIT/private|private-project' $D/*.md\ncp $D/* /media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/chats/ && diff -rq $D /media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/chats && echo mirrored",
+ "description": "Neutralise local links in chat logs, re-render and mirror",
  "timeout": 300000
 }
 ```

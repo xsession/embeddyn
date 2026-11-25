@@ -1,0 +1,45 @@
+{
+  "name": "dspic30f5011",
+  "description": "Microchip dsPIC30F5011 (16-bit DSC): XC16 toolchain, sim30 reference simulator, Renode CPU.dsPIC33 core",
+  "env_defaults": {
+    "XC16_BIN": "/opt/microchip/xc16/v2.10/bin",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${XC16_BIN}/xc16-gcc",
+    "cflags": ["-mcpu=30F5011", "-O1"],
+    "cflags_post": ["-Wl,--script=${XC16_BIN}/../support/dsPIC30F/gld/p30F5011.gld"],
+    "as": "${XC16_BIN}/xc16-as",
+    "asflags": ["-p30F5011"],
+    "ld": "${XC16_BIN}/xc16-ld",
+    "ldflags": ["-p30F5011"],
+    "ldflags_post": ["--script=${XC16_BIN}/../support/dsPIC30F/gld/p30F5011.gld"],
+    "bin2hex": "${XC16_BIN}/xc16-bin2hex",
+    "objdump": "${XC16_BIN}/xc16-objdump",
+    "reference_simulator": "${XC16_BIN}/sim30"
+  },
+  "files": {
+    "header": "${XC16_BIN}/../support/dsPIC30F/h/p30F5011.h",
+    "linker_script": "${XC16_BIN}/../support/dsPIC30F/gld/p30F5011.gld"
+  },
+  "image": {
+    "base": "0x01000000",
+    "phantom_lane": 3,
+    "notes": "program word at ISA address a sits at 0x01000000 + 2a, 4 bytes (24-bit instruction + phantom byte), the byte layout of XC16 HEX files"
+  },
+  "memory": {
+    "data_space": ["0x0000", "0xFFFF"],
+    "sfr": ["0x0000", "0x07FF"],
+    "ram": ["0x0800", "0x17FF"],
+    "cpu_registers": [["0x0000", "0x0054"], ["0x0080", "0x0082"]]
+  },
+  "renode": {
+    "platform": "platforms/cpus/microchip/dspic30f5011.repl",
+    "pc_command": "cpu GetRegister 26",
+    "vector_skip_traps": 8
+  },
+  "reference": {
+    "simulator": "sim30, device dspic30super (its Y RAM starts at 0x3000, the 5011's at 0x1000)",
+    "difftest": "tools/dspic30/difftest.py in the Renode fork"
+  }
+}
