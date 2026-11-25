@@ -1,9 +1,10 @@
 # Design: SPECT body contour on dsPIC30F5011 with iC-Haus light chains
 
-*Status: design, 2026-11-24. The STM32L476 prototype
-(`examples/mechatronics/spect-body-contour.yaml`) already closes the loop with
-real firmware in Renode and MuJoCo beam physics; this page plans the
-product-faithful version.*
+*Status: the dsPIC30F5011 runs in Renode with its peripherals (2026-11-25); the
+iC-NT/iC-ME chain models, the light link and the master/slave scenario are next.
+The STM32L476 prototype (`examples/mechatronics/spect-body-contour.yaml`) already
+closes the loop with real firmware in Renode and MuJoCo beam physics; this page
+plans the product-faithful version.*
 
 The workflow behind this page, phase by phase, is in the guide
 [Emulate a real product end to end](../guides/emulate-a-product.md).
@@ -106,10 +107,9 @@ both dsPICs ◄── CAN hub (dsPIC30 CAN models) ──► External Control CA
   profiles, into the link. The electrical chain behaviour (activation times,
   pulse widths, gain compression, ambient rejection, SHEN gating, the
   CANopen-synchronised start) is then exact to the instruction.
-* **Renode work** (local fork branch `merge-renode-1.17.1`): compile the
-  dsPIC30 peripheral models now parked in `_backup_peripherals`, add a dsPIC30
-  UART, make `dsPIC30_CAN` a CAN-hub node, and add the iC-NT, iC-ME, receiver front end
-  and LightLink models (C#, GPIO-connected).
+* **Renode work** (local fork branch `merge-renode-1.17.1`, see "dsPIC30F5011 in
+  Renode" below): CPU core and peripherals done; still to add the iC-NT, iC-ME,
+  receiver front end and LightLink models (C#, GPIO-connected).
 * **Firmware**: XC16 v2.10 (Linux, Free mode), CANopenNode with a dsPIC30 CAN
   driver; master = sends the start sign and clocks the LED chain with the
   300 kHz burst per pixel, slave = clocks the receiver chain, resets and reads
@@ -119,6 +119,58 @@ both dsPICs ◄── CAN hub (dsPIC30 CAN models) ──► External Control CA
   RC charge of the measurement capacitor while the comparator is high,
   discharge through the reset transistor; the slave's ADC samples the
   capacitor node.
+
+## dsPIC30F5011 in Renode (done)
+
+Everything lives in the local Renode fork (`/media/riko/model_store/renode-merge/renode`,
+branch `merge-renode-1.17.1`, not committed or pushed yet).
+
+**CPU.** `tlib/arch/dspic33/dspic30_core.c` is a complete dsPIC30F/33F instruction-set
+interpreter: every instruction including the DSP engine (MAC class with prefetches and
+accumulator write-back, saturation modes, SFTAC, LAC/SAC), REPEAT, DO, PSV, table
+access, modulo and bit-reversed addressing, traps and interrupt entry. It is checked
+instruction by instruction against Microchip's `sim30` (`tools/dspic30/difftest.py`:
+random tests of every non-DSP form, every DSP form under every CORCON mode, modulo
+addressing, and compiled C); the DSP rules were also checked against the MPLAB X
+simulator model in `open_microchip_tools`. Known `sim30` differences are tabled in
+`tools/dspic30/README.md`. In tlib each instruction is one helper call; translation
+blocks run straight-line code and end at the first non-sequential PC (about 18 MIPS
+on this host for compute-bound code).
+
+**Bus layout.** Data space at 0x0000-0xFFFF (SFRs, RAM from 0x0800); program word at
+ISA address *a* at `0x01000000 + 2a`, four bytes per instruction, which is the byte
+layout of XC16 HEX files. `tools/dspic30/hex2prog.py` turns a HEX file into
+`sysbus LoadBinary` images (flash, EEPROM at ISA 0x7FFC00, configuration words at
+0xF80000).
+
+**Peripherals** (`Peripherals/dsPIC30/*.cs`, platform
+`platforms/cpus/microchip/dspic30f5011.repl`, board
+`platforms/boards/microchip/dspic30f5011-bodycontour.repl` with Fcy = 20 MHz):
+
+| Model | Registers | Notes |
+|---|---|---|
+| `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority + DISI + NSTDIS + ALTIVT |
+| `dsPIC30_SystemControl` | RCON, OSCCON, NVMCON/ADR/ADRU/KEY, PMD1/2 | reset causes, watchdog from FWDT, flash row erase/program and EEPROM word/row/all via table writes |
+| `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode with TMRxHLD, gate, external clock |
+| `dsPIC30_OutputCompare` ×8 | OCxRS, OCxR, OCxCON | single compare, toggle, pulses, PWM with fault; `DutyCycle`, `PwmFrequency` |
+| `dsPIC30_InputCapture` ×8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |
+| `dsPIC30_ADC12` | ADCBUF0-F, ADCON1-3, ADCHS, ADPCFG, ADCSSL | IADC (External Control `adc`), manual/auto/Timer3/INT0 triggers, scan, alternate, BUFM, formats, VCFG |
+| `dsPIC30_UART` ×2 | UxMODE, UxSTA, UxTXREG, UxRXREG, UxBRG | 4-deep RX FIFO, URXISEL, loopback |
+| `dsPIC30_SPI` ×2, `dsPIC30_I2C` | SPIxSTAT/CON/BUF; I2C master | ISPIPeripheral / II2CPeripheral devices |
+| `dsPIC30_CAN` ×2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | ICAN: CAN hub and External Control CAN |
+| `dsPIC30_GPIOPort` ×5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | pin map and CN numbers of the 5011 |
+
+**Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at
+the expected rate, UART output and interrupt-driven echo, ADC conversions, 300 kHz PWM
+at 25 %, toggle compare captured by input capture, a CAN frame from CAN1 to CAN2
+through a hub, I2C NACK, SPI, EEPROM erase/write and flash row erase/program, RCON.
+
+**The real body-contour firmware** (the product's own build, kept outside this repository) runs
+on the board file without illegal opcodes or unmapped accesses; OC6/OC8 come out at
+298.5 kHz (TMR2 period 66 at Fcy 20 MHz, the firmware's 303 kHz). Known issue: its
+Timer2 runs at 300 kHz with the interrupt disabled, and every period is still a timer
+event in Renode, so this firmware runs at about 0.7 MIPS on the host; lazily computed
+period flags will remove that cost.
 
 ## Open questions for the product owner
 
