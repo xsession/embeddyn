@@ -151,7 +151,7 @@ timing, power, pin routing, limits) is `tools/dspic30/PERIPHERALS.md` in the for
 | Model | Registers | Behaviour |
 |---|---|---|
 | `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority, DISI, NSTDIS, ALTIVT, lazily computed flags |
-| `dsPIC30_SystemControl` | RCON, OSCCON, NVM*, PMD1/2 | Fcy from the FOSC fuses (primary/PLL, FRC, LPRC, secondary, POST) and clock switching; Run/Idle/Sleep; reset causes; watchdog from FWDT; flash/EEPROM programming; module disable |
+| `dsPIC30_SystemControl` | RCON, OSCCON, NVM*, PMD1/2 | Fcy from the FOSC fuses (primary/PLL, FRC, LPRC, secondary, POST) and clock switching; Run/Idle/Sleep; reset causes; watchdog from FWDT; flash/EEPROM programming; module disable; supply voltage with brown-out, power-up timer, low-voltage detect and MCLREN; fail-safe clock monitor with the oscillator-fail trap; CodeGuard write protection; DEVID/DEVREV |
 | `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode, gate, external clock, Sleep/Idle; lazy mode while nobody needs per-period events |
 | `dsPIC30_OutputCompare` x8 | OCxRS, OCxR, OCxCON | all compare and PWM modes, fault input, drives RD0-RD7; `DutyCycle`, `PwmFrequency` |
 | `dsPIC30_InputCapture` x8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |
@@ -159,22 +159,25 @@ timing, power, pin routing, limits) is `tools/dspic30/PERIPHERALS.md` in the for
 | `dsPIC30_UART` x2 | UxMODE/STA/TXREG/RXREG/BRG | 4-deep TX buffer and shift register timed at the baud rate, UTXISEL, 4-deep RX FIFO, OERR, loopback, wake on start bit |
 | `dsPIC30_SPI` x2 | SPIxSTAT/CON/BUF | master transfers timed at Fsck, slave mode as an ISPIPeripheral |
 | `dsPIC30_I2C` | I2C master | bus actions timed at Fscl, ACK/NACK, IWCOL, I2COV |
-| `dsPIC30_CAN` x2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | frames timed at the CFG bit rate, priorities, ABAT, double buffering, wake-up; ICAN for a CAN hub |
+| `dsPIC30_CAN` x2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE, EC | frames timed at the CFG bit rate, priorities, ABAT, double buffering, wake-up; error counters, warning/passive/bus-off states and recovery (errors injected: missing ACK, transmit/receive errors); ICAN for a CAN hub |
 | `dsPIC30_DCI` | DCICON1-3, DCISTAT, TSCON/RSCON, buffers | frames and slots, master or external frame sync, loopback, underflow/overflow |
-| `dsPIC30_GPIOPort` x5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | 5011 pin map: CN numbers, pins routed to INTx/ICx/TxCK/SSx/COFS, OC outputs, analog pins, pull-ups |
+| `dsPIC30_GPIOPort` x5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | 5011 pin map: CN numbers, pins routed to INTx/ICx/TxCK/SSx/COFS and the OCFA/OCFB fault inputs, OC outputs, analog pins, pull-ups |
 
 **Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at the
 rate the fuses give, UART output, echo, buffer and character timing, ADC conversions, 25 % PWM,
 toggle compare captured by input capture, a CAN frame from CAN1 to CAN2 through a hub, CAN bit
 rate, I2C NACK and bus timing, SPI timing, EEPROM and flash programming, Sleep and Idle with
 wake-up, module disable, DCI loopback, INT1 and IC1 from one pin, change notification, analog
-pins, clock switch to FRC, watchdog reset.
+pins, clock switch to FRC, watchdog reset; power-up timer, DEVID and FUID, CodeGuard write
+protection, low-voltage detect, OC fault input, fail-safe clock monitor, CAN error states with
+bus-off recovery, brown-out and MCLR resets. Configuration words, FUID and data EEPROM read
+erased (all ones) where the HEX file leaves them out.
 
 **The real body-contour firmware** (the product's own build, kept outside this repository) runs
 on the board file without illegal opcodes or unmapped accesses; Fcy comes out at 20 MHz from its
-fuses, and OC6/OC8 at 298.5 kHz (the firmware's 303 kHz). It runs at about 4.7 MIPS on the
-development host: its receiver-chain clocking toggles port pins in tight loops, and each port
-access is a call from the CPU into C#.
+fuses, and OC6/OC8 at 298.5 kHz (the firmware's 303 kHz). It runs at 1.5 to 4.7 MIPS on the
+development host, depending on host load: its receiver-chain clocking toggles port pins in
+tight loops, and each port access is a call from the CPU into C#.
 
 ## Open questions for the product owner
 
