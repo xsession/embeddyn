@@ -1,0 +1,80 @@
+{
+  "name": "dspic33fj128mc802",
+  "description": "Microchip dsPIC33FJ128MC802 (16-bit DSC, 28-pin, motor control): XC16 toolchain, Renode CPU.dsPIC33 core (dsPIC33F model)",
+  "env_defaults": {
+    "XC16_BIN": "/opt/microchip/xc16/v2.10/bin",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${XC16_BIN}/xc16-gcc",
+    "cflags": [
+      "-mcpu=33FJ128MC802",
+      "-O1"
+    ],
+    "cflags_post": [
+      "-Wl,--script=${XC16_BIN}/../support/dsPIC33F/gld/p33FJ128MC802.gld"
+    ],
+    "as": "${XC16_BIN}/xc16-as",
+    "asflags": [
+      "-p33FJ128MC802"
+    ],
+    "ld": "${XC16_BIN}/xc16-ld",
+    "ldflags": [
+      "-p33FJ128MC802"
+    ],
+    "ldflags_post": [
+      "--script=${XC16_BIN}/../support/dsPIC33F/gld/p33FJ128MC802.gld"
+    ],
+    "bin2hex": "${XC16_BIN}/xc16-bin2hex",
+    "objdump": "${XC16_BIN}/xc16-objdump"
+  },
+  "files": {
+    "header": "${XC16_BIN}/../support/dsPIC33F/h/p33FJ128MC802.h",
+    "linker_script": "${XC16_BIN}/../support/dsPIC33F/gld/p33FJ128MC802.gld"
+  },
+  "image": {
+    "base": "0x01000000",
+    "phantom_lane": 3,
+    "notes": "program word at ISA address a sits at 0x01000000 + 2a, 4 bytes (24-bit instruction + phantom byte), the byte layout of XC16 HEX files"
+  },
+  "memory": {
+    "data_space": [
+      "0x0000",
+      "0xFFFF"
+    ],
+    "sfr": [
+      "0x0000",
+      "0x07FF"
+    ],
+    "ram": [
+      "0x0800",
+      "0x47FF"
+    ],
+    "ydata": [
+      "0x2800",
+      "0x47FF"
+    ],
+    "dma_ram": [
+      "0x4000",
+      "0x47FF"
+    ],
+    "cpu_registers": [
+      [
+        "0x0000",
+        "0x0054"
+      ],
+      [
+        "0x0080",
+        "0x0082"
+      ]
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/microchip/dspic33fj128mc802.repl",
+    "pc_command": "cpu GetRegister 26",
+    "vector_skip_traps": 8
+  },
+  "reference": {
+    "simulator": "none for dsPIC33F in sim30 (dspic30super only); the ISA is the dsPIC30F's (DS70157), verified with sim30; 33F differences are checked with self-checking firmware"
+  }
+}
