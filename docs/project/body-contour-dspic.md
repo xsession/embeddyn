@@ -145,32 +145,36 @@ layout of XC16 HEX files. `tools/dspic30/hex2prog.py` turns a HEX file into
 
 **Peripherals** (`Peripherals/dsPIC30/*.cs`, platform
 `platforms/cpus/microchip/dspic30f5011.repl`, board
-`platforms/boards/microchip/dspic30f5011-bodycontour.repl` with Fcy = 20 MHz):
+`platforms/boards/microchip/dspic30f5011-bodycontour.repl`). The full reference (registers, modes,
+timing, power, pin routing, limits) is `tools/dspic30/PERIPHERALS.md` in the fork.
 
-| Model | Registers | Notes |
+| Model | Registers | Behaviour |
 |---|---|---|
-| `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority + DISI + NSTDIS + ALTIVT |
-| `dsPIC30_SystemControl` | RCON, OSCCON, NVMCON/ADR/ADRU/KEY, PMD1/2 | reset causes, watchdog from FWDT, flash row erase/program and EEPROM word/row/all via table writes |
-| `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode with TMRxHLD, gate, external clock |
-| `dsPIC30_OutputCompare` ×8 | OCxRS, OCxR, OCxCON | single compare, toggle, pulses, PWM with fault; `DutyCycle`, `PwmFrequency` |
-| `dsPIC30_InputCapture` ×8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |
-| `dsPIC30_ADC12` | ADCBUF0-F, ADCON1-3, ADCHS, ADPCFG, ADCSSL | IADC (External Control `adc`), manual/auto/Timer3/INT0 triggers, scan, alternate, BUFM, formats, VCFG |
-| `dsPIC30_UART` ×2 | UxMODE, UxSTA, UxTXREG, UxRXREG, UxBRG | 4-deep RX FIFO, URXISEL, loopback |
-| `dsPIC30_SPI` ×2, `dsPIC30_I2C` | SPIxSTAT/CON/BUF; I2C master | ISPIPeripheral / II2CPeripheral devices |
-| `dsPIC30_CAN` ×2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | ICAN: CAN hub and External Control CAN |
-| `dsPIC30_GPIOPort` ×5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | pin map and CN numbers of the 5011 |
+| `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority, DISI, NSTDIS, ALTIVT, lazily computed flags |
+| `dsPIC30_SystemControl` | RCON, OSCCON, NVM*, PMD1/2 | Fcy from the FOSC fuses (primary/PLL, FRC, LPRC, secondary, POST) and clock switching; Run/Idle/Sleep; reset causes; watchdog from FWDT; flash/EEPROM programming; module disable |
+| `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode, gate, external clock, Sleep/Idle; lazy mode while nobody needs per-period events |
+| `dsPIC30_OutputCompare` x8 | OCxRS, OCxR, OCxCON | all compare and PWM modes, fault input, drives RD0-RD7; `DutyCycle`, `PwmFrequency` |
+| `dsPIC30_InputCapture` x8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |
+| `dsPIC30_ADC12` | ADCBUF0-F, ADCON1-3, ADCHS, ADPCFG, ADCSSL | IADC inputs, manual/INT0/Timer3/auto triggers, TAD timing, ADRC in Sleep, scan, alternate, BUFM, formats, references, analog pins |
+| `dsPIC30_UART` x2 | UxMODE/STA/TXREG/RXREG/BRG | 4-deep TX buffer and shift register timed at the baud rate, UTXISEL, 4-deep RX FIFO, OERR, loopback, wake on start bit |
+| `dsPIC30_SPI` x2 | SPIxSTAT/CON/BUF | master transfers timed at Fsck, slave mode as an ISPIPeripheral |
+| `dsPIC30_I2C` | I2C master | bus actions timed at Fscl, ACK/NACK, IWCOL, I2COV |
+| `dsPIC30_CAN` x2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | frames timed at the CFG bit rate, priorities, ABAT, double buffering, wake-up; ICAN for a CAN hub |
+| `dsPIC30_DCI` | DCICON1-3, DCISTAT, TSCON/RSCON, buffers | frames and slots, master or external frame sync, loopback, underflow/overflow |
+| `dsPIC30_GPIOPort` x5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | 5011 pin map: CN numbers, pins routed to INTx/ICx/TxCK/SSx/COFS, OC outputs, analog pins, pull-ups |
 
-**Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at
-the expected rate, UART output and interrupt-driven echo, ADC conversions, 300 kHz PWM
-at 25 %, toggle compare captured by input capture, a CAN frame from CAN1 to CAN2
-through a hub, I2C NACK, SPI, EEPROM erase/write and flash row erase/program, RCON.
+**Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at the
+rate the fuses give, UART output, echo, buffer and character timing, ADC conversions, 25 % PWM,
+toggle compare captured by input capture, a CAN frame from CAN1 to CAN2 through a hub, CAN bit
+rate, I2C NACK and bus timing, SPI timing, EEPROM and flash programming, Sleep and Idle with
+wake-up, module disable, DCI loopback, INT1 and IC1 from one pin, change notification, analog
+pins, clock switch to FRC, watchdog reset.
 
 **The real body-contour firmware** (the product's own build, kept outside this repository) runs
-on the board file without illegal opcodes or unmapped accesses; OC6/OC8 come out at
-298.5 kHz (TMR2 period 66 at Fcy 20 MHz, the firmware's 303 kHz). Known issue: its
-Timer2 runs at 300 kHz with the interrupt disabled, and every period is still a timer
-event in Renode, so this firmware runs at about 0.7 MIPS on the host; lazily computed
-period flags will remove that cost.
+on the board file without illegal opcodes or unmapped accesses; Fcy comes out at 20 MHz from its
+fuses, and OC6/OC8 at 298.5 kHz (the firmware's 303 kHz). It runs at about 4.7 MIPS on the
+development host: its receiver-chain clocking toggles port pins in tight loops, and each port
+access is a call from the CPU into C#.
 
 ## Open questions for the product owner
 

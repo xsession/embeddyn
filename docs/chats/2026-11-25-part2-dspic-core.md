@@ -9615,3 +9615,1063 @@ Exit code 1
 }
 ```
 
+<details><summary>Result</summary>
+
+```
+/media/riko/model_store/GIT_/embeddyn/docs/chats/README.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/2026-11-24-branch-messages.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/2026-11-25-part2-dspic-core.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/2026-11-21-to-25-part1-main.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/README.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/2026-11-24-branch-messages.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/2026-11-25-part2-dspic-core.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/chats/2026-11-21-to-25-part1-main.md:0
+571b48c39dcc5dcf997ed17600de83169e8114e9
+571b48c39dcc5dcf997ed17600de83169e8114e9
+379898d2 docs: development chats and the dsPIC30F5011 Renode status
+e63976b1 docs: development chats and the dsPIC30F5011 Renode status
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 3 of 7 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Bash** — Read the FOSC configuration encodings
+
+```
+{
+ "command": "H=/media/riko/model_store/Microchip/xc16-linux/v2.10/support/dsPIC30F/h/p30F5011.h; grep -n -E '#define (FRC|XT|HS|EC|ECIO|LP|FRC_|ERC|ERCIO|PRI|FRC_PLL|XTL)[A-Z0-9_]* +0x' $H | head -40; grep -n -B2 -A40 'FOSC' $H | grep -E 'define|Oscillator' | head -50",
+ "description": "Read the FOSC configuration encodings"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+21733:#define XTL                  0xC300
+21734:#define FRC_PLL4             0xC301
+21735:#define HS                   0xC302
+21736:#define FRC_PLL16            0xC303
+21737:#define XT                   0xC304
+21738:#define XT_PLL4              0xC305
+21739:#define XT_PLL8              0xC306
+21740:#define XT_PLL16             0xC307
+21741:#define ERCIO                0xC308
+21742:#define ERC                  0xC309
+21743:#define FRC_PLL8             0xC30A
+21744:#define EC                   0xC30B
+21745:#define ECIO                 0xC30C
+21746:#define ECIO_PLL4            0xC30D
+21747:#define EC_PLL4              0xC30D
+21748:#define ECIO_PLL8            0xC30E
+21749:#define EC_PLL8              0xC30E
+21750:#define ECIO_PLL16           0xC30F
+21751:#define EC_PLL16             0xC30F
+21753:#define LPOSC                0xC00F
+21754:#define LP                   0xC00F
+21755:#define FRC                  0xC10F
+21756:#define LPRC                 0xC20F
+21757:#define PRI                  0xC30F
+21687:#define _FOSC(x) __attribute__((address(0xf80000),deprecated_definition("consider migrating to #pragma config"),section("__FOSC.sec"),space(prog))) __prog__ uint16_t _FOSC = (x);
+21698-**   Primary Oscillator Mode:
+21719-**   Oscillator Source:
+21724-**     PRI                  Primary Oscillator
+21733-#define XTL                  0xC300
+21734-#define FRC_PLL4             0xC301
+21735-#define HS                   0xC302
+21736-#define FRC_PLL16            0xC303
+22111-#define __FUID3_LENGTH 0x2
+22113:#define __FOSC_BASE 0xf80000
+22114:#define __FOSC_LENGTH 0x2
+22116-#define __FWDT_BASE 0xf80002
+22117-#define __FWDT_LENGTH 0x2
+22119-#define __FBORPOR_BASE 0xf80004
+22120-#define __FBORPOR_LENGTH 0x2
+22122-#define __FBS_BASE 0xf80006
+22123-#define __FBS_LENGTH 0x2
+22125-#define __FSS_BASE 0xf80008
+22126-#define __FSS_LENGTH 0x2
+22128-#define __FGS_BASE 0xf8000a
+22129-#define __FGS_LENGTH 0x2
+22131-#define __FICD_BASE 0xf8000c
+22132-#define __FICD_LENGTH 0x2
+22134-#define __DEVID_BASE 0xff0000
+22135-#define __DEVID_LENGTH 0x4
+22137-#define __SFRS_BASE 0x0
+22138-#define __SFRS_LENGTH 0x800
+22140-#define __DATA_BASE 0x800
+22141-#define __DATA_LENGTH 0x1000
+22143-#define __YDATA_BASE 0x1000
+22144-#define __YDATA_LENGTH 0x1000
+22145-#define __SFRS_BASE 0x0
+22146-#define __SFRS_LENGTH 0x800
+22148-#define __DATA_BASE 0x800
+22149-#define __DATA_LENGTH 0x1000
+22151-#define __YDATA_BASE 0x1000
+22152-#define __YDATA_LENGTH 0x1000
+22153-#define __SFRS_BASE 0x0
+22154-#define __SFRS_LENGTH 0x800
+```
+
+</details>
+
+**Tool: Bash** — Rewrite the timers with lazy flags, system clock and power gating
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; cat > $P/dsPIC30_Timers.cs <<'EOF'\n//\n// Copyright (c) 2026 embeddyn contributors\n// This file is licensed under the MIT License.\n//\nusing System;\nusing System.Collections.Generic;\n\nusing Antmicro.Renode.Core;\nusing Antmicro.Renode.Logging;\nusing Antmicro.Renode.Peripherals.Timers;\nusing Antmicro.Renode.Time;\n\nnamespace Antmicro.Renode.Peripherals.dsPIC30\n{\n    /// <summary>\n    /// One up-counting dsPIC timer: TMR counts at clock / prescale and resets after TMR == PR.\n    ///\n    /// Eager mode raises <see cref=\"PeriodMatch\"/> every period. Lazy mode (nobody needs the event:\n    /// interrupt disabled, no output compare or ADC trigger) lets the underlying timer run over many\n    /// periods per event and derives TMR and the number of period matches from its count, so a\n    /// 300 kHz timer costs nothing while its flag is only polled.\n    /// </summary>\n    internal class dsPIC30_TimerUnit\n    {\n        public dsPIC30_TimerUnit(IMachine machine, IPeripheral owner, string name, ulong frequency)\n        {\n            timer = new LimitTimer(machine.ClockSource, Math.Max(1, frequency), owner, name, limit: 0x10000, direction: Direction.Ascending,\n                workMode: WorkMode.Periodic, eventEnabled: true);\n            timer.LimitReached += OnLimit;\n            this.frequency = frequency;\n        }\n\n        public event Action PeriodMatch;\n\n        /// <summary>Apply control: on, prescale, counting clock (Hz), PR.</summary>\n        public void Configure(bool on, int prescale, ulong clock, ulong pr, ulong range = 0x10000)\n        {\n            var value = Value;\n            var matches = Matches;\n            if(clock == 0)\n            {\n                on = false;\n                clock = 1;\n            }\n            period = Math.Max(1, Math.Min(pr + 1, range));\n            timer.Enabled = false;\n            timer.Frequency = clock;\n            timer.Divider = (ulong)Math.Max(1, prescale);\n            this.on = on;\n            Rebase(value, matches);\n        }\n\n        /// <summary>Gate (TGATE pin low) or freeze (Sleep/Idle): stop counting, keep the count.</summary>\n        public void Hold(bool gated, bool frozen)\n        {\n            if(this.gated == gated && this.frozen == frozen)\n            {\n                return;\n            }\n            var value = Value;\n            var matches = Matches;\n            this.gated = gated;\n            this.frozen = frozen;\n            Rebase(value, matches);\n        }\n\n        public bool Eager\n        {\n            get => eager;\n            set\n            {\n                if(eager == value)\n                {\n                    return;\n                }\n                var v = Value;\n                var m = Matches;\n                eager = value;\n                Rebase(v, m);\n            }\n        }\n\n        public ulong Value\n        {\n            get => timer.Value % period;\n            set\n            {\n                var m = Matches;\n                Rebase(value < period ? value : 0, m);\n            }\n        }\n\n        /// <summary>Period matches since the timer was created (monotonic).</summary>\n        public ulong Matches => baseMatches + laps * lapLength + timer.Value / period;\n\n        public bool Running => on && !gated && !frozen;\n        public ulong Period => period;\n        public double TickFrequency => (double)timer.Frequency / timer.Divider;\n\n        public void Reset()\n        {\n            timer.Enabled = false;\n            timer.Frequency = Math.Max(1, frequency);\n            timer.Divider = 1;\n            on = gated = frozen = false;\n            eager = false;\n            period = 0x10000;\n            laps = 0;\n            baseMatches = 0;\n            Rebase(0, 0);\n        }\n\n        private void Rebase(ulong value, ulong matches)\n        {\n            timer.Enabled = false;\n            // lazy: one event per lapLength periods (about a quarter of a second)\n            lapLength = eager ? 1 : (ulong)Math.Max(1, Math.Min(1UL << 20, TickFrequency * 0.25 / period));\n            laps = 0;\n            baseMatches = matches;\n            timer.Limit = period * lapLength;\n            timer.Value = value;\n            timer.Enabled = Running;\n        }\n\n        private void OnLimit()\n        {\n            if(eager)\n            {\n                baseMatches++;\n                PeriodMatch?.Invoke();\n            }\n            else\n            {\n                laps++;\n            }\n        }\n\n        private bool on, gated, frozen, eager;\n        private ulong period = 0x10000, lapLength = 1, laps, baseMatches;\n        private readonly ulong frequency;\n        private readonly LimitTimer timer;\n    }\n\n    /// <summary>Common base of the timers: clock from <see cref=\"dsPIC30_SystemControl\"/>, lazy flags, power gating.</summary>\n    public abstract class dsPIC30_TimerBase : dsPIC30_Sfr\n    {\n        protected dsPIC30_TimerBase(IMachine machine, long size, dsPIC30_SystemControl system, ulong frequency,\n            dsPIC30_InterruptController intc) : base(machine, size)\n        {\n            this.system = system;\n            this.intc = intc;\n            fallbackFrequency = frequency;\n            if(system != null)\n            {\n                system.ClockChanged += _ => Apply();\n                system.PowerChanged += _ => Apply();\n            }\n        }\n\n        protected ulong Fcy => system?.CpuFrequency ?? fallbackFrequency;\n\n        protected bool Frozen(ushort tcon, bool externalClock)\n        {\n            var state = system?.PowerState ?? dsPIC30_PowerState.Run;\n            return (state == dsPIC30_PowerState.Sleep && !externalClock) || (state == dsPIC30_PowerState.Idle && Bit(tcon, 13));\n        }\n\n        /// <summary>Register `unit`'s period flag as interrupt source `source` of the controller (lazy when disabled).</summary>\n        internal void Lazy(dsPIC30_TimerUnit unit, int source, Func<bool> flagSuppressed)\n        {\n            if(intc == null || source < 0)\n            {\n                unit.Eager = true;\n                return;\n            }\n            var lastMatches = 0UL;\n            interruptEnabled[unit] = false;\n            intc.RegisterLazySource(source,\n                poll: () =>\n                {\n                    var m = unit.Matches;\n                    if(m != lastMatches)\n                    {\n                        lastMatches = m;\n                        if(!flagSuppressed())\n                        {\n                            intc.SetFlag(source);\n                        }\n                    }\n                },\n                enableChanged: enabled =>\n                {\n                    lastMatches = unit.Matches;\n                    interruptEnabled[unit] = enabled;\n                    UpdateEager(unit);\n                });\n            unit.PeriodMatch += () => lastMatches = unit.Matches;\n        }\n\n        internal void UpdateEager(dsPIC30_TimerUnit unit)\n        {\n            interruptEnabled.TryGetValue(unit, out var irq);\n            subscribers.TryGetValue(unit, out var users);\n            unit.Eager = intc == null || irq || (users != null && users.Count > 0);\n        }\n\n        internal void Require(dsPIC30_TimerUnit unit, object owner, bool need)\n        {\n            if(!subscribers.TryGetValue(unit, out var users))\n            {\n                subscribers[unit] = users = new HashSet<object>();\n            }\n            if(need)\n            {\n                users.Add(owner);\n            }\n            else\n            {\n                users.Remove(owner);\n            }\n            UpdateEager(unit);\n        }\n\n        protected abstract void Apply();\n\n        internal static int Prescale(usho
+… [12884 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:10:18
+
+I left one wrong line in the timer pair (a stray `Lazy(...)` call that would force eager mode); removing it. Then adding the lazy-source hooks to the interrupt controller.
+
+**Tool: Bash** — Add lazy-source support to the interrupt controller
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\nt = (P / \"dsPIC30_Timers.cs\").read_text()\nt = t.replace(\"\"\"                // 32-bit mode: unit 0 counts and its flag is the type C source\n                Lazy(units[0], -2, () => true);\n\"\"\", \"\")\n(P / \"dsPIC30_Timers.cs\").write_text(t)\ni = (P / \"dsPIC30_InterruptController.cs\").read_text()\ni = i.replace(\"\"\"        public int Priority(int source) => (ipc[source / 4] >> (4 * (source % 4))) & 7;\"\"\", \"\"\"        public int Priority(int source) => (ipc[source / 4] >> (4 * (source % 4))) & 7;\n\n        public bool IsEnabled(int source) => (iec[source / 16] & (1 << (source % 16))) != 0;\n\n        /// <summary>\n        /// A source whose flag is computed on demand (timers while their interrupt is disabled):\n        /// <paramref name=\"poll\"/> runs before IFS/INTTREG reads and may call <see cref=\"SetFlag\"/>;\n        /// <paramref name=\"enableChanged\"/> reports IEC changes of the source.\n        /// </summary>\n        public void RegisterLazySource(int source, Action poll, Action<bool> enableChanged)\n        {\n            lazy.Add(Tuple.Create(source, poll, enableChanged));\n            enableChanged(IsEnabled(source));\n        }\n\n        private void PollLazy()\n        {\n            foreach(var l in lazy)\n            {\n                l.Item2();\n            }\n        }\"\"\")\ni = i.replace(\"\"\"            switch(offset)\n            {\n            case 0x00: return (ushort)((intcon2 & 0x801F)\"\"\", \"\"\"            if((offset >= 0x02 && offset <= 0x06) || offset == 0x2E)\n            {\n                PollLazy();\n            }\n            switch(offset)\n            {\n            case 0x00: return (ushort)((intcon2 & 0x801F)\"\"\")\ni = i.replace(\"\"\"            case 0x0A: case 0x0C: case 0x0E: iec[(offset - 0x0A) / 2] = Merge(iec[(offset - 0x0A) / 2], value, mask); break;\"\"\", \"\"\"            case 0x0A: case 0x0C: case 0x0E:\n            {\n                var r = (int)(offset - 0x0A) / 2;\n                var old = iec[r];\n                iec[r] = Merge(old, value, mask);\n                var changed = old ^ iec[r];\n                if(changed != 0)\n                {\n                    foreach(var l in lazy)\n                    {\n                        if(l.Item1 / 16 == r && (changed & (1 << (l.Item1 % 16))) != 0)\n                        {\n                            if(IsEnabled(l.Item1))\n                            {\n                                l.Item2();          // catch up the flag before switching to events\n                            }\n                            l.Item3(IsEnabled(l.Item1));\n                        }\n                    }\n                }\n                break;\n            }\"\"\")\ni = i.replace(\"\"\"            Array.Clear(sourceState, 0, sourceState.Length);\n            Update();\n        }\"\"\", \"\"\"            Array.Clear(sourceState, 0, sourceState.Length);\n            foreach(var l in lazy)\n            {\n                l.Item3(false);\n            }\n            Update();\n        }\"\"\")\ni = i.replace(\"\"\"        private ushort intcon2, inttreg;\"\"\", \"\"\"        private readonly List<Tuple<int, Action, Action<bool>>> lazy = new List<Tuple<int, Action, Action<bool>>>();\n        private ushort intcon2, inttreg;\"\"\")\n(P / \"dsPIC30_InterruptController.cs\").write_text(i)\nEOF\ngrep -n 'lazy' $P/dsPIC30_InterruptController.cs | head",
+ "description": "Add lazy-source support to the interrupt controller"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+44:            foreach(var l in lazy)
+98:            lazy.Add(Tuple.Create(source, poll, enableChanged));
+104:            foreach(var l in lazy)
+148:                    foreach(var l in lazy)
+195:        private readonly List<Tuple<int, Action, Action<bool>>> lazy = new List<Tuple<int, Action, Action<bool>>>();
+```
+
+</details>
+
+**Tool: Bash** — Look at how CPU speed is represented
+
+```
+{
+ "command": "cd /media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/CPU; sed -n 295,330p BaseCPU.cs; grep -n 'performanceInMips\\|PerformanceInMips' BaseCPU.cs TranslationCPU.cs | head -20",
+ "description": "Look at how CPU speed is represented"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+public override bool HasAnyHaltingCondition => base.HasAnyHaltingCondition || !Clocked || HaltedByDebugger;
+
+        public bool OnPossessedThread
+        {
+            get
+            {
+                var cpuThreadLocal = cpuThread;
+                return cpuThreadLocal != null && Thread.CurrentThread.ManagedThreadId == cpuThreadLocal.ManagedThreadId;
+            }
+        }
+
+        public uint PerformanceInMips
+        {
+            get => performanceInMips.Value;
+            set => performanceInMips.Value = value;
+        }
+
+        public virtual ulong SkipInstructions
+        {
+            get => skipInstructions;
+            protected set => skipInstructions = value;
+        }
+
+        public string Model { get; }
+
+        public ulong ElapsedCycles { get; private set; }
+
+        public IEnumerable<BaseCPU> Clustered { get; }
+
+        public IEnumerable<ICluster<BaseCPU>> Clusters { get; } = new List<ICluster<BaseCPU>>(0);
+
+        public IBusController Bus => machine.SystemBus;
+
+        public Endianess Endianness { get; }
+
+        public CpuBitness Bitness => bitness;
+BaseCPU.cs:61:            var instructions = amountOfTime.ToCPUCycles(PerformanceInMips, out var residuum);
+BaseCPU.cs:65:                // instructions += ceil(residuum / TicksPerMicrosecond) * PerformanceInMips
+BaseCPU.cs:67:                instructions += PerformanceInMips;
+BaseCPU.cs:68:                var newInterval = TimeInterval.FromCPUCycles(instructions, PerformanceInMips, out var _);
+BaseCPU.cs:306:        public uint PerformanceInMips
+BaseCPU.cs:308:            get => performanceInMips.Value;
+BaseCPU.cs:309:            set => performanceInMips.Value = value;
+BaseCPU.cs:384:            PerformanceInMips = 100;
+BaseCPU.cs:584:                var intervalToReport = TimeInterval.FromCPUCycles(cycles, PerformanceInMips, out executedResiduum);
+BaseCPU.cs:808:            using(performanceInMips.Seal())
+BaseCPU.cs:816:                var instructionsToExecuteThisRound = interval.ToCPUCycles(PerformanceInMips, out ulong ticksResiduum);
+BaseCPU.cs:882:                                var intervalToSleep = TimeInterval.FromCPUCycles(instructionsToSkip, PerformanceInMips, out var cyclesResiduum).WithTicksMin(virtualTimeAhead.Ticks);
+BaseCPU.cs:886:                                instructionsToSkip = Math.Max(TimeInterval.FromTimeSpan(intervalSlept, nsResiduum).ToCPUCycles(PerformanceInMips, out var _) + cyclesResiduum, 1);
+BaseCPU.cs:949:                    var timeLeft = TimeInterval.FromCPUCycles(instructionsLeft + executedResiduum, PerformanceInMips, out var residuum) + TimeInterval.FromMicroseconds(ticksResiduum);
+BaseCPU.cs:1006:            var instructionsToNearestLimit = nearestLimitIn.ToCPUCycles(PerformanceInMips, out var unused);
+BaseCPU.cs:1109:        private readonly SealableValue<uint> performanceInMips = new SealableValue<uint>();
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Add the clock model, power states and the tlib wake callback
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ns = (P / \"dsPIC30_SystemControl.cs\").read_text()\ns = s.replace(\"\"\"namespace Antmicro.Renode.Peripherals.dsPIC30\n{\n    /// <summary>\"\"\", \"\"\"namespace Antmicro.Renode.Peripherals.dsPIC30\n{\n    public enum dsPIC30_PowerState\n    {\n        Run,\n        Idle,\n        Sleep,\n    }\n\n    /// <summary>\"\"\", 1)\ns = s.replace(\"\"\"    /// dsPIC30F system control at 0x0740: RCON, OSCCON, the NVM controller (NVMCON, NVMADR,\n    /// NVMADRU, NVMKEY at +0x20) and PMD1/PMD2 (+0x30), plus the watchdog timer.\n\"\"\", \"\"\"    /// dsPIC30F system control at 0x0740: RCON, OSCCON, the NVM controller (NVMCON, NVMADR,\n    /// NVMADRU, NVMKEY at +0x20) and PMD1/PMD2 (+0x30), plus the watchdog timer, the clock and the\n    /// power state.\n    ///\n    /// Clock: Fcy = Fosc / POST / 4. Fosc follows the FOSC configuration word when the machine\n    /// starts: FOS selects primary (FPR: XT/HS/EC/ERC from <c>oscillatorFrequency</c>, with PLL x4/x8/x16;\n    /// FRC with PLL), FRC 7.37 MHz, LPRC 512 kHz or the 32.768 kHz secondary oscillator. OSCCON.NOSC +\n    /// OSWEN switch the source when FCKSM allows it; POST divides. <c>cpuFrequency</c> > 0 fixes Fcy\n    /// instead. Peripherals given <c>system</c> follow <see cref=\"ClockChanged\"/>; the CPU runs at\n    /// Fcy rounded to whole MIPS (Renode's CPU rate is an integer).\n    ///\n    /// Power: PWRSAV #1 enters Idle, #0 Sleep (<see cref=\"PowerState\"/>, RCON.IDLE/SLEEP); the first\n    /// instruction or interrupt after wake-up returns to Run.\n\"\"\", 1)\ns = s.replace(\"\"\"        public dsPIC30_SystemControl(IMachine machine, dsPIC33 cpu, ulong cpuFrequency = 30000000,\n            ulong eepromBase = 0x7FFC00, ulong configBase = 0xF80000, double eepromWriteTime = 0.002) : base(machine, 0x34)\n        {\n            this.cpu = cpu;\n            this.eepromBase = eepromBase;\n            this.configBase = configBase;\n            CpuFrequency = cpuFrequency;\n            cpu.PerformanceInMips = (uint)Math.Max(1, cpuFrequency / 1000000);\"\"\", \"\"\"        public dsPIC30_SystemControl(IMachine machine, dsPIC33 cpu, ulong cpuFrequency = 0, ulong oscillatorFrequency = 7372800,\n            ulong secondaryFrequency = 32768, ulong eepromBase = 0x7FFC00, ulong configBase = 0xF80000, double eepromWriteTime = 0.002) : base(machine, 0x34)\n        {\n            this.cpu = cpu;\n            this.eepromBase = eepromBase;\n            this.configBase = configBase;\n            fixedFcy = cpuFrequency;\n            primary = oscillatorFrequency;\n            secondary = secondaryFrequency;\n            SetFcy(cpuFrequency > 0 ? cpuFrequency : oscillatorFrequency / 4);\"\"\", 1)\ns = s.replace(\"\"\"            cpu.PowerSave += sleep => rcon |= (ushort)(sleep ? RconSleep : RconIdle);\"\"\", \"\"\"            cpu.PowerSave += sleep =>\n            {\n                rcon |= (ushort)(sleep ? RconSleep : RconIdle);\n                SetPower(sleep ? dsPIC30_PowerState.Sleep : dsPIC30_PowerState.Idle);\n            };\n            cpu.Woken += () => SetPower(dsPIC30_PowerState.Run);\"\"\", 1)\ns = s.replace(\"\"\"                    started = true;\n                    ConfigureWatchdog();\"\"\", \"\"\"                    started = true;\n                    ConfigureClock();\n                    ConfigureWatchdog();\"\"\", 1)\ns = s.replace(\"\"\"        /// <summary>Instruction clock Fcy in Hz.</summary>\n        public ulong CpuFrequency { get; }\"\"\", \"\"\"        /// <summary>Instruction clock Fcy in Hz.</summary>\n        public ulong CpuFrequency { get; private set; }\n\n        /// <summary>Oscillator frequency Fosc (before POST and the /4) in Hz.</summary>\n        public ulong OscillatorFrequency { get; private set; }\n\n        public dsPIC30_PowerState PowerState { get; private set; }\n\n        public event Action<ulong> ClockChanged;\n        public event Action<dsPIC30_PowerState> PowerChanged;\n\n        /// <summary>MCLR: external reset (RCON.EXTR).</summary>\n        public void ExternalReset()\n        {\n            pendingResetFlags = RconExtr;\n            machine.RequestReset();\n        }\"\"\", 1)\ns = s.replace(\"\"\"            osccon = 0x3020;\"\"\", \"\"\"            SetPower(dsPIC30_PowerState.Run);\n            osccon = (ushort)(((fosc >> 8 & 3) << 12) | ((fosc >> 8 & 3) << 8) | 0x0020);\n            if(started)\n            {\n                ConfigureClock();\n            }\"\"\", 1)\ns = s.replace(\"\"\"            case 0x02:\n                osccon = (ushort)((Merge(osccon, value, mask) & ~1) | 0x0020);   // OSWEN completes at once, PLL locked\n                break;\"\"\", \"\"\"            case 0x02:\n            {\n                // COSC read-only; OSWEN starts a switch to NOSC (if FCKSM allows), done at once; PLL locked\n                var v = Merge(osccon, value, mask);\n                var nosc = (v >> 8) & 3;\n                var cosc = (osccon >> 12) & 3;\n                if((v & 1) != 0 && ((fosc >> 14) & 3) < 2)\n                {\n                    cosc = nosc;\n                }\n                osccon = (ushort)((v & 0x0FCA & ~1) | (cosc << 12) | 0x0020);\n                ConfigureClock();\n                break;\n            }\"\"\", 1)\ns = s.replace(\"\"\"        private void OnResetRequested(int reason)\"\"\", \"\"\"        private void ConfigureClock()\n        {\n            if(started)\n            {\n                fosc = ReadConfig(0);\n            }\n            if(fixedFcy > 0)\n            {\n                OscillatorFrequency = fixedFcy * 4;\n                SetFcy(fixedFcy);\n                return;\n            }\n            var source = (osccon >> 12) & 3;\n            ulong f;\n            switch(source)\n            {\n            case 0: f = secondary; break;\n            case 1: f = Frc; break;\n            case 2: f = Lprc; break;\n            default:\n            {\n                var fpr = fosc & 0xF;\n                var pll = new ulong[] { 1, 4, 1, 16, 1, 4, 8, 16, 1, 1, 8, 1, 1, 4, 8, 16 }[fpr];\n                var frc = fpr == 1 || fpr == 3 || fpr == 0xA;\n                f = (frc ? Frc : primary) * pll;\n                break;\n            }\n            }\n            var post = new ulong[] { 1, 4, 16, 64 }[(osccon >> 6) & 3];\n            OscillatorFrequency = f;\n            SetFcy(f / post / 4);\n        }\n\n        private void SetFcy(ulong fcy)\n        {\n            fcy = Math.Max(1, fcy);\n            var changed = fcy != CpuFrequency;\n            CpuFrequency = fcy;\n            var mips = (uint)Math.Max(1, Math.Round(fcy / 1e6));\n            if(cpu.PerformanceInMips != mips)\n            {\n                cpu.PerformanceInMips = mips;\n            }\n            if(changed)\n            {\n                if(fcy % 1000000 != 0)\n                {\n                    this.Log(LogLevel.Info, \"Fcy {0} Hz; the CPU runs at {1} MIPS (Renode rates are whole MIPS), peripherals at Fcy\", fcy, mips);\n                }\n                ClockChanged?.Invoke(fcy);\n            }\n        }\n\n        private void SetPower(dsPIC30_PowerState state)\n        {\n            if(PowerState == state)\n            {\n                return;\n            }\n            PowerState = state;\n            PowerChanged?.Invoke(state);\n        }\n\n        private void OnResetRequested(int reason)\"\"\", 1)\ns = s.replace(\"\"\"        private int unlock;\"\"\", \"\"\"        private int unlock;\n        private ushort fosc = 0xC30F;\n        private readonly ulong fixedFcy, primary, secondary;\n        private const ulong Frc = 7370000, Lprc = 512000;\"\"\", 1)\ns = s.replace(\"\"\"           
+… [3720 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/helper.c:23:    env->power_save = 0;
+/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/op_helper.c:70:    if(env->power_save) {
+/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/op_helper.c:71:        env->power_save = 0;
+/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/op_helper.c:101:        env->power_save = 1;
+/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/op_helper.c:160:            if(env->power_save) {
+/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Cores/tlib/arch/dspic33/op_helper.c:161:                env->power_save = 0;
+```
+
+</details>
+
+**Tool: Bash** — Rewrite the UART with timed transmission and power behaviour
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; cat > $P/dsPIC30_UART.cs <<'EOF'\n//\n// Copyright (c) 2026 embeddyn contributors\n// This file is licensed under the MIT License.\n//\nusing System;\nusing System.Collections.Generic;\n\nusing Antmicro.Renode.Core;\nusing Antmicro.Renode.Logging;\nusing Antmicro.Renode.Peripherals.Bus;\nusing Antmicro.Renode.Peripherals.Timers;\nusing Antmicro.Renode.Peripherals.UART;\nusing Antmicro.Renode.Time;\n\nnamespace Antmicro.Renode.Peripherals.dsPIC30\n{\n    /// <summary>\n    /// dsPIC30F UART: UxMODE, UxSTA, UxTXREG, UxRXREG, UxBRG (U1 at 0x020C, U2 at 0x0216).\n    ///\n    /// Transmit: a 4-character buffer (UTXBF when full) feeds the shift register; each character\n    /// takes its frame time at the baud rate Fcy / (16 (BRG + 1)) (start, 8 or 9 data bits, parity,\n    /// 1 or 2 stop bits per PDSEL/STSEL), TRMT is set when the shift register and buffer are empty.\n    /// UTXISEL 0: interrupt each time a character moves into the shift register; 1: when that\n    /// empties the buffer. Setting UTXEN raises the interrupt (buffer empty). <c>instantTransmit</c>\n    /// sends at once instead.\n    /// Receive: 4-character FIFO, URXISEL 0x/10/11 = every character / 3 / 4 characters, OERR on\n    /// overflow (cleared by software, which also resumes reception), LPBACK. In Sleep the UART stops;\n    /// with WAKE a received start bit raises the receive interrupt (wake-up). USIDL stops it in Idle.\n    /// Renode characters are 8-bit: in 9-bit mode bit 8 reads 0 and ADDEN accepts nothing.\n    /// IRQ outputs: RxIRQ, TxIRQ.\n    /// </summary>\n    public class dsPIC30_UART : UARTBase, IWordPeripheral, IBytePeripheral, IKnownSize\n    {\n        public dsPIC30_UART(IMachine machine, dsPIC30_SystemControl system = null, ulong frequency = 30000000, bool instantTransmit = false) : base(machine)\n        {\n            this.system = system;\n            this.frequency = frequency;\n            this.instantTransmit = instantTransmit;\n            RxIRQ = new GPIO();\n            TxIRQ = new GPIO();\n            shifter = new LimitTimer(machine.ClockSource, 1000000000, this, \"uart-tx\", limit: 1, direction: Direction.Ascending,\n                workMode: WorkMode.OneShot, eventEnabled: true);\n            shifter.LimitReached += CharacterSent;\n            Reset();\n        }\n\n        public GPIO RxIRQ { get; }\n        public GPIO TxIRQ { get; }\n        public long Size => 0x0A;\n\n        public override Bits StopBits => (mode & 1) != 0 ? Bits.Two : Bits.One;\n\n        public override Parity ParityBit\n        {\n            get\n            {\n                switch((mode >> 1) & 3)\n                {\n                case 1: return Parity.Even;\n                case 2: return Parity.Odd;\n                default: return Parity.None;\n                }\n            }\n        }\n\n        public override uint BaudRate => (uint)(Fcy / (16UL * (brg + 1UL)));\n\n        public override void Reset()\n        {\n            base.Reset();\n            mode = 0;\n            sta = 0x0110;\n            brg = 0;\n            rx.Clear();\n            tx.Clear();\n            shifting = false;\n            shifter.Enabled = false;\n            RxIRQ.Unset();\n            TxIRQ.Unset();\n        }\n\n        public ushort ReadWord(long offset) => Read(offset & ~1L);\n        public void WriteWord(long offset, ushort value) => Write(offset & ~1L, value, 0xFFFF);\n        public byte ReadByte(long offset) => (byte)(Read(offset & ~1L) >> (int)(8 * (offset & 1)));\n        public void WriteByte(long offset, byte value)\n        {\n            var shift = (int)(8 * (offset & 1));\n            Write(offset & ~1L, (ushort)(value << shift), (ushort)(0xFF << shift));\n        }\n\n        protected override bool IsReceiveEnabled => Enabled;\n\n        protected override void CharWritten()\n        {\n            while(TryGetCharacter(out var c))\n            {\n                Receive(c);\n            }\n        }\n\n        protected override void QueueEmptied()\n        {\n        }\n\n        private bool Enabled => (mode & 0x8000) != 0;\n        private ulong Fcy => system?.CpuFrequency ?? frequency;\n        private dsPIC30_PowerState Power => system?.PowerState ?? dsPIC30_PowerState.Run;\n        private bool Stopped => Power == dsPIC30_PowerState.Sleep || (Power == dsPIC30_PowerState.Idle && (mode & 0x2000) != 0);\n\n        private void Receive(byte c)\n        {\n            if(Stopped)\n            {\n                if((mode & 0x0080) != 0 && Power == dsPIC30_PowerState.Sleep)\n                {\n                    mode &= unchecked((ushort)~0x0080);   // WAKE clears on the wake-up\n                    RxIRQ.Blink();\n                }\n                return;\n            }\n            if(((mode >> 1) & 3) == 3 && (sta & 0x0020) != 0)\n            {\n                return;                // ADDEN: no address bit on 8-bit characters\n            }\n            if((sta & 0x0002) != 0)\n            {\n                return;                // OERR stops reception until cleared\n            }\n            if(rx.Count >= 4)\n            {\n                sta |= 0x0002;\n                return;\n            }\n            rx.Enqueue(c);\n            var level = (sta >> 6) & 3;\n            var n = rx.Count;\n            if(level < 2 || (level == 2 && n >= 3) || (level == 3 && n >= 4))\n            {\n                RxIRQ.Blink();\n            }\n        }\n\n        private ushort Read(long offset)\n        {\n            switch(offset)\n            {\n            case 0: return mode;\n            case 2:\n            {\n                ushort s = (ushort)(sta & ~0x0311);\n                if(rx.Count > 0) { s |= 0x0001; }\n                if(!shifting && tx.Count == 0) { s |= 0x0100; }         // TRMT\n                if(tx.Count >= 4) { s |= 0x0200; }                       // UTXBF\n                s |= 0x0010;                                              // RIDLE\n                return s;\n            }\n            case 4: return 0;\n            case 6:\n                if(rx.Count == 0)\n                {\n                    return 0;\n                }\n                var c = rx.Dequeue();\n                if(rx.Count > 0 && ((sta >> 6) & 3) < 2)\n                {\n                    RxIRQ.Blink();\n                }\n                return c;\n            case 8: return brg;\n            default: return 0;\n            }\n        }\n\n        private void Write(long offset, ushort value, ushort mask)\n        {\n            switch(offset)\n            {\n            case 0:\n            {\n                var was = mode;\n                mode = (ushort)(((mode & ~mask) | (value & mask)) & 0xA4E7);\n                if((was & 0x8000) != 0 && !Enabled)\n                {\n                    rx.Clear();\n                    tx.Clear();\n                    shifting = false;\n                    shifter.Enabled = false;\n                    sta &= 0x80E0;\n                }\n                break;\n            }\n            case 2:\n            {\n                var was = sta;\n                const ushort writable = 0x8CE0;      // UTXISEL, UTXBRK, UTXEN, URXISEL, ADDEN\n                var nv = (ushort)((sta & ~(mask & writable)) | (value & mask & writable));\n                if((sta & 0x0002) != 0 && (mask & 0x0002) != 0 && (value & 0x0002) == 0)\n                {\n                    rx.Clear();                       // clearing OERR resets the receive FIFO\n                }\n                else\n                {\n                    nv |= (ushort)(sta & 0x0002);\n                }\n                sta = nv;\n                if((was & 0x0400) == 0 && (sta & 0x0400) != 0 && Enabled)\n                {\n                    TxIRQ.Blink();\n                }\n                if((sta & 0x0400) == 0)\n                {\n       
+… [2778 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+**Tool: Bash** — Make OC lazy in PWM and give the ADC timing and power behaviour
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\no = (P / \"dsPIC30_Capture.cs\").read_text()\no = o.replace(\"\"\"    /// The pin is output \"Pin\". In PWM mode edges are generated only with <c>pwmEdges</c>\n    /// (high-frequency PWM would cost two events per period); otherwise Pin is high while the\n    /// duty cycle is above zero and <see cref=\"DutyCycle\"/> / <see cref=\"PwmFrequency\"/> give the waveform.\"\"\", \"\"\"    /// The pin is output \"Pin\". In PWM mode edges are generated only with <c>pwmEdges</c>\n    /// (high-frequency PWM would cost two events per period); otherwise Pin is high while the\n    /// duty cycle is above zero, <see cref=\"DutyCycle\"/> / <see cref=\"PwmFrequency\"/> give the waveform\n    /// and OCxRS reaches OCxR at the next period boundary, computed from the timer's count (no\n    /// per-period events). OCSIDL stops the module in Idle.\"\"\")\no = o.replace(\"\"\"        public double DutyCycle\n        {\n            get\n            {\n                if(Mode < 6 || !timer.Running(TimerIndex) || faulted)\"\"\", \"\"\"        public double DutyCycle\n        {\n            get\n            {\n                Sync();\n                if(Mode < 6 || !timer.Running(TimerIndex) || faulted)\"\"\")\no = o.replace(\"\"\"            switch(offset)\n            {\n            case 0: return ocrs;\n            case 2: return ocr;\n            case 4: return con;\n            default: return 0;\n            }\n        }\"\"\", \"\"\"            Sync();\n            switch(offset)\n            {\n            case 0: return ocrs;\n            case 2: return ocr;\n            case 4: return con;\n            default: return 0;\n            }\n        }\n\n        // PWM without edge events: OCxRS is copied to OCxR at the first period boundary after it was written\n        private void Sync()\n        {\n            if(Mode >= 6 && !pwmEdges && latchPending && timer.Matches(TimerIndex) != latchMatches && !faulted)\n            {\n                ocr = ocrs;\n                latchPending = false;\n            }\n        }\n\n        private void UpdateEvents()\n        {\n            var need = (Mode >= 1 && Mode <= 5) || (Mode >= 6 && pwmEdges);\n            timer.RequireEvents(TimerIndex, this, need);\n            timer.RequireEvents(1 - TimerIndex, this, false);\n        }\"\"\")\no = o.replace(\"\"\"            case 0: ocrs = Merge(ocrs, value, mask); break;\n            case 2: ocr = Merge(ocr, value, mask); break;\"\"\", \"\"\"            case 0:\n                Sync();\n                ocrs = Merge(ocrs, value, mask);\n                latchPending = true;\n                latchMatches = timer.Matches(TimerIndex);\n                break;\n            case 2: ocr = Merge(ocr, value, mask); break;\"\"\")\no = o.replace(\"\"\"                    case 0: SetPin(false); break;\n                    }\n                }\n                break;\n            }\n            }\"\"\", \"\"\"                    case 0: SetPin(false); break;\n                    }\n                }\n                UpdateEvents();\n                break;\n            }\n            }\"\"\")\no = o.replace(\"\"\"        private ushort ocrs, ocr, con;\n        private bool fired, faulted;\"\"\", \"\"\"        private ushort ocrs, ocr, con;\n        private bool fired, faulted, latchPending;\n        private ulong latchMatches;\"\"\")\no = o.replace(\"\"\"            ocrs = ocr = con = 0;\n            fired = false;\"\"\", \"\"\"            ocrs = ocr = con = 0;\n            fired = false;\n            latchPending = false;\n            timer.RequireEvents(0, this, false);\n            timer.RequireEvents(1, this, false);\"\"\")\n(P / \"dsPIC30_Capture.cs\").write_text(o)\n\na = (P / \"dsPIC30_ADC12.cs\").read_text()\na = a.replace(\"\"\"    /// Result FORM: integer, signed integer, fractional, signed fractional.\n    /// </summary>\"\"\", \"\"\"    /// Result FORM: integer, signed integer, fractional, signed fractional.\n    /// ADRC uses the internal RC (TAD = <c>rcTad</c>, 1.5 µs typical) and keeps converting in Sleep\n    /// (its interrupt wakes the device); otherwise Sleep stops the ADC, and ADSIDL stops it in Idle.\n    /// Fcy comes from <c>system</c> (or <c>frequency</c>).\n    /// </summary>\"\"\")\na = a.replace(\"\"\"        public dsPIC30_ADC12(IMachine machine, ulong frequency = 30000000, double referenceVoltage = 5.0,\n            dsPIC30_TimerPair timer = null) : base(machine, 0x2C)\n        {\n            this.frequency = frequency;\"\"\", \"\"\"        public dsPIC30_ADC12(IMachine machine, dsPIC30_SystemControl system = null, ulong frequency = 30000000,\n            double referenceVoltage = 5.0, dsPIC30_TimerPair timer = null, double rcTad = 1.5e-6) : base(machine, 0x2C)\n        {\n            this.system = system;\n            this.timer = timer;\n            this.rcTad = rcTad;\n            this.frequency = frequency;\n            if(system != null)\n            {\n                system.PowerChanged += state =>\n                {\n                    if(Halted)\n                    {\n                        step.Enabled = false;   // conversion abandoned; sampling restarts when running again\n                        converting = false;\n                    }\n                    else if(On && sampling && Ssrc == 7)\n                    {\n                        StartSampling();\n                    }\n                };\n            }\"\"\")\na = a.replace(\"\"\"            step = new LimitTimer(machine.ClockSource, frequency, this, \"adc\", limit: 1, direction: Direction.Ascending,\"\"\", \"\"\"            step = new LimitTimer(machine.ClockSource, 1000000000, this, \"adc\", limit: 1, direction: Direction.Ascending,\"\"\")\na = a.replace(\"\"\"        private bool On => (adcon1 & 0x8000) != 0;\n        private int Ssrc => (adcon1 >> 5) & 7;\n        private double TadCycles => ((adcon3 & 0x3F) + 1) / 2.0;\"\"\", \"\"\"        private bool On => (adcon1 & 0x8000) != 0;\n        private int Ssrc => (adcon1 >> 5) & 7;\n        private ulong Fcy => system?.CpuFrequency ?? frequency;\n        private bool Rc => (adcon3 & 0x80) != 0;\n        /// <summary>TAD in seconds: Tcy (ADCS + 1) / 2, or the internal RC.</summary>\n        private double Tad => Rc ? rcTad : ((adcon3 & 0x3F) + 1) / 2.0 / Fcy;\n        private bool Halted\n        {\n            get\n            {\n                var state = system?.PowerState ?? dsPIC30_PowerState.Run;\n                return (state == dsPIC30_PowerState.Sleep && !Rc) || (state == dsPIC30_PowerState.Idle && (adcon1 & 0x2000) != 0);\n            }\n        }\"\"\")\na = a.replace(\"\"\"                var samc = Math.Max(1, (adcon3 >> 8) & 0x1F);\n                Arm(samc * TadCycles);\"\"\", \"\"\"                var samc = Math.Max(1, (adcon3 >> 8) & 0x1F);\n                Arm(samc * Tad);\"\"\")\na = a.replace(\"\"\"            converting = true;\n            Arm(14 * TadCycles);\"\"\", \"\"\"            converting = true;\n            Arm(14 * Tad);\"\"\")\na = a.replace(\"\"\"        private void Arm(double cycles)\n        {\n            step.Enabled = false;\n            step.Frequency = frequency;\n            step.Limit = (ulong)Math.Max(1, Math.Round(cycles));\n            step.Value = 0;\n            step.Enabled = true;\n        }\"\"\", \"\"\"        private void Arm(double seconds)\n        {\n            step.Enabled = false;\n            if(Halted)\n            {\n                return;\n            }\n            step.Limit = (ulong)Math.Max(1, Math.Round(seconds * 1e9));\n            step.Value = 0;\n            step.Enabled = true;\n        }\"\"\")\na = a.replace(\"\"\"            case 0
+… [1676 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+**Tool: Bash** — Add analog pins, peripheral overrides and pin mirrors to the ports
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ng = (P / \"dsPIC30_GPIO.cs\").read_text()\ng = g.replace(\"\"\"    /// <summary>\n    /// dsPIC30F I/O port: TRISx, PORTx, LATx (register at TRISx). GPIO inputs 0-15 are the pins\n    /// as driven from outside; outputs 0-15 follow LATx while the pin is an output (TRIS = 0).\n    /// PORTx reads the pin: LATx for outputs, the external level for inputs (or the CN pull-up,\n    /// or <c>idleLevel</c>, while nothing drives it). <c>cnMap</c> (\"pin:cn,...\") routes input\n    /// changes to the change-notification controller.\n    /// </summary>\"\"\", \"\"\"    /// <summary>\n    /// dsPIC30F I/O port: TRISx, PORTx, LATx (register at TRISx).\n    ///\n    /// GPIO inputs 0-15: the pins as driven from outside. Inputs 16-31: a peripheral output on\n    /// pin n-16 (output compare, ...): once driven it overrides TRIS and LAT for that pin.\n    /// Outputs 0-15: the pin level while the MCU drives it (TRIS = 0 or a peripheral output).\n    /// Outputs 16-31 and 32-47 mirror every pin's level (both banks), so peripheral inputs on the\n    /// pin (INTx, ICx, TxCK, ADC trigger) can be wired from the platform: `[16+n] -> intc@64`.\n    /// PORTx reads the pin: the driven level, the external level for inputs (or the CN pull-up, or\n    /// <c>idleLevel</c>, while nothing drives it); pins that <c>analog</c> (the ADC's ADPCFG) has\n    /// configured analog read 0. <c>cnMap</c> (\"pin:cn,...\") routes input changes to the\n    /// change-notification controller.\n    /// </summary>\"\"\")\ng = g.replace(\"\"\"        public dsPIC30_GPIOPort(IMachine machine, ushort implementedPins = 0xFFFF, dsPIC30_ChangeNotification changeNotification = null,\n            string cnMap = \"\", bool idleLevel = false) : base(machine, 6)\n        {\n            this.implemented = implementedPins;\n            this.cn = changeNotification;\n            this.idleLevel = idleLevel;\n            var c = new Dictionary<int, IGPIO>();\n            for(var i = 0; i < 16; i++)\"\"\", \"\"\"        public dsPIC30_GPIOPort(IMachine machine, ushort implementedPins = 0xFFFF, dsPIC30_ChangeNotification changeNotification = null,\n            string cnMap = \"\", bool idleLevel = false, dsPIC30_ADC12 analog = null) : base(machine, 6)\n        {\n            this.implemented = implementedPins;\n            this.cn = changeNotification;\n            this.idleLevel = idleLevel;\n            this.analog = analog;\n            var c = new Dictionary<int, IGPIO>();\n            for(var i = 0; i < 48; i++)\n            {\n                c[i] = new GPIO();\n            }\n            for(var i = 0; i < 16; i++)\"\"\")\ng = g.replace(\"\"\"                c[i] = new GPIO();\n                cnOf[i] = -1;\"\"\", \"\"\"                cnOf[i] = -1;\"\"\")\ng = g.replace(\"\"\"            Array.Clear(external, 0, 16);\n            Array.Clear(driven, 0, 16);\n            UpdateOutputs();\"\"\", \"\"\"            Array.Clear(external, 0, 16);\n            Array.Clear(driven, 0, 16);\n            Array.Clear(peripheral, 0, 16);\n            Array.Clear(peripheralLevel, 0, 16);\n            UpdateOutputs();\"\"\")\ng = g.replace(\"\"\"        public void OnGPIO(int number, bool value)\n        {\n            if(number < 0 || number > 15)\n            {\n                return;\n            }\n            var before = PinLevel(number);\n            external[number] = value;\n            driven[number] = true;\n            var after = PinLevel(number);\n            if(before != after && cnOf[number] >= 0 && Bit(tris, number))\n            {\n                cn?.PinChanged(cnOf[number]);\n            }\n        }\"\"\", \"\"\"        public void OnGPIO(int number, bool value)\n        {\n            if(number >= 16 && number < 32)\n            {\n                var p = number - 16;\n                peripheral[p] = true;\n                peripheralLevel[p] = value;\n                UpdateOutputs();\n                return;\n            }\n            if(number < 0 || number > 15)\n            {\n                return;\n            }\n            var before = PinLevel(number);\n            external[number] = value;\n            driven[number] = true;\n            var after = PinLevel(number);\n            if(before != after && cnOf[number] >= 0 && Bit(tris, number) && !peripheral[number])\n            {\n                cn?.PinChanged(cnOf[number]);\n            }\n            UpdateMirror(number);\n        }\"\"\")\ng = g.replace(\"\"\"        private bool PinLevel(int pin)\n        {\n            if(!Bit(tris, pin))\n            {\n                return Bit(lat, pin);\n            }\"\"\", \"\"\"        private bool PinLevel(int pin)\n        {\n            if(peripheral[pin])\n            {\n                return peripheralLevel[pin];\n            }\n            if(!Bit(tris, pin))\n            {\n                return Bit(lat, pin);\n            }\"\"\")\ng = g.replace(\"\"\"            ushort v = 0;\n            for(var i = 0; i < 16; i++)\n            {\n                if(Bit(implemented, i) && PinLevel(i))\n                {\n                    v |= (ushort)(1 << i);\n                }\n            }\n            return v;\"\"\", \"\"\"            ushort v = 0;\n            var analogPins = analog == null ? (ushort)0 : (ushort)~analog.AnalogPins();\n            for(var i = 0; i < 16; i++)\n            {\n                if(Bit(implemented, i) && PinLevel(i) && !Bit(analogPins, i))\n                {\n                    v |= (ushort)(1 << i);\n                }\n            }\n            return v;\"\"\")\ng = g.replace(\"\"\"            for(var i = 0; i < 16; i++)\n            {\n                var output = Bit(implemented, i) && !Bit(tris, i);\n                var level = output && Bit(lat, i);\n                if(Connections[i].IsSet != level)\n                {\n                    Connections[i].Set(level);\n                }\n            }\n        }\"\"\", \"\"\"            for(var i = 0; i < 16; i++)\n            {\n                var output = Bit(implemented, i) && (!Bit(tris, i) || peripheral[i]);\n                var level = output && PinLevel(i);\n                if(Connections[i].IsSet != level)\n                {\n                    Connections[i].Set(level);\n                }\n                UpdateMirror(i);\n            }\n        }\n\n        private void UpdateMirror(int pin)\n        {\n            var level = Bit(implemented, pin) && PinLevel(pin);\n            foreach(var bank in new[] { 16, 32 })\n            {\n                if(Connections[bank + pin].IsSet != level)\n                {\n                    Connections[bank + pin].Set(level);\n                }\n            }\n        }\"\"\")\ng = g.replace(\"\"\"        private readonly bool[] driven = new bool[16];\"\"\", \"\"\"        private readonly bool[] driven = new bool[16];\n        private readonly bool[] peripheral = new bool[16];\n        private readonly bool[] peripheralLevel = new bool[16];\n        private readonly dsPIC30_ADC12 analog;\"\"\")\n(P / \"dsPIC30_GPIO.cs\").write_text(g)\nprint(\"ok\")\nEOF\ngrep -n 'case 0: tris' $P/dsPIC30_GPIO.cs",
+ "description": "Add analog pins, peripheral overrides and pin mirrors to the ports"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+110:            case 0: tris = (ushort)(Merge(tris, value, mask) & implemented | ~implemented & 0); break;
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:14:07
+
+Next, SPI, I²C and CAN get bus timing. For the DCI codec interface model I need its register bit layouts, so pulling those from the device header.
+
+**Tool: Bash** — Extract DCI and PMD register layouts
+
+```
+{
+ "command": "H=/media/riko/model_store/Microchip/xc16-linux/v2.10/support/dsPIC30F/h/p30F5011.h; /media/riko/model_store/embeddyn-venv/bin/python - \"$H\" <<'EOF'\nimport re, sys\nt = open(sys.argv[1]).read()\nfor name in [\"DCICON1\",\"DCICON2\",\"DCICON3\",\"DCISTAT\",\"TSCON\",\"RSCON\",\"PMD1\",\"PMD2\",\"C1EC\"]:\n    m = re.search(r\"typedef struct tag%sBITS \\{(.*?)\\} %sBITS;\" % (name, name), t, re.S)\n    if not m: print(name, \"?\"); continue\n    body = m.group(1); first = re.search(r\"struct \\{(.*?)\\};\", body, re.S)\n    if first: body = first.group(1)\n    bit = 0; out = []\n    for f, w in re.findall(r\"uint16_t\\s*(\\w*)\\s*:\\s*(\\d+);\", body):\n        w = int(w)\n        if f: out.append(f\"{f}:{bit}\" + (f\"-{bit+w-1}\" if w > 1 else \"\"))\n        bit += w\n    print(name, \" \".join(out))\nEOF",
+ "description": "Extract DCI and PMD register layouts"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+DCICON1 COFSM:0-1 DJST:5 CSDOM:6 UNFM:7 COFSD:8 CSCKE:9 CSCKD:10 DLOOP:11 DCISIDL:13 DCIEN:15
+DCICON2 WS:0-3 COFSG:5-8 BLEN:10-11
+DCICON3 BCG:0-11
+DCISTAT TMPTY:0 TUNF:1 RFUL:2 ROV:3 SLOT:8-11
+TSCON TSE0:0 TSE1:1 TSE2:2 TSE3:3 TSE4:4 TSE5:5 TSE6:6 TSE7:7 TSE8:8 TSE9:9 TSE10:10 TSE11:11 TSE12:12 TSE13:13 TSE14:14 TSE15:15
+RSCON RSE0:0 RSE1:1 RSE2:2 RSE3:3 RSE4:4 RSE5:5 RSE6:6 RSE7:7 RSE8:8 RSE9:9 RSE10:10 RSE11:11 RSE12:12 RSE13:13 RSE14:14 RSE15:15
+PMD1 ADCMD:0 C1MD:1 C2MD:2 SPI1MD:3 SPI2MD:4 U1MD:5 U2MD:6 I2CMD:7 DCIMD:8 T1MD:11 T2MD:12 T3MD:13 T4MD:14 T5MD:15
+PMD2 OC1MD:0 OC2MD:1 OC3MD:2 OC4MD:3 OC5MD:4 OC6MD:5 OC7MD:6 OC8MD:7 IC1MD:8 IC2MD:9 IC3MD:10 IC4MD:11 IC5MD:12 IC6MD:13 IC7MD:14 IC8MD:15
+C1EC ?
+```
+
+</details>
+
+**Tool: Bash** — Rewrite SPI and I2C with bus timing and SPI slave mode
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; cat > $P/dsPIC30_Serial.cs <<'EOF'\n//\n// Copyright (c) 2026 embeddyn contributors\n// This file is licensed under the MIT License.\n//\nusing System;\nusing System.Collections.Generic;\n\nusing Antmicro.Renode.Core;\nusing Antmicro.Renode.Core.Structure;\nusing Antmicro.Renode.Logging;\nusing Antmicro.Renode.Peripherals.Bus;\nusing Antmicro.Renode.Peripherals.I2C;\nusing Antmicro.Renode.Peripherals.SPI;\nusing Antmicro.Renode.Peripherals.Timers;\nusing Antmicro.Renode.Time;\n\nnamespace Antmicro.Renode.Peripherals.dsPIC30\n{\n    /// <summary>\n    /// dsPIC30F SPI: SPIxSTAT, SPIxCON, SPIxBUF (SPI1 at 0x0220, SPI2 at 0x0226).\n    ///\n    /// Master (MSTEN): a write to SPIxBUF goes to the transmit buffer (SPITBF) and into the shift\n    /// register when it is free; the transfer takes 8 or 16 (MODE16) clocks at Fsck = Fcy /\n    /// (primary PPRE 64/16/4/1 x secondary SPRE 8..1), then the byte(s) are exchanged with the\n    /// attached ISPIPeripheral (MODE16: high byte first), SPIRBF or SPIROV is set and the interrupt\n    /// raised. Slave: the module is an ISPIPeripheral itself (<see cref=\"Transmit\"/>), answering with\n    /// the word written to SPIxBUF; with SSEN, GPIO input 0 (SSx) must be low. Disabling the module\n    /// or SPISIDL in Idle ends transfers. <c>instantTransfer</c> skips the transfer time.\n    /// </summary>\n    public class dsPIC30_SPI : NullRegistrationPointPeripheralContainer<ISPIPeripheral>, IWordPeripheral, IBytePeripheral, IKnownSize,\n        ISPIPeripheral, IGPIOReceiver\n    {\n        public dsPIC30_SPI(IMachine machine, dsPIC30_SystemControl system = null, ulong frequency = 30000000, bool instantTransfer = false) : base(machine)\n        {\n            this.system = system;\n            this.frequency = frequency;\n            this.instantTransfer = instantTransfer;\n            IRQ = new GPIO();\n            shifter = new LimitTimer(machine.ClockSource, 1000000000, this, \"spi\", limit: 1, direction: Direction.Ascending,\n                workMode: WorkMode.OneShot, eventEnabled: true);\n            shifter.LimitReached += TransferDone;\n            Reset();\n        }\n\n        public GPIO IRQ { get; }\n        public long Size => 6;\n\n        /// <summary>Master clock in Hz.</summary>\n        public double ClockFrequency\n        {\n            get\n            {\n                var primary = new[] { 64, 16, 4, 1 }[con & 3];\n                var secondary = 8 - ((con >> 2) & 7);\n                return (double)Fcy / (primary * secondary);\n            }\n        }\n\n        public override void Reset()\n        {\n            stat = con = 0;\n            rx = 0;\n            rbf = false;\n            txPending = false;\n            shifting = false;\n            shifter.Enabled = false;\n            slaveSelect = false;\n            slaveBytes = 0;\n        }\n\n        public ushort ReadWord(long offset) => Read(offset & ~1L);\n        public void WriteWord(long offset, ushort value) => Write(offset & ~1L, value, 0xFFFF);\n        public byte ReadByte(long offset) => (byte)(Read(offset & ~1L) >> (int)(8 * (offset & 1)));\n        public void WriteByte(long offset, byte value)\n        {\n            var shift = (int)(8 * (offset & 1));\n            Write(offset & ~1L, (ushort)(value << shift), (ushort)(0xFF << shift));\n        }\n\n        // ---- slave side: another SPI master clocks this module ----\n        public byte Transmit(byte data)\n        {\n            if(!Enabled || Master || ((con & 0x80) != 0 && slaveSelect))\n            {\n                return 0xFF;\n            }\n            var wide = (con & 0x400) != 0;\n            byte reply;\n            if(wide)\n            {\n                reply = slaveBytes == 0 ? (byte)(txWord >> 8) : (byte)txWord;\n                slaveRx = (ushort)((slaveRx << 8) | data);\n            }\n            else\n            {\n                reply = (byte)txWord;\n                slaveRx = data;\n            }\n            slaveBytes++;\n            if(!wide || slaveBytes == 2)\n            {\n                slaveBytes = 0;\n                Received(slaveRx);\n                txPending = false;\n            }\n            return reply;\n        }\n\n        public void FinishTransmission()\n        {\n            slaveBytes = 0;\n        }\n\n        public void OnGPIO(int number, bool value)\n        {\n            if(number == 0)\n            {\n                slaveSelect = value;    // SSx high = deselected\n                if(value)\n                {\n                    slaveBytes = 0;\n                }\n            }\n        }\n\n        private bool Enabled => (stat & 0x8000) != 0;\n        private bool Master => (con & 0x20) != 0;\n        private ulong Fcy => system?.CpuFrequency ?? frequency;\n\n        private ushort Read(long offset)\n        {\n            switch(offset)\n            {\n            case 0: return (ushort)(stat | (rbf ? 1 : 0) | (txPending ? 2 : 0));\n            case 2: return con;\n            case 4: rbf = false; return rx;\n            default: return 0;\n            }\n        }\n\n        private void Write(long offset, ushort value, ushort mask)\n        {\n            switch(offset)\n            {\n            case 0:\n            {\n                var was = stat;\n                // SPIROV is cleared by software\n                stat = (ushort)(((stat & ~mask) | (value & mask)) & 0xA040);\n                if((was & 0x8000) != 0 && !Enabled)\n                {\n                    shifter.Enabled = false;\n                    shifting = txPending = false;\n                    RegisteredPeripheral?.FinishTransmission();\n                }\n                break;\n            }\n            case 2: con = (ushort)(((con & ~mask) | (value & mask)) & 0x6FFF); break;\n            case 4:\n                if(!Enabled)\n                {\n                    break;\n                }\n                txWord = (ushort)(value & mask);\n                txPending = true;\n                if(Master && !shifting)\n                {\n                    StartTransfer();\n                }\n                break;\n            }\n        }\n\n        private void StartTransfer()\n        {\n            if(!txPending)\n            {\n                return;\n            }\n            shiftWord = txWord;\n            txPending = false;\n            shifting = true;\n            if(instantTransfer)\n            {\n                TransferDone();\n                return;\n            }\n            var bits = (con & 0x400) != 0 ? 16 : 8;\n            shifter.Enabled = false;\n            shifter.Limit = (ulong)Math.Max(1, Math.Round(bits * 1e9 / ClockFrequency));\n            shifter.Value = 0;\n            shifter.Enabled = true;\n        }\n\n        private void TransferDone()\n        {\n            var device = RegisteredPeripheral;\n            ushort received;\n            if((con & 0x400) != 0)\n            {\n                var hi = device?.Transmit((byte)(shiftWord >> 8)) ?? 0xFF;\n                var lo = device?.Transmit((byte)shiftWord) ?? 0xFF;\n                received = (ushort)(hi << 8 | lo);\n            }\n            else\n            {\n                received = device?.Transmit((byte)shiftWord) ?? 0xFF;\n            }\n            shifting = false;\n            Received(received);\n            StartTransfer();\n        }\n\n        private void Received(ushort value)\n        {\n            if(rbf)\n            {\n                stat |= 0x40;     // SPIROV: the new word is lost\n            }\n            else\n            {\n                rx = value;\n                rbf = true;\n            }\n            IRQ.Blink();\n        }\n\n        private ushort stat, con, rx, txWord, shiftWord, slaveRx;\n        private bool rbf, txPending, shifting, slaveSelect;\n        private int sl
+… [9674 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:15:14
+
+Now CAN timing, with frame duration from CxCFG1/CxCFG2 and the CANCKS clock choice, plus wake-up from Disable mode and ABAT setting TXABT. After that the DCI.
+
+**Tool: Bash** — Add CAN bus timing and wake, and write the DCI model
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\nc = (P / \"dsPIC30_CAN.cs\").read_text()\nc = c.replace(\"\"\"using Antmicro.Renode.Peripherals.CAN;\"\"\", \"\"\"using Antmicro.Renode.Peripherals.CAN;\nusing Antmicro.Renode.Peripherals.Timers;\nusing Antmicro.Renode.Time;\"\"\")\nc = c.replace(\"\"\"    /// configuration, listen-all. Bit timing (CFG1/2) is stored only. IRQ goes to the CxIF source.\n    /// Connect to a CANHub like any ICAN.\n    /// </summary>\"\"\", \"\"\"    /// configuration, listen-all. IRQ goes to the CxIF source. Connect to a CANHub like any ICAN.\n    /// Timing: a frame occupies the bus for its length in bits (with typical stuffing) at the bit rate of\n    /// CxCFG1/CxCFG2: TQ = 2 (BRP + 1) / Fcan, Fcan = Fcy (CANCKS = 1) or 4 Fcy; bit = 1 + (PRSEG + 1) +\n    /// (SEG1PH + 1) + SEG2 TQ. TXREQ clears and TXnIF sets when the frame has been sent; queued buffers go\n    /// one after another by TXPRI. ABAT aborts pending requests (TXABT). In Disable mode a frame on the\n    /// bus sets WAKIF instead of being received. Error counters stay 0 (no bus errors are modelled).\n    /// </summary>\"\"\")\nc = c.replace(\"\"\"        public dsPIC30_CAN(IMachine machine) : base(machine, 0x9C)\n        {\n            IRQ = new GPIO();\n            Reset();\n        }\"\"\", \"\"\"        public dsPIC30_CAN(IMachine machine, dsPIC30_SystemControl system = null, ulong frequency = 30000000, bool instantTransmit = false) : base(machine, 0x9C)\n        {\n            this.system = system;\n            this.frequency = frequency;\n            this.instantTransmit = instantTransmit;\n            IRQ = new GPIO();\n            busTimer = new LimitTimer(machine.ClockSource, 1000000000, this, \"can-tx\", limit: 1, direction: Direction.Ascending,\n                workMode: WorkMode.OneShot, eventEnabled: true);\n            busTimer.LimitReached += FrameDone;\n            Reset();\n        }\n\n        /// <summary>Nominal bit rate from CxCFG1/CxCFG2 in bit/s.</summary>\n        public double BitRate\n        {\n            get\n            {\n                var cfg1 = regs[0x92 / 2];\n                var cfg2 = regs[0x94 / 2];\n                var fcy = (double)(system?.CpuFrequency ?? frequency);\n                var fcan = (regs[Ctrl / 2] & 0x0800) != 0 ? fcy : 4 * fcy;\n                var tq = 2.0 * ((cfg1 & 0x3F) + 1) / fcan;\n                var prseg = (cfg2 & 7) + 1;\n                var seg1 = ((cfg2 >> 3) & 7) + 1;\n                var seg2 = (cfg2 & 0x80) != 0 ? ((cfg2 >> 8) & 7) + 1 : Math.Max(seg1, 2);\n                return 1.0 / ((1 + prseg + seg1 + seg2) * tq);\n            }\n        }\"\"\")\nc = c.replace(\"\"\"            Array.Clear(regs, 0, regs.Length);\n            regs[Ctrl / 2] = 0x0480;     // REQOP = OPMODE = configuration\n            UpdateIrq(0);\"\"\", \"\"\"            Array.Clear(regs, 0, regs.Length);\n            regs[Ctrl / 2] = 0x0480;     // REQOP = OPMODE = configuration\n            busTimer.Enabled = false;\n            sending = -1;\n            UpdateIrq(0);\"\"\")\nc = c.replace(\"\"\"            var mode = OpMode;\n            if(mode == ModeConfig || mode == ModeDisable || mode == ModeLoopback)\n            {\n                return;\n            }\n            Receive(frame, mode == ModeListenAll);\"\"\", \"\"\"            var mode = OpMode;\n            if(mode == ModeDisable)\n            {\n                regs[Intf / 2] |= 0x0040;        // WAKIF: bus activity while disabled\n                UpdateIrq(0x0040);\n                return;\n            }\n            if(mode == ModeConfig || mode == ModeLoopback)\n            {\n                return;\n            }\n            Receive(frame, mode == ModeListenAll);\"\"\")\nc = c.replace(\"\"\"                if((v & 0x1000) != 0 || (value & mask & 0x1000) != 0)\n                {\n                    foreach(var tx in TxCon)\n                    {\n                        regs[tx / 2] &= unchecked((ushort)~0x0008);\n                    }\n                }\"\"\", \"\"\"                if((v & 0x1000) != 0 || (value & mask & 0x1000) != 0)\n                {\n                    foreach(var tx in TxCon)\n                    {\n                        if((regs[tx / 2] & 0x0008) != 0 && Array.IndexOf(TxCon, tx) != sending)\n                        {\n                            regs[tx / 2] = (ushort)((regs[tx / 2] & ~0x0008) | 0x0040);     // TXABT\n                        }\n                    }\n                }\"\"\")\nold_tp = c[c.index(\"        private void TransmitPending()\"):c.index(\"        private CANMessageFrame BuildFrame(int b)\")]\nnew_tp = '''        private void TransmitPending()\n        {\n            var mode = OpMode;\n            if(sending >= 0 || mode == ModeConfig || mode == ModeDisable || mode == ModeListen)\n            {\n                return;\n            }\n            // highest TXPRI first, then the higher buffer number\n            var next = Enumerable.Range(0, 3).Where(b => (regs[TxCon[b] / 2] & 0x0008) != 0)\n                .OrderByDescending(b => regs[TxCon[b] / 2] & 3).ThenByDescending(b => b).Cast<int?>().FirstOrDefault();\n            if(next == null)\n            {\n                return;\n            }\n            sending = next.Value;\n            var frame = BuildFrame(TxBase[sending]);\n            if(instantTransmit)\n            {\n                FrameDone();\n                return;\n            }\n            var bits = (frame.ExtendedFormat ? 67 : 47) + 8 * (frame.RemoteFrame ? 0 : frame.Data.Length);\n            bits += bits / 5;            // typical bit stuffing\n            busTimer.Enabled = false;\n            busTimer.Limit = (ulong)Math.Max(1, Math.Round(bits * 1e9 / Math.Max(1, BitRate)));\n            busTimer.Value = 0;\n            busTimer.Enabled = true;\n        }\n\n        private void FrameDone()\n        {\n            var b = sending;\n            sending = -1;\n            if(b < 0 || (regs[TxCon[b] / 2] & 0x0008) == 0)\n            {\n                TransmitPending();\n                return;\n            }\n            var frame = BuildFrame(TxBase[b]);\n            regs[TxCon[b] / 2] &= unchecked((ushort)~0x0078);\n            if(OpMode == ModeLoopback)\n            {\n                Receive(frame, false);\n            }\n            else\n            {\n                FrameSent?.Invoke(frame);\n            }\n            regs[Intf / 2] |= (ushort)(1 << (2 + b));\n            UpdateIrq(1 << (2 + b));\n            TransmitPending();\n        }\n\n'''\nc = c.replace(old_tp, new_tp)\nc = c.replace(\"\"\"        private readonly ushort[] regs = new ushort[0x9C / 2];\"\"\", \"\"\"        private readonly ushort[] regs = new ushort[0x9C / 2];\n        private int sending = -1;\n        private readonly LimitTimer busTimer;\n        private readonly dsPIC30_SystemControl system;\n        private readonly ulong frequency;\n        private readonly bool instantTransmit;\"\"\")\n(P / \"dsPIC30_CAN.cs\").write_text(c)\nprint(\"ok\")\nEOF\ncat > $P/dsPIC30_DCI.cs <<'EOF'\n//\n// Copyright (c) 2026 embeddyn contributors\n// This file is licensed under the MIT License.\n//\nusing System;\nusing System.Collections.Generic;\n\nusing Antmicro.Renode.Core;\nusing Antmicro.Renode.Logging;\nusing Antmicro.Renode.Peripherals.Timers;\nusing Antmicro.Renode.Time;\n\nnamespace Antmicro.Renode.Peripherals.dsPIC30\n{\n    /// <summary>\n    /// dsPIC30F data converter interface (codec serial port) at 0x0240: DCICON1-3, DCISTAT, TSCON,\n    /// RSCON, RXBUF0-3, TXBUF0-3.\n    ///\n    /// A frame has COFSG + 1 time slots of WS + 1 bits. In master mode (COFSD = 0, CSCKD = 0) the bit\n    /// clock is Fcy / (2
+… [7819 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+ok
+```
+
+</details>
+
+**Tool: Bash** — Add PMD module disable and build everything
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ns = (P / \"dsPIC30_Sfr.cs\").read_text()\ns = s.replace(\"\"\"        public long Size { get; }\n\n        public ushort ReadWord(long offset)\n        {\n            return Read(offset & ~1L);\n        }\n\n        public void WriteWord(long offset, ushort value)\n        {\n            Write(offset & ~1L, value, 0xFFFF);\n        }\n\n        public byte ReadByte(long offset)\n        {\n            return (byte)(Read(offset & ~1L) >> (int)(8 * (offset & 1)));\n        }\n\n        public void WriteByte(long offset, byte value)\n        {\n            var shift = (int)(8 * (offset & 1));\n            Write(offset & ~1L, (ushort)(value << shift), (ushort)(0xFF << shift));\n        }\"\"\", \"\"\"        public long Size { get; }\n\n        /// <summary>Peripheral module disable: the system control and the module's bit (PMD1 0-15, PMD2 16-31).\n        /// While the bit is set the module reads 0 and ignores writes.</summary>\n        public dsPIC30_SystemControl Pmd { get; set; }\n        public int PmdBit { get; set; } = -1;\n\n        public ushort ReadWord(long offset)\n        {\n            return Disabled ? (ushort)0 : Read(offset & ~1L);\n        }\n\n        public void WriteWord(long offset, ushort value)\n        {\n            if(!Disabled)\n            {\n                Write(offset & ~1L, value, 0xFFFF);\n            }\n        }\n\n        public byte ReadByte(long offset)\n        {\n            return Disabled ? (byte)0 : (byte)(Read(offset & ~1L) >> (int)(8 * (offset & 1)));\n        }\n\n        public void WriteByte(long offset, byte value)\n        {\n            if(Disabled)\n            {\n                return;\n            }\n            var shift = (int)(8 * (offset & 1));\n            Write(offset & ~1L, (ushort)(value << shift), (ushort)(0xFF << shift));\n        }\n\n        protected bool Disabled => Pmd != null && PmdBit >= 0 && Pmd.ModuleDisabled(PmdBit);\"\"\")\n(P / \"dsPIC30_Sfr.cs\").write_text(s)\ny = (P / \"dsPIC30_SystemControl.cs\").read_text()\ny = y.replace(\"\"\"        /// <summary>MCLR: external reset (RCON.EXTR).</summary>\"\"\", \"\"\"        /// <summary>PMD bit `bit` (0-15 PMD1, 16-31 PMD2) is set: the module is disabled.</summary>\n        public bool ModuleDisabled(int bit) => bit < 16 ? (pmd1 & (1 << bit)) != 0 : (pmd2 & (1 << (bit - 16))) != 0;\n\n        /// <summary>MCLR: external reset (RCON.EXTR).</summary>\"\"\")\n(P / \"dsPIC30_SystemControl.cs\").write_text(y)\n# PMD for the classes that do not derive from dsPIC30_Sfr\nfor f, cls in ((\"dsPIC30_UART.cs\", \"dsPIC30_UART\"), (\"dsPIC30_Serial.cs\", \"dsPIC30_SPI\"), (\"dsPIC30_Serial.cs\", \"dsPIC30_I2C\")):\n    t = (P / f).read_text()\n    head = f\"public class {cls} :\"\n    i = t.index(head)\n    j = t.index(\"        public ushort ReadWord(long offset) => Read(offset & ~1L);\", i)\n    k = t.index(\"        }\\n\", t.index(\"public void WriteByte(long offset, byte value)\", j)) + len(\"        }\\n\")\n    block = '''        public dsPIC30_SystemControl Pmd { get; set; }\n        public int PmdBit { get; set; } = -1;\n        private bool Disabled => Pmd != null && PmdBit >= 0 && Pmd.ModuleDisabled(PmdBit);\n\n        public ushort ReadWord(long offset) => Disabled ? (ushort)0 : Read(offset & ~1L);\n        public void WriteWord(long offset, ushort value) { if(!Disabled) { Write(offset & ~1L, value, 0xFFFF); } }\n        public byte ReadByte(long offset) => Disabled ? (byte)0 : (byte)(Read(offset & ~1L) >> (int)(8 * (offset & 1)));\n        public void WriteByte(long offset, byte value)\n        {\n            if(Disabled)\n            {\n                return;\n            }\n            var shift = (int)(8 * (offset & 1));\n            Write(offset & ~1L, (ushort)(value << shift), (ushort)(0xFF << shift));\n        }\n'''\n    t = t[:j] + block + t[k:]\n    (P / f).write_text(t)\nprint(\"ok\")\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && (./build.sh > /media/riko/model_store/tmp/renode-build.log 2>&1; echo \"exit=$?\" >> /media/riko/model_store/tmp/renode-build.log); tail -1 /media/riko/model_store/tmp/renode-build.log; grep -E 'error' /media/riko/model_store/tmp/renode-build.log | sed 's/.*dsPIC30\\///; s/\\[.*//' | sort -u | head -20",
+ "description": "Add PMD module disable and build everything",
+ "timeout": 1200000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+exit=0
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Check the rebuilt core and new warnings
+
+```
+{
+ "command": "ls -la /media/riko/model_store/renode-merge/renode/output/bin/Release/platform-lib/linux-x64/translate-dspic33-le.so; nm -D /media/riko/model_store/renode-merge/renode/output/bin/Release/platform-lib/linux-x64/translate-dspic33-le.so | grep -c 'OnWake'; grep -c 'warning CS' /media/riko/model_store/tmp/renode-build.log; grep 'warning CS' /media/riko/model_store/tmp/renode-build.log | grep dsPIC30 | sed 's/.*dsPIC30\\///; s/\\[.*//' | sort -u | head",
+ "description": "Check the rebuilt core and new warnings"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+-rwxrwxrwx 1 root root 709816 nov   25 07:17 /media/riko/model_store/renode-merge/renode/output/bin/Release/platform-lib/linux-x64/translate-dspic33-le.so
+1
+70
+dsPIC30_CAN.cs(270,36): warning CS0675: Bitwise-or operator used on a sign-extended operand; consider casting to a smaller unsigned type first 
+dsPIC30_CAN.cs(273,40): warning CS0675: Bitwise-or operator used on a sign-extended operand; consider casting to a smaller unsigned type first
+```
+
+</details>
+
+**Tool: Bash** — Rewrite the platform with system wiring and pin routing, and load it
+
+```
+{
+ "command": "R=/media/riko/model_store/renode-merge/renode; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nR = Path(\"/media/riko/model_store/renode-merge/renode\")\nL = []\na = L.append\na(\"\"\"// Microchip dsPIC30F5011 (DS70116): 16-bit DSC, 66 KB flash, 4 KB RAM, 1 KB data EEPROM.\n//\n// Bus layout (see dsPIC33.cs): data space at 0x0000-0xFFFF (SFRs below 0x0800, RAM 0x0800-0x17FF);\n// program word at ISA address a at 0x01000000 + 2*a, 4 bytes per instruction as in XC16 HEX files\n// (tools/dspic30/hex2prog.py writes the LoadBinary images). The core registers 0x0000-0x0053 and\n// INTCON1 (0x0080) are inside the CPU.\n//\n// Clock: `system` derives Fcy from the FOSC configuration word and OSCCON (primary oscillator\n// `oscillatorFrequency`, 7.3728 MHz here; boards override it, or set cpuFrequency to fix Fcy).\n// Every clocked peripheral follows it.\n//\n// Interrupt sources (vector order, intc inputs): 0 INT0, 1 IC1, 2 OC1, 3 T1, 4 IC2, 5 OC2, 6 T2, 7 T3,\n// 8 SPI1, 9 U1RX, 10 U1TX, 11 ADC, 12 NVM, 13 SI2C, 14 MI2C, 15 CN, 16 INT1, 17 IC7, 18 IC8,\n// 19 OC3, 20 OC4, 21 T4, 22 T5, 23 INT2, 24 U2RX, 25 U2TX, 26 SPI2, 27 C1, 28 IC3, 29 IC4,\n// 30 IC5, 31 IC6, 32 OC5, 33 OC6, 34 OC7, 35 OC8, 36 INT3, 37 INT4, 38 C2, 41 DCI.\n// INT0-INT4 pin inputs of intc: 64-68.\n//\n// Pins: drive a pin from outside with `portX OnGPIO n level`; the port forwards it to the\n// peripheral inputs below through its mirror outputs (16+n, 32+n). OC1-OC8 drive RD0-RD7.\n// Not wired (connect in a board file when used): OCFA (RB6) / OCFB (RB15) fault inputs of\n// oc1-oc4 / oc5-oc8 (GPIO input 0), CSCK.\n\ncpu: CPU.dsPIC33 @ sysbus\n    cpuType: \"dspic30f5011\"\n\nram: Memory.MappedMemory @ sysbus 0x0800\n    size: 0x1000\n\nflash: Memory.MappedMemory @ sysbus 0x01000000\n    size: 0x16000\n\n// data EEPROM: ISA 0x7FFC00-0x7FFFFE\neeprom: Memory.MappedMemory @ sysbus 0x01FFF800\n    size: 0x800\n\n// configuration words: ISA 0xF80000-0xF8000E\nconfig: Memory.MappedMemory @ sysbus 0x02F00000\n    size: 0x400\n\nintc: dsPIC30.dsPIC30_InterruptController @ sysbus 0x0082\n    cpu: cpu\n    IRQ -> cpu@0\n\nsystem: dsPIC30.dsPIC30_SystemControl @ sysbus 0x0740\n    cpu: cpu\n    oscillatorFrequency: 7372800\n    IRQ -> intc@12\n\ncn: dsPIC30.dsPIC30_ChangeNotification @ sysbus 0x00C0\n    IRQ -> intc@15\n\ntimer1: dsPIC30.dsPIC30_Timer1 @ sysbus 0x0100\n    system: system\n    intc: intc\n    source: 3\n    Pmd: system\n    PmdBit: 11\n    IRQ -> intc@3\n\ntimer23: dsPIC30.dsPIC30_TimerPair @ sysbus 0x0106\n    system: system\n    intc: intc\n    name: \"timer23\"\n    sourceB: 6\n    sourceC: 7\n    Pmd: system\n    PmdBit: 12\n    [0, 1] -> intc@[6, 7]\n\ntimer45: dsPIC30.dsPIC30_TimerPair @ sysbus 0x0114\n    system: system\n    intc: intc\n    name: \"timer45\"\n    sourceB: 21\n    sourceC: 22\n    Pmd: system\n    PmdBit: 14\n    [0, 1] -> intc@[21, 22]\n\"\"\")\nocs = [(1, 0x180, 2), (2, 0x186, 5), (3, 0x18C, 19), (4, 0x192, 20), (5, 0x198, 32), (6, 0x19E, 33), (7, 0x1A4, 34), (8, 0x1AA, 35)]\na(\"// Output compare OC1-OC8 on RD0-RD7 (time base Timer2 or Timer3 of timer23)\")\nfor n, addr, irq in ocs:\n    a(f\"\"\"oc{n}: dsPIC30.dsPIC30_OutputCompare @ sysbus 0x{addr:04X}\n    timer: timer23\n    name: \"oc{n}\"\n    Pmd: system\n    PmdBit: {16 + n - 1}\n    IRQ -> intc@{irq}\n    Pin -> portd@{16 + n - 1}\n\"\"\")\nics = [(1, 0x140, 1), (2, 0x144, 4), (3, 0x148, 28), (4, 0x14C, 29), (5, 0x150, 30), (6, 0x154, 31), (7, 0x158, 17), (8, 0x15C, 18)]\na(\"// Input capture IC1-IC8 (pins RD8-RD11, RD4, RD5, RB4, RB5 via the port mirrors)\")\nfor n, addr, irq in ics:\n    a(f\"\"\"ic{n}: dsPIC30.dsPIC30_InputCapture @ sysbus 0x{addr:04X}\n    timer: timer23\n    Pmd: system\n    PmdBit: {24 + n - 1}\n    IRQ -> intc@{irq}\n\"\"\")\na(\"\"\"// 12-bit ADC, AN0-AN15 (IADC channels in microvolts; External Control `adc` sets them)\nadc: dsPIC30.dsPIC30_ADC12 @ sysbus 0x0280\n    system: system\n    referenceVoltage: 5.0\n    timer: timer23\n    Pmd: system\n    PmdBit: 0\n    IRQ -> intc@11\n\nuart1: dsPIC30.dsPIC30_UART @ sysbus 0x020C\n    system: system\n    Pmd: system\n    PmdBit: 5\n    RxIRQ -> intc@9\n    TxIRQ -> intc@10\n\nuart2: dsPIC30.dsPIC30_UART @ sysbus 0x0216\n    system: system\n    Pmd: system\n    PmdBit: 6\n    RxIRQ -> intc@24\n    TxIRQ -> intc@25\n\nspi1: dsPIC30.dsPIC30_SPI @ sysbus 0x0220\n    system: system\n    Pmd: system\n    PmdBit: 3\n    IRQ -> intc@8\n\nspi2: dsPIC30.dsPIC30_SPI @ sysbus 0x0226\n    system: system\n    Pmd: system\n    PmdBit: 4\n    IRQ -> intc@26\n\ni2c: dsPIC30.dsPIC30_I2C @ sysbus 0x0200\n    system: system\n    Pmd: system\n    PmdBit: 7\n    MasterIRQ -> intc@14\n    SlaveIRQ -> intc@13\n\ncan1: dsPIC30.dsPIC30_CAN @ sysbus 0x0300\n    system: system\n    Pmd: system\n    PmdBit: 1\n    IRQ -> intc@27\n\ncan2: dsPIC30.dsPIC30_CAN @ sysbus 0x03C0\n    system: system\n    Pmd: system\n    PmdBit: 2\n    IRQ -> intc@38\n\ndci: dsPIC30.dsPIC30_DCI @ sysbus 0x0240\n    system: system\n    Pmd: system\n    PmdBit: 8\n    IRQ -> intc@41\n\n// I/O ports: CN numbers per pin (cnMap), mirror outputs (bank 16+n and 32+n) to peripheral inputs\nportb: dsPIC30.dsPIC30_GPIOPort @ sysbus 0x02C6\n    changeNotification: cn\n    cnMap: \"0:2,1:3,2:4,3:5,4:6,5:7,15:12\"\n    analog: adc\n    18 -> spi1@0\n    20 -> ic7@0\n    21 -> ic8@0\n\nportc: dsPIC30.dsPIC30_GPIOPort @ sysbus 0x02CC\n    implementedPins: 0xE006\n    changeNotification: cn\n    cnMap: \"13:1,14:0\"\n    17 -> timer23@0\n    18 -> timer23@1\n    29 -> timer45@0\n    30 -> timer1@0\n\nportd: dsPIC30.dsPIC30_GPIOPort @ sysbus 0x02D2\n    implementedPins: 0x0FFF\n    changeNotification: cn\n    cnMap: \"4:13,5:14,6:15,7:16\"\n    20 -> ic5@0\n    21 -> ic6@0\n    24 -> intc@65\n    25 -> intc@66\n    26 -> intc@67\n    27 -> intc@68\n    40 -> ic1@0\n    41 -> ic2@0\n    42 -> ic3@0\n    43 -> ic4@0\n\nportf: dsPIC30.dsPIC30_GPIOPort @ sysbus 0x02DE\n    implementedPins: 0x007F\n    changeNotification: cn\n    cnMap: \"4:17,5:18\"\n    22 -> intc@64\n    38 -> adc@0\n\nportg: dsPIC30.dsPIC30_GPIOPort @ sysbus 0x02E4\n    implementedPins: 0xF3CF\n    changeNotification: cn\n    cnMap: \"6:8,7:9,8:10,9:11\"\n    25 -> spi2@0\n    31 -> dci@0\n\"\"\")\n(R / \"platforms/cpus/microchip/dspic30f5011.repl\").write_text(\"\\n\".join(L))\n(R / \"platforms/boards/microchip/dspic30f5011-bodycontour.repl\").write_text(\"\"\"// Body-contour board: dsPIC30F5011, 10 MHz external clock, ECIO_PLL8 -> Fcy 20 MHz\n// (TMR2 period 66 -> 303 kHz IR LED modulation).\nusing \"platforms/cpus/microchip/dspic30f5011.repl\"\n\nsystem:\n    oscillatorFrequency: 10000000\n\"\"\")\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd $R && cat > /media/riko/model_store/tmp/plat.resc <<'EOF'\nmach create\nmachine LoadPlatformDescription @platforms/cpus/microchip/dspic30f5011.repl\nperipherals\nquit\nEOF\ntimeout 300 $RENODE_BIN --disable-xwt --console -e \"include @/media/riko/model_store/tmp/plat.resc\" 2>&1 | grep -iE 'error|exception|could not' | head -10",
+ "description": "Rewrite the platform with system wiring and pin routing, and load it",
+ "timeout": 300000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:20:38
+
+The platform loads cleanly. Re-running the three test firmwares. The default clock is now taken from their fuses (7.3728 MHz × 8 PLL / 4 = 14.7456 MHz), so the expected counts change accordingly.
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "done": [
+  3,
+  4,
+  5
+ ],
+ "start": 6
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 6 of 7 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Bash** — Re-run the test firmwares on the new platform
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && rm -f tools/dspic30/tests/periph/out/uart1.txt*; for s in periph/periph renode/smoke periph/periph_all; do echo \"== $s\"; timeout 300 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/$s.resc\" 2>&1 | grep -v '^\\s*$' | grep -iE 'error|exception|^0x|^[0-9.]+$|expect' | tr '\\n' ' '; echo; done; cat tools/dspic30/tests/periph/out/uart1.txt",
+ "description": "Re-run the test firmwares on the new platform",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+== periph/periph
+﻿timer1_irq: loops ticks (expect ticks ~ 0.01*30e6/1001 = 300) 0x23F4 0x0093 uart_hello: ticks (expect ~40) echoed (expect 3) LATD 0x0013 0x0003 0x0001 
+== renode/smoke
+0x1000480 0x7360 0xFFFF 0x0262 0xC0DE 0x47A8 0x0000000002FAF080 
+== periph/periph_all
+0x0D0E 0x0400 0x4000 0x000A 0x000A 0x0001 0x048C 0x0003 0xBBAA 0x00CC 0x0001 0x0004 0x0001 0x00FF 0x1234 0xFFFF 0xBEEF 0xFFFF 0x1000 0x101F 0x0055 0x0003 0x1000734 
+hello from dsPIC30F5011
+ABC
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Run the real firmware 2 s on the board file and time it
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; W=/media/riko/model_store/tmp/bodycontour; cd /media/riko/model_store/renode-merge/renode && /media/riko/model_store/embeddyn-venv/bin/python -c \"\nfrom pathlib import Path; p=Path('$W/run.resc'); t=p.read_text(); t=t.replace('emulation RunFor \\\"0.5\\\"','emulation RunFor \\\"2\\\"'); t=t.replace('quit','echo \\\"FCY\\\"\\nsystem CpuFrequency\\ncpu PerformanceInMips\\ncpu ExecutedInstructions\\nquit'); p.write_text(t)\"; /usr/bin/time -f \"%e s wall\" timeout 900 $RENODE_BIN --disable-xwt --console -e \"include @$W/run.resc\" > $W/log.txt 2>&1; grep -E 'started|paused|wall' $W/log.txt; sed -n '/PC$/,$p' $W/log.txt | grep -v '92m' | head -14; grep -E 'WARNING|ERROR' $W/log.txt | sed 's/^\\[[0-9:.]*\\] //' | sort | uniq -c | head; tail -1 $W/log.txt",
+ "description": "Run the real firmware 2 s on the board file and time it",
+ "timeout": 1200000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+[07:21:09.2434] [INFO] bc: Machine started.
+[07:21:24.8729] [INFO] bc: Machine paused.
+20.01 s wall
+20.01 s wall
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Show the end of the real-firmware run
+
+```
+{
+ "command": "W=/media/riko/model_store/tmp/bodycontour; grep -v '^\\s*$' $W/log.txt | grep -v 'diag-pre\\|92m' | tail -16",
+ "description": "Show the end of the real-firmware run"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+[07:21:09.2434] [INFO] bc: Machine started.
+[07:21:24.8729] [INFO] bc: Machine paused.
+﻿PC
+0x1009ae8
+0x4d74
+0x0003
+OC
+0
+298507.46268656716
+0
+298507.46268656716
+FCY
+0x0000000001312D00
+0x00000014
+0x0000000002625A00
+20.01 s wall
+```
+
+</details>
+
+**Tool: Bash** — Sample the firmware's PC to find hot spots
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; W=/media/riko/model_store/tmp/bodycontour; cd /media/riko/model_store/renode-merge/renode && { sed -n '1,/^uart2 CreateFileBackend/p' $W/run.resc | grep -v CreateFileBackend; echo 'emulation RunFor \"0.2\"'; for i in $(seq 150); do echo 'emulation RunFor \"0.0013\"'; echo 'cpu GetRegister 26'; done; echo quit; } > $W/prof.resc; timeout 900 $RENODE_BIN --disable-xwt --console -e \"include @$W/prof.resc\" 2>&1 | grep -E '^0x[0-9A-Fa-f]+$' | sort | uniq -c | sort -rn | head -12",
+ "description": "Sample the firmware's PC to find hot spots",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Check the profiling script output
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; W=/media/riko/model_store/tmp/bodycontour; cd /media/riko/model_store/renode-merge/renode && head -12 $W/prof.resc; timeout 900 $RENODE_BIN --disable-xwt --console -e \"include @$W/prof.resc\" 2>&1 | grep -v '^\\s*$' | tail -5",
+ "description": "Check the profiling script output",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+mach create "bc"
+machine LoadPlatformDescription @/media/riko/model_store/renode-merge/renode/platforms/boards/microchip/dspic30f5011-bodycontour.repl
+emulation CreateCANHub "canHub"
+connector Connect sysbus.can1 canHub
+connector Connect sysbus.can2 canHub
+sysbus LoadBinary @/media/riko/model_store/tmp/bodycontour/private-project_000000.bin 0x1000000
+sysbus LoadBinary @/media/riko/model_store/tmp/bodycontour/private-project_f80000.bin 0x2f00000
+emulation RunFor "0.2"
+emulation RunFor "0.0013"
+cpu GetRegister 26
+emulation RunFor "0.0013"
+cpu GetRegister 26
+[07:22:00.2591] [INFO] bc: Machine resumed.
+[07:22:00.2678] [INFO] bc: Machine paused.
+0x4bb0
+[92mR[0m[92me[0m[92mn[0m[92mo[0m[92md[0m[92me[0m[92m [0m[92mi[0m[92ms[0m[92m [0m[92mq[0m[92mu[0m[92mi[0m[92mt[0m[92mt[0m[92mi[0m[92mn[0m[92mg[0m[92m[0m[92m
+[0m[92m[0m[0m[0m[07:22:00.3077] [INFO] bc: Disposed.
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Tally the sampled PCs
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; W=/media/riko/model_store/tmp/bodycontour; cd /media/riko/model_store/renode-merge/renode && timeout 900 $RENODE_BIN --disable-xwt --console -e \"include @$W/prof.resc\" 2>&1 | tr -d '\\r' | grep -aoE '^.?0x[0-9a-fA-F]{3,6}$' | sed 's/^[^0]*//' | sort | uniq -c | sort -rn | head -12",
+ "description": "Tally the sampled PCs",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+13 0x4d74
+     12 0x4d72
+     12 0x4d70
+     11 0x4d76
+     10 0x4d80
+      5 0x510c
+      4 0x4d82
+      3 0x80c
+      3 0x4d7e
+      3 0x4022
+      3 0x401e
+      3 0x182
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:22:19
+
+The hot spot is a small loop at ISA 0x4D70–0x4D82. Disassembling it from the firmware's own ELF (local only; the chat-log redaction omits this output).
+
+**Tool: Bash** — Disassemble the hot loop
+
+```
+{
+ "command": "E=<private firmware repo>/app/bodycontour/bodycontour/.project/private-project/dist/default/production/private-project.elf; /media/riko/model_store/Microchip/xc16-linux/v2.10/bin/xc16-objdump -d $E 2>/dev/null | awk '/^ *4d5[0-9a-f]:/,/^ *4d8[0-9a-f]:/' | cut -f3 | head -30; /media/riko/model_store/Microchip/xc16-linux/v2.10/bin/xc16-objdump -d $E 2>/dev/null | grep -B30 '^ *4d70:' | grep '>:$' | tail -1",
+ "description": "Disassemble the hot loop"
+}
+```
+
+*(output from a private location omitted)*
+
+**Tool: Bash** — Make port updates incremental and retime the real firmware
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ng = (P / \"dsPIC30_GPIO.cs\").read_text()\nold = g[g.index(\"        private void UpdateOutputs()\"):g.index(\"        private ushort tris, lat;\")]\nnew = '''        // Recompute only the pins whose level or drive changed (bit-banged chain clocks write the\n        // port millions of times per second).\n        private void UpdateOutputs()\n        {\n            ushort drive = 0, level = 0, mirror = 0;\n            for(var i = 0; i < 16; i++)\n            {\n                if(!Bit(implemented, i))\n                {\n                    continue;\n                }\n                var l = PinLevel(i);\n                if(l)\n                {\n                    mirror |= (ushort)(1 << i);\n                }\n                if(!Bit(tris, i) || peripheral[i])\n                {\n                    drive |= (ushort)(1 << i);\n                    if(l)\n                    {\n                        level |= (ushort)(1 << i);\n                    }\n                }\n            }\n            var changedOut = (ushort)((level ^ lastLevel) | (drive ^ lastDrive));\n            var changedMirror = (ushort)(mirror ^ lastMirror);\n            lastLevel = level;\n            lastDrive = drive;\n            lastMirror = mirror;\n            for(var i = 0; i < 16 && (changedOut | changedMirror) != 0; i++)\n            {\n                var bit = (ushort)(1 << i);\n                if((changedOut & bit) != 0)\n                {\n                    Connections[i].Set((level & bit) != 0);\n                }\n                if((changedMirror & bit) != 0)\n                {\n                    var l = (mirror & bit) != 0;\n                    Connections[16 + i].Set(l);\n                    Connections[32 + i].Set(l);\n                }\n            }\n        }\n\n        private void UpdateMirror(int pin)\n        {\n            UpdateOutputs();\n        }\n\n'''\ng = g.replace(old, new)\ng = g.replace(\"\"\"        private ushort tris, lat;\"\"\", \"\"\"        private ushort tris, lat;\n        private ushort lastLevel, lastDrive, lastMirror;\"\"\")\ng = g.replace(\"\"\"            Array.Clear(peripheralLevel, 0, 16);\n            UpdateOutputs();\"\"\", \"\"\"            Array.Clear(peripheralLevel, 0, 16);\n            lastLevel = lastDrive = lastMirror = 0;\n            foreach(var c in Connections.Values)\n            {\n                c.Unset();\n            }\n            UpdateOutputs();\"\"\")\n(P / \"dsPIC30_GPIO.cs\").write_text(g)\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && (./build.sh > /media/riko/model_store/tmp/renode-build.log 2>&1; echo \"exit=$?\" >> /media/riko/model_store/tmp/renode-build.log); tail -1 /media/riko/model_store/tmp/renode-build.log; grep -E ' error ' /media/riko/model_store/tmp/renode-build.log | head -3; W=/media/riko/model_store/tmp/bodycontour; timeout 900 $RENODE_BIN --disable-xwt --console -e \"include @$W/run.resc\" > $W/log.txt 2>&1; grep -E 'started|paused' $W/log.txt",
+ "description": "Make port updates incremental and retime the real firmware",
+ "timeout": 1500000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+exit=0
+[07:23:42.2208] [INFO] bc: Machine started.
+[07:23:50.6901] [INFO] bc: Machine paused.
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Write and build the detailed peripheral test firmware
+
+```
+{
+ "command": "cd /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph && cat > periph_detail.c <<'EOF'\n/* Detailed behaviour: UART buffer/timing, lazy timer flag, Sleep/Idle, PMD, SPI/I2C timing, DCI loopback,\n * pin routing (INT1 + IC1 on RD8, CN on RB0), analog pins, clock switch. Results in r[] at 0x0A00;\n * r[0] = step reached. The script drives RF6 (INT0) high at 30 ms, RD8 at 60 ms, RB0 at 70 ms. */\n#include <xc.h>\n_FOSC(CSW_ON_FSCM_OFF & XT_PLL8);\n_FWDT(WDT_OFF);\n\nvolatile unsigned int r[40] __attribute__((address(0x0A00)));\nvolatile unsigned int t1ticks, int0hits, int1hits, cnhits, dcihits;\n\nvoid __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) { t1ticks++; IFS0bits.T1IF = 0; }\nvoid __attribute__((interrupt, no_auto_psv)) _INT0Interrupt(void) { int0hits++; IFS0bits.INT0IF = 0; }\nvoid __attribute__((interrupt, no_auto_psv)) _INT1Interrupt(void) { int1hits++; IFS1bits.INT1IF = 0; }\nvoid __attribute__((interrupt, no_auto_psv)) _CNInterrupt(void) { cnhits++; IFS0bits.CNIF = 0; }\nvoid __attribute__((interrupt, no_auto_psv)) _DCIInterrupt(void) { dcihits++; IFS2bits.DCIIF = 0; }\n\nint main(void)\n{\n    unsigned int i, a, b;\n    /* 1: UART1 at 9600 baud: 5 quick writes -> buffer full, TRMT clear; time until TRMT via Timer2 */\n    U1BRG = 95; U1MODE = 0x8000; U1STA = 0x0400;       /* 14.7456 MHz / (16 * 96) = 9600 */\n    T2CON = 0; TMR2 = 0; PR2 = 0xFFFF; T2CON = 0x8030; /* 1:256 */\n    for(i = 0; i < 5; i++) U1TXREG = 'A' + i;\n    r[1] = U1STA;\n    while(!U1STAbits.TRMT);\n    r[2] = TMR2;                                        /* 5 chars * 10 bits / 9600 = 5.2 ms = 300 ticks */\n    T2CON = 0;\n    r[0] = 1;\n\n    /* 2: lazy flag: Timer3 at 147 kHz, interrupt disabled, count flag polls for ~1 ms */\n    PR3 = 99; TMR3 = 0; IFS0bits.T3IF = 0; T3CON = 0x8000;\n    a = 0;\n    for(i = 0; i < 2000; i++) { if(IFS0bits.T3IF) { a++; IFS0bits.T3IF = 0; } }\n    r[3] = a;\n    T3CON = 0;\n    r[0] = 2;\n\n    /* 3: Sleep: Timer1 (internal clock) frozen, woken by INT0 (RF6) driven by the script at 30 ms */\n    PR1 = 0xFFFF; TMR1 = 0; T1CON = 0x8000;\n    IFS0bits.INT0IF = 0; IEC0bits.INT0IE = 1; IPC0bits.INT0IP = 3;\n    __builtin_pwrsav(0);\n    r[4] = TMR1;       /* small: frozen during Sleep */\n    r[5] = RCON;       /* SLEEP set */\n    r[6] = int0hits;\n    T1CON = 0;\n    RCONbits.SLEEP = 0;\n    r[0] = 3;\n\n    /* 4: Idle, woken by the Timer1 interrupt */\n    PR1 = 14745; TMR1 = 0; IFS0bits.T1IF = 0; IEC0bits.T1IE = 1; T1CON = 0x8000;\n    __builtin_pwrsav(1);\n    r[7] = t1ticks; r[8] = RCON;\n    IEC0bits.T1IE = 0; T1CON = 0;\n    r[0] = 4;\n\n    /* 5: PMD: Timer1 disabled reads 0 */\n    PR1 = 1234; PMD1bits.T1MD = 1; r[9] = PR1; PMD1bits.T1MD = 0; r[10] = PR1;\n    r[0] = 5;\n\n    /* 6: SPI1 at Fcy/64: SPIRBF not set right after the write, set after the transfer */\n    SPI1CON = 0x0020; SPI1STAT = 0x8000;\n    SPI1BUF = 0xA5; r[11] = SPI1STAT; while(!SPI1STATbits.SPIRBF); r[12] = SPI1STAT; r[13] = SPI1BUF;\n    SPI1STAT = 0;\n    /* 7: I2C start stays busy for a bit time */\n    I2CBRG = 140; I2CCON = 0x8000; I2CCONbits.SEN = 1; r[14] = I2CCON; while(I2CCONbits.SEN); r[15] = I2CSTAT;\n    I2CCONbits.PEN = 1; while(I2CCONbits.PEN); I2CCON = 0;\n    r[0] = 7;\n\n    /* 8: DCI master loopback: 16-bit words, 2 slots, 1 word per interrupt */\n    DCICON1 = 0x0800;                                  /* DLOOP, master frame sync and clock */\n    DCICON2 = (0 << 10) | (1 << 5) | 15;               /* BLEN 1 word, 2 slots, 16-bit */\n    DCICON3 = 9;\n    TSCON = 1; RSCON = 1;\n    TXBUF0 = 0x1234;\n    IFS2bits.DCIIF = 0; IEC2bits.DCIIE = 1;\n    DCICON1bits.DCIEN = 1;\n    while(dcihits < 3);\n    r[16] = RXBUF0; r[17] = DCISTAT; DCICON1 = 0; IEC2bits.DCIIE = 0;\n    r[0] = 8;\n\n    /* 9: RD8 drives INT1 and IC1 (script raises RD8 at 60 ms); RB0 change -> CN2 (at 70 ms) */\n    TRISD = 0xFFFF; TRISB = 0xFFFF; ADPCFG = 0xFFFF;\n    IC1CON = 0x0083; PR2 = 0xFFFF; TMR2 = 0; T2CON = 0x8000;\n    IFS1bits.INT1IF = 0; IEC1bits.INT1IE = 1;\n    CNEN1 = 1 << 2; IFS0bits.CNIF = 0; IEC0bits.CNIE = 1;\n    while(int1hits == 0 || cnhits == 0);\n    r[18] = int1hits; r[19] = IC1CONbits.ICBNE; r[20] = cnhits; r[21] = PORTB & 1;\n    /* analog pins read 0 */\n    ADPCFG = 0xFFFE; r[22] = PORTB & 1; ADPCFG = 0xFFFF;\n    r[0] = 9;\n\n    /* 10: clock switch to FRC (7.37 MHz -> Fcy 1.8425 MHz) */\n    __builtin_write_OSCCONH(0x01);\n    __builtin_write_OSCCONL(0x01);\n    while(OSCCONbits.COSC != 1);\n    r[23] = OSCCON;\n    r[0] = 10;\n    for(;;);\n}\nEOF\nB=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin; export TMPDIR=/media/riko/model_store/tmp; $B/xc16-gcc -mcpu=30F5011 -O1 -o periph_detail.elf periph_detail.c -Wl,--script=$B/../support/dsPIC30F/gld/p30F5011.gld 2>&1 | grep -iE 'error|undefined' ; $B/xc16-bin2hex periph_detail.elf 2>/dev/null; /media/riko/model_store/embeddyn-venv/bin/python ../../hex2prog.py periph_detail.hex out",
+ "description": "Write and build the detailed peripheral test firmware",
+ "timeout": 180000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+sysbus LoadBinary @out/periph_detail_000000.bin 0x1000000
+sysbus LoadBinary @out/periph_detail_f80000.bin 0x2f00000
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Run the detailed test firmware with pin stimuli
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && { cat <<'EOF'\nmach create \"detail\"\nmachine LoadPlatformDescription @platforms/cpus/microchip/dspic30f5011.repl\nsysbus LoadBinary $ORIGIN/out/periph_detail_000000.bin 0x1000000\nsysbus LoadBinary $ORIGIN/out/periph_detail_f80000.bin 0x2f00000\nemulation RunFor \"0.03\"\nportf OnGPIO 6 true\nemulation RunFor \"0.03\"\nportd OnGPIO 8 true\nemulation RunFor \"0.01\"\nportb OnGPIO 0 true\nemulation RunFor \"0.03\"\necho \"RESULTS r[0..23]\"\nEOF\nfor i in $(seq 0 23); do printf 'sysbus ReadWord 0x%X\\n' $((0xA00 + 2*i)); done; echo 'echo \"FCY\"'; echo 'system CpuFrequency'; echo quit; } > tools/dspic30/tests/periph/periph_detail.resc; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/periph_detail.resc\" 2>&1 | grep -v '^\\s*$' | sed -n '/RESULTS/,$p' | grep -v 92m | tr '\\n' ' '; echo",
+ "description": "Run the detailed test firmware with pin stimuli",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+RESULTS r[0..23] 0x000A 0x0610 0x012C 0x0008 0x0000 0x000B 0x0001 0x0001 0x0007 0x0000 0x04D2 0x8000 0x8001 0x00FF 0x8001 0x0008 0x0000 0x010B 0x0001 0x0001 0x0001 0x0001 0x0000 0x1120 FCY 0x00000000001C1D44
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Look for a mid-quantum time sync API
+
+```
+{
+ "command": "cd /media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator; grep -n 'public void SyncTime\\|void SyncTime\\|SyncTime()' Peripherals/Peripherals/CPU/*.cs Main/Peripherals/CPU/*.cs Main/Time/*.cs 2>/dev/null | head; grep -rn 'Quantum' Main/Time/TimeSourceBase.cs | head -5",
+ "description": "Look for a mid-quantum time sync API"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Peripherals/Peripherals/CPU/TranslationCPU.cs:666:        public override void SyncTime()
+Peripherals/Peripherals/CPU/BaseCPU.cs:74:        public virtual void SyncTime()
+Main/Peripherals/CPU/ICPU.cs:43:        void SyncTime();
+Main/Time/TimeSourceBase.cs:46:            Quantum = DefaultQuantum;
+Main/Time/TimeSourceBase.cs:60:                $"Quantum: {Quantum}");
+Main/Time/TimeSourceBase.cs:91:        public void SynchroniseQuantum()
+Main/Time/TimeSourceBase.cs:289:        // TODO: do not allow to set Quantum of 0
+Main/Time/TimeSourceBase.cs:290:        /// <see cref="ITimeSource.Quantum">
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Read SyncTime and its users
+
+```
+{
+ "command": "cd /media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator; sed -n 660,690p Peripherals/Peripherals/CPU/TranslationCPU.cs; sed -n 70,90p Peripherals/Peripherals/CPU/BaseCPU.cs; grep -rn '\\.SyncTime()' --include=*.cs Peripherals/Peripherals | head -5",
+ "description": "Read SyncTime and its users"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+public void RequestReturn()
+        {
+            TlibSetReturnRequest();
+        }
+
+        public override void SyncTime()
+        {
+            if(!OnPossessedThread)
+            {
+                this.Log(LogLevel.Error, "Syncing time should be done from CPU thread only. Ignoring the operation");
+                return;
+            }
+
+            var numberOfExecutedInstructions = TlibGetExecutedInstructions();
+            this.Trace($"CPU executed {numberOfExecutedInstructions} instructions and time synced");
+            ReportProgress(numberOfExecutedInstructions);
+        }
+
+        public void ActivateNewHooks() => hooks.ActivateNewHooks();
+
+        public string GetCurrentLLVMTriple(out ulong pc)
+        {
+            lock(executionLock)
+            {
+                pc = PC;
+                return GetLLVMTriple(DisassemblyFlags);
+            }
+        }
+
+        public override ExecutionResult ExecuteInstructions(ulong numberOfInstructionsToExecute, out ulong numberOfExecutedInstructions)
+            }
+            SkipInstructions += instructions;
+        }
+
+        public virtual void SyncTime()
+        {
+            // by default do nothing
+        }
+
+        public ulong Step(int count = 1)
+        {
+            if(isAborted)
+            {
+                this.Log(LogLevel.Warning, "Ignoring stepping on an aborted CPU");
+                return PC;
+            }
+            if(HasAnyHaltingCondition)
+            {
+                this.Log(LogLevel.Warning, "Ignoring stepping on a halted CPU");
+                return PC;
+            }
+Peripherals/Peripherals/CAN/CAST_CANCTRL.cs:149:            cpu.SyncTime();
+Peripherals/Peripherals/CAN/CAST_CANCTRL.cs:1020:                cpu.SyncTime();
+Peripherals/Peripherals/GPIOPort/S32K3XX_eMIOS.cs:65:                cpu.SyncTime();
+Peripherals/Peripherals/GPIOPort/S32K3XX_eMIOS.cs:849:                            cpu.SyncTime();
+Peripherals/Peripherals/GPIOPort/SiLabs_GPIO_1.cs:167:                cpu.SyncTime();
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Sync virtual time on timer reads and rerun the detailed test
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\nP = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30\")\ns = (P / \"dsPIC30_Sfr.cs\").read_text()\ns = s.replace(\"using Antmicro.Renode.Peripherals.Bus;\", \"using Antmicro.Renode.Peripherals.Bus;\\nusing Antmicro.Renode.Peripherals.CPU;\")\ns = s.replace(\"\"\"        protected static ushort Merge(ushort old, ushort value, ushort mask)\"\"\", \"\"\"        /// <summary>Bring virtual time up to the executing instruction (timers read mid-block would lag\n        /// by up to a time quantum). Only acts on the CPU thread.</summary>\n        internal static void SyncTime(IMachine machine)\n        {\n            if(machine.SystemBus.TryGetCurrentCPU(out var cpu) && cpu is BaseCPU b && b.OnPossessedThread)\n            {\n                b.SyncTime();\n            }\n        }\n\n        protected static ushort Merge(ushort old, ushort value, ushort mask)\"\"\")\n(P / \"dsPIC30_Sfr.cs\").write_text(s)\ni = (P / \"dsPIC30_InterruptController.cs\").read_text()\ni = i.replace(\"\"\"            if((offset >= 0x02 && offset <= 0x06) || offset == 0x2E)\n            {\n                PollLazy();\n            }\"\"\", \"\"\"            if(((offset >= 0x02 && offset <= 0x06) || offset == 0x2E) && lazy.Count > 0)\n            {\n                SyncTime(machine);\n                PollLazy();\n            }\"\"\")\n(P / \"dsPIC30_InterruptController.cs\").write_text(i)\nt = (P / \"dsPIC30_Timers.cs\").read_text()\nt = t.replace(\"\"\"        protected ulong Fcy => system?.CpuFrequency ?? fallbackFrequency;\"\"\", \"\"\"        protected ulong Fcy => system?.CpuFrequency ?? fallbackFrequency;\n\n        protected override ushort ReadRegister(long offset)\n        {\n            SyncTime(machine);\n            return Read(offset);\n        }\"\"\")\n# keep it simple: call SyncTime inside the timer Read implementations instead\nt = t.replace(\"\"\"        protected override ushort ReadRegister(long offset)\n        {\n            SyncTime(machine);\n            return Read(offset);\n        }\"\"\", \"\")\nt = t.replace(\"\"\"        protected override ushort Read(long offset)\n        {\n            switch(offset)\n            {\n            case 0: return (ushort)unit.Value;\"\"\", \"\"\"        protected override ushort Read(long offset)\n        {\n            if(offset == 0)\n            {\n                SyncTime(machine);\n            }\n            switch(offset)\n            {\n            case 0: return (ushort)unit.Value;\"\"\")\nt = t.replace(\"\"\"        protected override ushort Read(long offset)\n        {\n            switch(offset)\n            {\n            case 0x0:\n                if(Is32Bit)\"\"\", \"\"\"        protected override ushort Read(long offset)\n        {\n            if(offset == 0x0 || offset == 0x4)\n            {\n                SyncTime(machine);\n            }\n            switch(offset)\n            {\n            case 0x0:\n                if(Is32Bit)\"\"\")\n(P / \"dsPIC30_Timers.cs\").write_text(t)\nc = (P / \"dsPIC30_Capture.cs\").read_text()\nc = c.replace(\"\"\"            var which = (con & 0x80) != 0 ? 0 : 1;\n            fifo.Enqueue((ushort)timer.Counter(which));\"\"\", \"\"\"            var which = (con & 0x80) != 0 ? 0 : 1;\n            SyncTime(machine);\n            fifo.Enqueue((ushort)timer.Counter(which));\"\"\")\nc = c.replace(\"\"\"            if(Mode >= 1 && Mode <= 5)\n            {\n                Plan(timer.Counter(TimerIndex));\n            }\"\"\", \"\"\"            if(Mode >= 1 && Mode <= 5)\n            {\n                SyncTime(machine);\n                Plan(timer.Counter(TimerIndex));\n            }\"\"\")\nc = c.replace(\"\"\"        private void Sync()\n        {\n            if(Mode >= 6\"\"\", \"\"\"        private void Sync()\n        {\n            if(Mode >= 6 && !pwmEdges && latchPending)\n            {\n                SyncTime(machine);\n            }\n            if(Mode >= 6\"\"\")\n(P / \"dsPIC30_Capture.cs\").write_text(c)\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && (./build.sh > /media/riko/model_store/tmp/renode-build.log 2>&1; echo \"exit=$?\" >> /media/riko/model_store/tmp/renode-build.log); tail -1 /media/riko/model_store/tmp/renode-build.log; grep -E ' error ' /media/riko/model_store/tmp/renode-build.log | sed 's/.*dsPIC30\\///' | head -3; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/periph_detail.resc\" 2>&1 | grep -v '^\\s*$' | sed -n '/RESULTS/,$p' | grep -v 92m | tr '\\n' ' '; echo",
+ "description": "Sync virtual time on timer reads and rerun the detailed test",
+ "timeout": 1500000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+exit=0
+RESULTS r[0..23] 0x000A 0x0610 0x012C 0x0078 0x0004 0x000B 0x0001 0x0001 0x0007 0x0000 0x04D2 0x8000 0x8001 0x00FF 0x8001 0x0008 0x0000 0x010B 0x0001 0x0001 0x0001 0x0001 0x0000 0x1120 FCY 0x00000000001C1D44
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Load DCI transmit words at block start and rerun
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_DCI.cs\"); t = p.read_text()\nt = t.replace(\"\"\"                var index = words % Blen;\n                ushort sent = 0;\"\"\", \"\"\"                var index = words % Blen;\n                if(index == 0)\n                {\n                    BlockStart();\n                }\n                ushort sent = 0;\"\"\")\nt = t.replace(\"\"\"                    sent = txWritten ? txShadow[index] : ((con1 & 0x0080) != 0 ? lastTx : (ushort)0);\"\"\", \"\"\"                    sent = blockHasData ? txShadow[index] : ((con1 & 0x0080) != 0 ? lastTx : (ushort)0);\"\"\")\nt = t.replace(\"\"\"        private void BufferBoundary()\n        {\"\"\", \"\"\"        // a block starts: the words written to TXBUF since the last block go out now\n        private void BlockStart()\n        {\n            blockHasData = txWritten;\n            if(txWritten)\n            {\n                Array.Copy(txbuf, txShadow, 4);\n            }\n            else\n            {\n                status |= 0x0002;        // TUNF\n            }\n            txWritten = false;\n        }\n\n        private void BufferBoundary()\n        {\"\"\")\nt = t.replace(\"\"\"            // transmit side: the written words go to the shadow for the next block\n            if(!txWritten)\n            {\n                status |= 0x0002;        // TUNF\n            }\n            Array.Copy(txbuf, txShadow, 4);\n            txWritten = false;\n            status |= 0x0001;            // TMPTY\"\"\", \"\"\"            status |= 0x0001;            // TMPTY: TXBUF may be written for the next block\"\"\")\nt = t.replace(\"\"\"        private bool txWritten, rxRead;\"\"\", \"\"\"        private bool txWritten, rxRead, blockHasData;\"\"\")\np.write_text(t)\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && (./build.sh > /media/riko/model_store/tmp/renode-build.log 2>&1; echo \"exit=$?\" >> /media/riko/model_store/tmp/renode-build.log); tail -1 /media/riko/model_store/tmp/renode-build.log; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/periph_detail.resc\" 2>&1 | grep -v '^\\s*$' | sed -n '/RESULTS/,$p' | grep -v 92m | tr '\\n' ' '; echo",
+ "description": "Load DCI transmit words at block start and rerun",
+ "timeout": 1500000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+exit=0
+RESULTS r[0..23] 0x000A 0x0610 0x012C 0x0078 0x0004 0x000B 0x0001 0x0001 0x0007 0x0000 0x04D2 0x8000 0x8001 0x00FF 0x8001 0x0008 0x0000 0x010B 0x0001 0x0001 0x0001 0x0001 0x0000 0x1120 FCY 0x00000000001C1D44
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Use UNFM in the DCI test and rerun
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"periph_detail.c\"); t = p.read_text()\nt = t.replace(\"    DCICON1 = 0x0800;                                  /* DLOOP, master frame sync and clock */\",\n              \"    DCICON1 = 0x0880;                                  /* DLOOP, UNFM (repeat last word), master */\")\np.write_text(t)\nEOF\nB=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin; export TMPDIR=/media/riko/model_store/tmp; $B/xc16-gcc -mcpu=30F5011 -O1 -o periph_detail.elf periph_detail.c -Wl,--script=$B/../support/dsPIC30F/gld/p30F5011.gld 2>&1 | grep -iE 'error'; $B/xc16-bin2hex periph_detail.elf 2>/dev/null; /media/riko/model_store/embeddyn-venv/bin/python ../../hex2prog.py periph_detail.hex out >/dev/null; cd ../../../..; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/periph_detail.resc\" 2>&1 | grep -v '^\\s*$' | sed -n '/RESULTS/,$p' | grep -v 92m | tr '\\n' ' '; echo",
+ "description": "Use UNFM in the DCI test and rerun",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+RESULTS r[0..23] 0x000A 0x0610 0x012C 0x0078 0x0004 0x000B 0x0001 0x0001 0x0007 0x0000 0x04D2 0x8000 0x8001 0x00FF 0x8001 0x0008 0x1234 0x010B 0x0001 0x0001 0x0001 0x0001 0x0000 0x1120 FCY 0x00000000001C1D44
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:27:53
+
+DCI loopback now returns 0x1234. Adding a CAN bit-rate check to the same script (config mode, CANCKS = 1, minimal segments, so Fcy/8 is expected), then re-running every test plus the real firmware.
+
+**Tool: Bash** — Rerun all tests and the real firmware
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"tools/dspic30/tests/periph/periph_detail.resc\"); t = p.read_text()\nt = t.replace(\"echo \\\"FCY\\\"\\nsystem CpuFrequency\\nquit\", \"\"\"echo \"FCY\"\nsystem CpuFrequency\necho \"CAN bit rate (expect Fcy / 8 = 230312.5)\"\nsysbus WriteWord 0x390 0x0C80\nsysbus WriteWord 0x392 0x0000\nsysbus WriteWord 0x394 0x0080\ncan1 BitRate\nquit\"\"\")\np.write_text(t)\np = Path(\"tools/dspic30/tests/periph/periph.resc\"); t = p.read_text()\nt = t.replace(\"expect ticks ~ 0.01*30e6/1001 = 300\", \"Fcy 14.7456 MHz from XT_PLL8: expect ticks ~ 0.01*14.7456e6/1001 = 147\")\nt = t.replace(\"uart_hello: ticks (expect ~40)\", \"uart_hello: ticks (expect ~19: 0.04 s at 14.7456e6/30000 Hz)\")\np.write_text(t)\nEOF\nfor s in periph/periph renode/smoke periph/periph_all periph/periph_detail; do echo \"== $s\"; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/$s.resc\" 2>&1 | grep -v '^\\s*$' | grep -iE 'error|exception|^0x|^[0-9.]+$|expect' | tr '\\n' ' '; echo; done; W=/media/riko/model_store/tmp/bodycontour; timeout 900 $RENODE_BIN --disable-xwt --console -e \"include @$W/run.resc\" > $W/log.txt 2>&1; grep -E 'started|paused|WARN|ERR' $W/log.txt | head -4",
+ "description": "Rerun all tests and the real firmware",
+ "timeout": 1800000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+== periph/periph
+﻿timer1_irq: loops ticks (Fcy 14.7456 MHz from XT_PLL8: expect ticks ~ 0.01*14.7456e6/1001 = 147) 0x23F4 0x0093 uart_hello: ticks (expect ~19: 0.04 s at 14.7456e6/30000 Hz) echoed (expect 3) LATD 0x0013 0x0003 0x0001 
+== renode/smoke
+0x1000480 0x7360 0xFFFF 0x0262 0xC0DE 0x47A8 0x0000000002FAF080 
+== periph/periph_all
+0x0D0E 0x0400 0x4000 0x000A 0x000A 0x0001 0x048C 0x0003 0xBBAA 0x00CC 0x0001 0x0004 0x0001 0x00FF 0x1234 0xFFFF 0xBEEF 0xFFFF 0x1000 0x101F 0x0055 0x0003 0x1000734 
+== periph/periph_detail
+0x000A 0x0610 0x012C 0x0078 0x0004 0x000B 0x0001 0x0001 0x0007 0x0000 0x04D2 0x8000 0x8001 0x00FF 0x8001 0x0008 0x1234 0x010B 0x0001 0x0001 0x0001 0x0001 0x0000 0x1120 0x00000000001C1D44 CAN bit rate (expect Fcy / 8 = 230312.5) 
+[07:28:18.5687] [INFO] bc: Machine started.
+[07:28:27.1819] [INFO] bc: Machine paused.
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: Bash** — Show the CAN bit rate value
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/periph_detail.resc\" 2>&1 | grep -v '^\\s*$' | grep -A3 'CAN bit rate' | grep -v 92m",
+ "description": "Show the CAN bit rate value",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+CAN bit rate (expect Fcy / 8 = 230312.5)
+230312.5
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:28:44
+
+The CAN bit rate comes out at 230312.5 bit/s as expected. The watchdog is the only model still unexercised; a quick firmware for it: a 2 ms watchdog, no CLRWDT, then check RCON.WDTO after the reset.
+
+**Tool: Bash** — Test the watchdog reset path
+
+```
+{
+ "command": ". /media/riko/model_store/renode-merge/env.sh; R=/media/riko/model_store/renode-merge/renode; cd $R/tools/dspic30/tests/periph && cat > wdt_reset.c <<'EOF'\n/* Watchdog: 2 ms period (PSA 1:1, PSB 1:1). The first run never clears it; after the WDT reset\n * RCON.WDTO is set and the firmware records it and then keeps clearing the watchdog. */\n#include <xc.h>\n_FOSC(CSW_FSCM_OFF & XT_PLL8);\n_FWDT(WDT_ON & WDTPSA_1 & WDTPSB_1);\nvolatile unsigned int r[4] __attribute__((address(0x0A00)));\nint main(void)\n{\n    if(RCONbits.WDTO)\n    {\n        r[0] = 0xD06;  r[1] = RCON;\n        for(;;) { __builtin_clrwdt(); r[2]++; }\n    }\n    r[3] = 0x1111;\n    for(;;);\n}\nEOF\nB=/media/riko/model_store/Microchip/xc16-linux/v2.10/bin; export TMPDIR=/media/riko/model_store/tmp; $B/xc16-gcc -mcpu=30F5011 -O1 -o wdt_reset.elf wdt_reset.c -Wl,--script=$B/../support/dsPIC30F/gld/p30F5011.gld 2>&1 | grep -iE 'error'; $B/xc16-bin2hex wdt_reset.elf 2>/dev/null; /media/riko/model_store/embeddyn-venv/bin/python ../../hex2prog.py wdt_reset.hex out >/dev/null\ncat > wdt_reset.resc <<'EOF'\nmach create \"wdt\"\nmachine LoadPlatformDescription @platforms/cpus/microchip/dspic30f5011.repl\nsysbus LoadBinary $ORIGIN/out/wdt_reset_000000.bin 0x1000000\nsysbus LoadBinary $ORIGIN/out/wdt_reset_f80000.bin 0x2f00000\nemulation RunFor \"0.02\"\necho \"WDT: r[0] (expect 0x0D06 after the watchdog reset) RCON (WDTO 0x0010) r[2] r[3]\"\nsysbus ReadWord 0xA00\nsysbus ReadWord 0xA02\nsysbus ReadWord 0xA04\nsysbus ReadWord 0xA06\nquit\nEOF\ncd $R; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/wdt_reset.resc\" 2>&1 | grep -v '^\\s*$' | grep -iE 'error|exception|^0x|expect|reset|Watchdog' | grep -v 92m | head",
+ "description": "Test the watchdog reset path",
+ "timeout": 900000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+[91m(monitor) [0minclude @tools/dspic30/tests/periph/wdt_reset.resc
+[07:28:54.8672] [INFO] Including script(s): /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/wdt_reset.resc
+﻿WDT: r[0] (expect 0x0D06 after the watchdog reset) RCON (WDTO 0x0010) r[2] r[3]
+0x0000
+0x0000
+0x0000
+0x1111
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:29:02
+
+The watchdog never fired. Checking what the FWDT word holds and what the model reads.
+
+**Tool: Bash** — Inspect the watchdog fuse value
+
+```
+{
+ "command": "od -A x -t x4 /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/out/wdt_reset_f80000.bin; grep -n 'WDT_ON\\b\\|WDTPSA_1\\b\\|WDTPSB_1\\b' /media/riko/model_store/Microchip/xc16-linux/v2.10/support/dsPIC30F/h/p30F5011.h | head",
+ "description": "Inspect the watchdog fuse value"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+000000 00008306 00008000
+000008
+21778:**     WDTPSB_1             1:1
+21796:**     WDTPSA_1             1:1
+21803:**     WDT_ON               Enabled
+21807:#define WDTPSB_1             0x8030
+21824:#define WDTPSA_1             0x800F
+21830:#define WDT_ON               0x803F
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:29:10
+
+The fuse is right (0x8000: enabled, both prescalers 1:1). The bug is mine: the model read configuration word 2 (FBORPOR) instead of word 1 (FWDT). Fixing it.
+
+**Tool: Bash** — Read the right fuse word and rerun the watchdog test
+
+```
+{
+ "command": "P=/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30; grep -n 'ReadConfig(2)' $P/dsPIC30_SystemControl.cs; /media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/media/riko/model_store/renode-merge/renode/src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/dsPIC30_SystemControl.cs\"); t = p.read_text()\nt = t.replace(\"var fwdt = ReadConfig(2);\", \"var fwdt = ReadConfig(1);      // FWDT at ISA 0xF80002\")\np.write_text(t)\nEOF\n. /media/riko/model_store/renode-merge/env.sh; cd /media/riko/model_store/renode-merge/renode && (./build.sh > /media/riko/model_store/tmp/renode-build.log 2>&1; echo \"exit=$?\" >> /media/riko/model_store/tmp/renode-build.log); tail -1 /media/riko/model_store/tmp/renode-build.log; timeout 600 $RENODE_BIN --disable-xwt --console -e \"include @tools/dspic30/tests/periph/wdt_reset.resc\" 2>&1 | grep -v '^\\s*$' | grep -iE 'error|exception|^0x|expect|Watchdog' | grep -v 92m | head",
+ "description": "Read the right fuse word and rerun the watchdog test",
+ "timeout": 1500000
+}
+```
+
+<details><summary>Result</summary>
+
+```
+270:            var fwdt = ReadConfig(2);
+exit=0
+[07:30:04.2356] [INFO] system: Watchdog timeout: reset
+﻿WDT: r[0] (expect 0x0D06 after the watchdog reset) RCON (WDTO 0x0010) r[2] r[3]
+0x0D06
+0x0010
+0x5F72
+0x0000
+Shell cwd was reset to /media/riko/model_store/GIT_/embeddyn
+```
+
+</details>
+
+**Tool: mcp__ccd_turn__update_plan**
+
+```
+{
+ "advance": true
+}
+```
+
+<details><summary>Result</summary>
+
+```
+Plan updated: step 7 of 7 is in progress. App actions available now: create_pr.
+```
+
+</details>
+
+**Tool: Write**
+
+```
+{
+ "file_path": "/media/riko/model_store/renode-merge/renode/tools/dspic30/PERIPHERALS.md",
+ "content": "# dsPIC30F5011 peripheral models: reference\n\nModels: `src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/*.cs` (namespace\n`Antmicro.Renode.Peripherals.dsPIC30`). Platform: `platforms/cpus/microchip/dspic30f5011.repl`.\nRegister layouts follow the XC16 device header `p30F5011.h` and linker script `p30F5011.gld`;\nbehaviour follows the dsPIC30F Family Reference Manual (DS70046) and the data sheet (DS70116).\n\nEvery model is checked with XC16-built firmware in `tests/periph/` (see \"Tests\" at the end).\n\n## Conventions\n\n* **Register access.** SFRs are 16-bit. Byte accesses (`mov.b`, `bset.b`, ...) are merged into\n  the word by the model itself, so a byte write never triggers a read side effect.\n* **Clock.** Clocked models take `system: system` and follow its Fcy, including clock switches.\n  Without `system` they use their `frequency` parameter.\n* **Interrupts.** Each model raises a GPIO pulse into the interrupt controller input numbered as\n  its vector (`IRQ -> intc@3`). A rising edge sets the IFS flag. Software clears the flag, as on\n  the device.\n* **Power.** `system` publishes Run, Idle or Sleep. In Sleep, models clocked from Fcy stop. In\n  Idle, a model stops only if its xSIDL bit is set.\n* **Module disable.** Set `Pmd: system` and `PmdBit: n` on a model: while the PMD1/PMD2 bit is\n  set, the module reads 0 and ignores writes. Bit numbering: PMD1 is 0–15, PMD2 is 16–31.\n* **Time.** Reads of timer counts, polls of lazy interrupt flags and input captures first call\n  `SyncTime()`. This brings virtual time up to the executing instruction, so values read\n  mid-block are exact.\n\n## CPU-side registers (inside the CPU, not a peripheral)\n\nThe following live in the CPU core (`dspic30_core.c`), in the data space at 0x0000–0x0053 and\n0x0080:\n* W0–W15, SPLIM, the accumulators;\n* PCL/PCH, TBLPAG, PSVPAG, RCOUNT, DCOUNT, DOSTART/DOEND;\n* SR, CORCON, MODCON, XMODSRT–XBREV, DISICNT;\n* INTCON1.\n\nINTCON1 holds the trap enables (OVATE, OVBTE, COVTE), the status bits (OSCFAIL, STKERR, ADDRERR,\nMATHERR) and NSTDIS.\n\nThe debugger sees them as CPU registers: `cpu GetRegister n`, using the indices in\n`dsPIC33Registers.cs`.\n\n## Interrupt controller (`dsPIC30_InterruptController`, 0x0082)\n\nRegisters: INTCON2, IFS0–2, IEC0–2, IPC0–10, INTTREG.\n\n* Inputs 0–47 are the interrupt sources in vector order:\n\n  | Input | Source | Input | Source | Input | Source | Input | Source |\n  |---|---|---|---|---|---|---|---|\n  | 0 | INT0 | 12 | NVM | 24 | U2RX | 36 | INT3 |\n  | 1 | IC1 | 13 | SI2C | 25 | U2TX | 37 | INT4 |\n  | 2 | OC1 | 14 | MI2C | 26 | SPI2 | 38 | C2 |\n  | 3 | T1 | 15 | CN | 27 | C1 | 41 | DCI |\n  | 4 | IC2 | 16 | INT1 | 28 | IC3 | | |\n  | 5 | OC2 | 17 | IC7 | 29 | IC4 | | |\n  | 6 | T2 | 18 | IC8 | 30 | IC5 | | |\n  | 7 | T3 | 19 | OC3 | 31 | IC6 | | |\n  | 8 | SPI1 | 20 | OC4 | 32 | OC5 | | |\n  | 9 | U1RX | 21 | T4 | 33 | OC6 | | |\n  | 10 | U1TX | 22 | T5 | 34 | OC7 | | |\n  | 11 | ADC | 23 | INT2 | 35 | OC8 | | |\n\n* Inputs 64–68 are the INT0–INT4 pins. INTCON2.INTxEP selects the active edge: 0 rising,\n  1 falling.\n* The highest-priority source that is pending and enabled is published to the CPU. Ties go to\n  the lower vector. IPC resets to priority 4 for every source.\n* The CPU vectors when that priority is above its own (SR.IPL plus CORCON.IPL3):\n  * DISI holds off priorities 1–6;\n  * NSTDIS raises the CPU priority to 7 on entry;\n  * INTCON2.ALTIVT selects the alternate vector table;\n  * traps (priorities 8–15) always win.\n* INTTREG shows the pending vector and its priority. INTCON2.DISI mirrors DISICNT ≠ 0.\n* **Lazy sources.** Timers register their flags as lazy while their interrupt is disabled. The\n  flag is computed when IFS or INTTREG is read, so a fast timer that is only polled costs no\n  events.\n\n## System control (`dsPIC30_SystemControl`, 0x0740)\n\nRegisters: RCON, OSCCON, NVMCON/NVMADR/NVMADRU/NVMKEY (+0x20), PMD1/PMD2 (+0x30). It also holds\nthe watchdog, the clock and the power state.\n\n* **Clock.** Fcy = Fosc / POST / 4. Fosc comes from the FOSC configuration word (ISA 0xF80000),\n  read when the machine starts:\n\n  | FOS | Source | Fosc |\n  |---|---|---|\n  | 11 | primary | FPR modes XT/HS/XTL/EC/ECIO/ERC/ERCIO run at `oscillatorFrequency`; the PLL modes multiply by 4, 8 or 16 |\n  | 01 | FRC | 7.37 MHz (FPR `FRC_PLLx` multiplies by 4, 8 or 16) |\n  | 10 | LPRC | 512 kHz |\n  | 00 | secondary (LP) | `secondaryFrequency` (32.768 kHz) |\n\n  * **Clock switching:** OSCCON.NOSC with OSWEN switches the source when FCKSM allows it\n    (`CSW_ON_*`). COSC follows, and LOCK reads 1.\n  * **Postscaler:** POST divides Fosc by 1, 4, 16 or 64.\n  * **Fixed Fcy:** `cpuFrequency` > 0 fixes Fcy and ignores the fuses.\n  * **CPU rate:** the CPU runs at Fcy rounded to whole MIPS, because Renode's CPU rate is an\n    integer. The peripherals run at the exact Fcy, and a non-integer Fcy is logged.\n* **Reset causes (RCON).**\n\n  | Cause | RCON bits |\n  |---|---|\n  | power-on | POR, BOR |\n  | RESET instruction | SWR |\n  | illegal opcode | IOPUWR |\n  | trap conflict | TRAPR |\n  | watchdog | WDTO |\n  | MCLR (`system ExternalReset`) | EXTR |\n  | entering Sleep or Idle | SLEEP or IDLE |\n\n  Software resets go through `machine.RequestReset()`. RCON keeps the cause across the reset.\n* **Watchdog.** It is enabled by FWDT.FWDTEN (ISA 0xF80002) or RCON.SWDTEN.\n  * Period: 2 ms × FWPSA (1, 8, 64 or 512) × FWPSB (1–16).\n  * CLRWDT restarts the count.\n  * A timeout resets the device (WDTO); in Sleep or Idle it wakes the CPU instead.\n* **NVM.** Table writes (TBLWTL/TBLWTH, byte or word) fill the write latches. NVMCON operations\n  run after the 0x55/0xAA write to NVMKEY, with WREN set; otherwise WRERR is set.\n\n  | NVMCON | Operation | Duration |\n  |---|---|---|\n  | 0x4041 | erase a 32-instruction flash row | at once (the CPU stalls on the chip) |\n  | 0x4001 | program a flash row | at once |\n  | 0x4044 | erase an EEPROM word | `eepromWriteTime` (2 ms) |\n  | 0x4045 | erase an EEPROM row (16 words) | `eepromWriteTime` |\n  | 0x4046 | erase the whole EEPROM | `eepromWriteTime` |\n  | 0x4004 | write an EEPROM word | `eepromWriteTime` |\n  | 0x4005 | write an EEPROM row | `eepromWriteTime` |\n  | 0x4008 | write a configuration word | at once |\n\n  While an EEPROM operation runs, WR stays set. When the operation ends, WR clears and the NVM\n  interrupt is raised. Flash writes invalidate translated code.\n* **Power.** PWRSAV #1 enters Idle and PWRSAV #0 enters Sleep. The CPU's first instruction or\n  interrupt after waking returns to Run (`PowerChanged`).\n\n## Timers (`dsPIC30_Timer1` at 0x0100, `dsPIC30_TimerPair` at 0x0106 and 0x0114)\n\n* **Timer1 (type A).** Registers: TMR1, PR1, T1CON.\n  * Counts at Fcy divided by TCKPS (1, 8, 64 or 256). TCS = 1 counts `externalFrequency`, the\n    secondary oscillator or T1CK.\n  * Resets after TMR1 == PR1.\n  * TGATE: counts while T1CK (GPIO input 0, pin RC14) is high, and the flag sets on its falling\n    edge.\n  * Keeps counting in Sleep when on the external clock. TSIDL stops it in Idle.\n* **Timer2/3 and Timer4/5 (type B + type C).** Registers: TMRx, TMRyHLD, TMRy, PRx, PRy, TxCON,\n  TyCON.\n  * 16-bit or 32-bit (T32). In 32-bit mode:\n    * PRy:PRx is the period;\n    * the type B control bits apply;\n    * the interrupt is the type C source;\n    * reading TMRx latches TMRyHLD, and TMRyHLD is written before TMRx.\n  * GPIO inputs 0 and 1 are TxCK/TyCK (gate or external clock).\n  * Interrupt outputs: 0 is Timer2/4, 1 is Timer3/5.\n* **Events.** Output compare, input capture and the ADC read `Counter()`, `Matches()` and\n  `PeriodMatch`. They call `RequireEvents()` when they need an event every period.\n* **Lazy mode.** A timer with no consumer and its interrupt disabled runs many periods per\n  internal event. TMR and the period flag are
+… [12248 more characters not shown]
+```
+
+<details><summary>Result</summary>
+
+```
+File created successfully at: /media/riko/model_store/renode-merge/renode/tools/dspic30/PERIPHERALS.md (file state is current in your context — no need to Read it back)
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:31:45
+
+Now the fork README and the embeddyn design page, so both point at the reference and describe the new clock and power behaviour.
+
+**Tool: Bash** — Update the fork README and design page, and scan for private names
+
+```
+{
+ "command": "/media/riko/model_store/embeddyn-venv/bin/python - <<'EOF'\nfrom pathlib import Path\np = Path(\"/media/riko/model_store/renode-merge/renode/tools/dspic30/README.md\"); t = p.read_text()\nold = t[t.index(\"Peripheral models are in `src/Infrastructure\"):]\nt = t.replace(old, \"\"\"Peripheral models are in `src/Infrastructure/src/Emulator/Peripherals/Peripherals/dsPIC30/`:\ninterrupt controller, system control (clock from the configuration fuses, power states, reset\ncauses, watchdog, NVM), timers, output compare, input capture, 12-bit ADC, UART, SPI, I2C, CAN,\nDCI, GPIO and change notification. Every register, mode, timing rule and limit is described in\n[PERIPHERALS.md](PERIPHERALS.md).\n`platforms/boards/microchip/dspic30f5011-bodycontour.repl` is the body-contour board (10 MHz\nexternal clock, so Fcy is 20 MHz from its ECIO_PLL8 fuses).\nFirmware tests: `tests/build_firmware.sh` builds them; `tests/renode/smoke.resc` (core only) and\n`tests/periph/*.resc` (peripherals) run from the Renode root with `include @tools/dspic30/tests/...`.\n\"\"\")\np.write_text(t)\nd = Path(\"/media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md\"); t = d.read_text()\nstart = t.index(\"**Peripherals** (`Peripherals/dsPIC30/*.cs`\")\nend = t.index(\"## Open questions for the product owner\")\nt = t[:start] + \"\"\"**Peripherals** (`Peripherals/dsPIC30/*.cs`, platform\n`platforms/cpus/microchip/dspic30f5011.repl`, board\n`platforms/boards/microchip/dspic30f5011-bodycontour.repl`). The full reference (registers, modes,\ntiming, power, pin routing, limits) is `tools/dspic30/PERIPHERALS.md` in the fork.\n\n| Model | Registers | Behaviour |\n|---|---|---|\n| `dsPIC30_InterruptController` | INTCON2, IFS0-2, IEC0-2, IPC0-10, INTTREG | sources in vector order, INT0-4 pin edges, priority, DISI, NSTDIS, ALTIVT, lazily computed flags |\n| `dsPIC30_SystemControl` | RCON, OSCCON, NVM*, PMD1/2 | Fcy from the FOSC fuses (primary/PLL, FRC, LPRC, secondary, POST) and clock switching; Run/Idle/Sleep; reset causes; watchdog from FWDT; flash/EEPROM programming; module disable |\n| `dsPIC30_Timer1`, `dsPIC30_TimerPair` | Timer1; Timer2/3, Timer4/5 | prescalers, 32-bit mode, gate, external clock, Sleep/Idle; lazy mode while nobody needs per-period events |\n| `dsPIC30_OutputCompare` x8 | OCxRS, OCxR, OCxCON | all compare and PWM modes, fault input, drives RD0-RD7; `DutyCycle`, `PwmFrequency` |\n| `dsPIC30_InputCapture` x8 | ICxBUF, ICxCON | edge modes, prescale, 4-deep FIFO, ICI |\n| `dsPIC30_ADC12` | ADCBUF0-F, ADCON1-3, ADCHS, ADPCFG, ADCSSL | IADC inputs, manual/INT0/Timer3/auto triggers, TAD timing, ADRC in Sleep, scan, alternate, BUFM, formats, references, analog pins |\n| `dsPIC30_UART` x2 | UxMODE/STA/TXREG/RXREG/BRG | 4-deep TX buffer and shift register timed at the baud rate, UTXISEL, 4-deep RX FIFO, OERR, loopback, wake on start bit |\n| `dsPIC30_SPI` x2 | SPIxSTAT/CON/BUF | master transfers timed at Fsck, slave mode as an ISPIPeripheral |\n| `dsPIC30_I2C` | I2C master | bus actions timed at Fscl, ACK/NACK, IWCOL, I2COV |\n| `dsPIC30_CAN` x2 | filters, masks, TX0-2, RX0-1, CTRL, CFG, INTF/INTE | frames timed at the CFG bit rate, priorities, ABAT, double buffering, wake-up; ICAN for a CAN hub |\n| `dsPIC30_DCI` | DCICON1-3, DCISTAT, TSCON/RSCON, buffers | frames and slots, master or external frame sync, loopback, underflow/overflow |\n| `dsPIC30_GPIOPort` x5, `dsPIC30_ChangeNotification` | TRIS/PORT/LAT; CNEN/CNPU | 5011 pin map: CN numbers, pins routed to INTx/ICx/TxCK/SSx/COFS, OC outputs, analog pins, pull-ups |\n\n**Checked with firmware** (XC16-built, `tools/dspic30/tests/periph/`): Timer1 interrupts at the\nrate the fuses give, UART output, echo, buffer and character timing, ADC conversions, 25 % PWM,\ntoggle compare captured by input capture, a CAN frame from CAN1 to CAN2 through a hub, CAN bit\nrate, I2C NACK and bus timing, SPI timing, EEPROM and flash programming, Sleep and Idle with\nwake-up, module disable, DCI loopback, INT1 and IC1 from one pin, change notification, analog\npins, clock switch to FRC, watchdog reset.\n\n**The real body-contour firmware** (the product's own build, kept outside this repository) runs\non the board file without illegal opcodes or unmapped accesses; Fcy comes out at 20 MHz from its\nfuses, and OC6/OC8 at 298.5 kHz (the firmware's 303 kHz). It runs at about 4.7 MIPS on the\ndevelopment host: its receiver-chain clocking toggles port pins in tight loops, and each port\naccess is a call from the CPU into C#.\n\n\"\"\" + t[end:]\nd.write_text(t)\nimport shutil\nshutil.copy(d, \"/media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/project/body-contour-dspic.md\")\nprint(\"ok\")\nEOF\ngrep -c -i -E 'el-[0-9]{2}-[0-9]{2}|GIT/private|private-project' /media/riko/model_store/renode-merge/renode/tools/dspic30/PERIPHERALS.md /media/riko/model_store/renode-merge/renode/tools/dspic30/README.md /media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/*.c /media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/*.resc",
+ "description": "Update the fork README and design page, and scan for private names"
+}
+```
+
+<details><summary>Result</summary>
+
+```
+ok
+/media/riko/model_store/renode-merge/renode/tools/dspic30/README.md:0
+/media/riko/model_store/GIT_/embeddyn/docs/project/body-contour-dspic.md:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/timer1_irq.c:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/periph_detail.c:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/wdt_reset.c:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/periph_all.resc:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/periph_detail.resc:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/periph.resc:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/PERIPHERALS.md:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/wdt_reset.resc:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/periph_all.c:0
+/media/riko/model_store/renode-merge/renode/tools/dspic30/tests/periph/uart_hello.c:0
+```
+
+</details>
+
+### Assistant — 2026-11-25 06:32:10
+
+No private names anywhere. Refreshing the part-2 chat log so it covers this session, mirrored to the monorepo.
+
+**Tool: Bash** — Refresh the chat log and list uncommitted changes
+
+```
+{
+ "command": "P=/home/riko/.claude/projects/-media-riko-model-store-GIT--embeddyn; D=/media/riko/model_store/GIT_/embeddyn/docs/chats; /media/riko/model_store/embeddyn-venv/bin/python $D/render_chat.py $P/d8aa7d0f-b50e-461e-8002-9130aa10629a.jsonl $D/2026-11-25-part2-dspic-core.md --title \"embeddyn development chat, part 2 (2026-11-25): dsPIC30 DSP, Renode integration, peripherals\" --redact-file $HOME/.config/embeddyn/chat-redact.tsv && cp $D/2026-11-25-part2-dspic-core.md /media/riko/model_store/GIT_/codelayer_forge/engines/embeddyn/docs/chats/; grep -c -E '[0-9]{2}-38-00|GIT/private|private-project' $D/2026-11-25-part2-dspic-core.md; export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0='*'; R=/media/riko/model_store/renode-merge/renode; for d in $R/src/Infrastructure/src/Emulator/Cores/tlib $R/src/Infrastructure $R /media/riko/model_store/GIT_/embeddyn /media/riko/model_store/GIT_/codelayer_forge; do echo \"== $(basename $d)\"; git -C $d status --short | grep -v '\\.claude/\\|\\.vscode/' | head -12; done",
+ "description": "Refresh the chat log and list uncommitted changes",
+ "timeout": 300000
+}
+```
+
