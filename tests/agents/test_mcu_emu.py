@@ -210,6 +210,60 @@ def test_build_and_run_mspm0(tmp_path, profile, platform, sram):
     assert r["after"]["iomux PinLevel 0"] == "True"
 
 
+def test_dspic33fj128mc804_profile(monkeypatch):
+    monkeypatch.setenv("XC16_BIN", "/xc")
+    p = tools.load_profile("dspic33fj128mc804")
+    assert "-mcpu=33FJ128MC804" in p["toolchain"]["cflags"]
+    assert p["renode"]["platform"] == "platforms/cpus/microchip/dspic33fj128mc804.repl"
+    assert p["image"]["base"] == "0x01000000" and p["image"]["phantom_lane"] == 3
+
+
+def test_dspic33ep512gp806_profile(monkeypatch):
+    monkeypatch.setenv("XC16_BIN", "/xc")
+    p = tools.load_profile("dspic33ep512gp806")
+    assert "-mcpu=33EP512GP806" in p["toolchain"]["cflags"]
+    assert p["toolchain"]["cflags_post"] == ["-Wl,--script=/xc/../support/dsPIC33E/gld/p33EP512GP806.gld"]
+    assert p["renode"]["platform"] == "platforms/cpus/microchip/dspic33ep512gp806.repl"
+    assert p["memory"]["ram"] == ["0x1000", "0xDFFF"]
+
+
+def test_dspic33ep128gm604_profile(monkeypatch):
+    monkeypatch.setenv("XC16_BIN", "/xc")
+    p = tools.load_profile("dspic33ep128gm604")
+    assert "-mcpu=33EP128GM604" in p["toolchain"]["cflags"]
+    assert p["renode"]["platform"] == "platforms/cpus/microchip/dspic33ep128gm604.repl"
+    assert p["memory"]["ram"] == ["0x1000", "0x4FFF"]
+
+
+def test_concerto_profiles(monkeypatch):
+    monkeypatch.setenv("RENODE_ROOT", "/r")
+    monkeypatch.setenv("C2000_CGT", "/cgt")
+    m3 = tools.load_profile("f28m35h52c1_m3")
+    c28 = tools.load_profile("f28m35h52c1_c28")
+    assert "-T/r/tools/concerto/tests/m3.ld" in m3["toolchain"]["cflags"]
+    assert c28["toolchain"]["style"] == "ti" and "--retain=*(codestart)" in c28["toolchain"]["ldflags"]
+    assert m3["renode"]["platform"] == c28["renode"]["platform"] == "platforms/cpus/ti/f28m35h52c1.repl"
+    # per-CPU load commands pass through unchanged
+    assert tools._load_lines(["c28 LoadTIProgram @a.out false", "m3 VectorTableOffset 0", "b.bin 0x0"]) == \
+        ["c28 LoadTIProgram @a.out false", "m3 VectorTableOffset 0", "sysbus LoadBinary @b.bin 0x0"]
+
+
+needs_concerto = pytest.mark.skipif(not (os.environ.get("ARM_BIN") and os.environ.get("C2000_CGT") and os.environ.get("RENODE_BIN")
+                                         and os.environ.get("RENODE_ROOT") and shutil.which("dotnet")),
+                                    reason="ARM_BIN, C2000_CGT, RENODE_BIN, RENODE_ROOT and dotnet needed")
+
+
+@needs_concerto
+def test_build_and_run_concerto_ipc(tmp_path):
+    tests = Path(os.environ["RENODE_ROOT"]) / "tools" / "concerto" / "tests"
+    m3 = tools.build_firmware("f28m35h52c1_m3", str(tests / "m3_ipc.c"), out_dir=str(tmp_path / "m3"))
+    c28 = tools.build_firmware("f28m35h52c1_c28", str(tests / "c28_ipc.c"), out_dir=str(tmp_path / "c28"))
+    assert m3["ok"] and c28["ok"], (m3, c28)
+    r = tools.renode_run("platforms/cpus/ti/f28m35h52c1.repl", m3["load_commands"] + c28["load_commands"], run_for="0.01",
+                         uart=["uart0"], cpu="m3")
+    assert "M3: C28 says 00001235 00C28C28" in r["uart"]["uart0"], r
+
+
 needs_tools = pytest.mark.skipif(not (os.environ.get("XC16_BIN") and os.environ.get("RENODE_BIN") and os.environ.get("RENODE_ROOT")
                                       and shutil.which("dotnet")), reason="XC16_BIN, RENODE_BIN, RENODE_ROOT and dotnet needed")
 
@@ -222,3 +276,29 @@ def test_build_and_run_dspic30_smoke(tmp_path):
     # 0.2 s: blank configuration fuses mean the 64 ms power-up timer before the first instruction
     r = tools.renode_run("platforms/cpus/microchip/dspic30f5011.repl", b["load_commands"], run_for="0.2", reads=["0x900", "0x906"])
     assert r["reads"] == {"0x900": "0x7360", "0x906": "0xC0DE"}, r
+
+
+@needs_tools
+def test_build_and_run_dspic33e_cpu(tmp_path):
+    src = Path(os.environ["RENODE_ROOT"]) / "tools/dspic30/tests/dspic33e/cpu33e.c"
+    b = tools.build_firmware("dspic33ep512gp806", str(src), out_dir=str(tmp_path))
+    assert b["ok"], b
+    r = tools.renode_run("platforms/cpus/microchip/dspic33ep512gp806.repl", b["load_commands"], run_for="0.05",
+                         reads=["0x1000", "0x1002", "0x1014", "0x101E"])
+    # 12 steps done; four nested DO loops 36; PSV const 0xC0DE; REPEAT #20000 -> 20001
+    assert r["reads"] == {"0x1000": "0x000C", "0x1002": "0x0024", "0x1014": "0xC0DE", "0x101E": "0x4E21"}, r
+
+
+@needs_tools
+def test_build_and_run_dspic33ep128gm604(tmp_path):
+    src = Path(os.environ["RENODE_ROOT"]) / "tools/dspic30/tests/dspic33e/periph604.c"
+    b = tools.build_firmware("dspic33ep128gm604", str(src), out_dir=str(tmp_path))
+    assert b["ok"], b
+    # the configuration words are in flash: build_firmware returns a load command per HEX segment
+    r = tools.renode_run("platforms/cpus/microchip/dspic33ep128gm604.repl", b["load_commands"], run_for="0.05",
+                         before=["adc1 SetVoltage 1000000 4", "adc1 SetVoltage 2000000 6"],
+                         reads=["0x1000", "0x1008", "0x100A", "0x100C", "0x1012"], after=["pwm Frequency 1"])
+    # all nine steps; override 0x4000; op amp follower 1.0 V on AN3; C4OUT; PTG 3 interrupts / 3 conversions
+    assert r["reads"] == {"0x1000": "0x0009", "0x1008": "0x4000", "0x100A": "0x04D9", "0x100C": "0x0008",
+                          "0x1012": "0x0303"}, r
+    assert abs(float(r["after"]["pwm Frequency 1"]) - 20000) < 5, r

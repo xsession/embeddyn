@@ -401,8 +401,10 @@ def build_firmware(profile: str, source: str, out_dir: str | None = None, extra_
         return {"ok": False, "stage": "hex", "errors": _lines(r.stdout + r.stderr, r".", 10)}
     image = p.get("image", {})
     images = hex_images(hex_path, out / "out", _int(image.get("base", 0)), phantom_lane=image.get("phantom_lane"))
-    return {"ok": True, "elf": str(elf), "hex": str(hex_path), "images": images,
-            "load_commands": [f"sysbus LoadBinary @{i['file']} {i['address']}" for i in images],
+    # a profile can give its own load commands (e.g. per-CPU loads on multi-core parts), ';'-separated
+    loads = ([c.strip().format(elf=elf) for c in image["loader"].split(";")] if image.get("loader")
+             else [f"sysbus LoadBinary @{i['file']} {i['address']}" for i in images])
+    return {"ok": True, "elf": str(elf), "hex": str(hex_path), "images": images, "load_commands": loads,
             "warnings": _lines(text, r"warning", 15)}
 
 
@@ -487,7 +489,10 @@ def _load_lines(loads: list | None) -> list[str]:
     out = []
     for item in loads or []:
         if isinstance(item, str):
-            out.append(item if item.startswith(("sysbus", "cpu ")) else f"sysbus LoadBinary @{item}")
+            # monitor commands ("sysbus ...", "cpu LoadTIProgram ...", "c28 LoadTIProgram ...", "m3 VectorTableOffset 0")
+            # pass through; a bare path is a binary to load
+            raw = item.startswith(("sysbus", "cpu ")) or re.match(r"^\w+ [A-Z]\w+", item)
+            out.append(item if raw else f"sysbus LoadBinary @{item}")
         else:
             kind = item.get("kind", "binary")
             if kind == "elf":
@@ -518,7 +523,8 @@ def renode_check_platform(platform: str, extra_repl: list | None = None, renode_
       "commands around the run (e.g. 'adc SetVoltage 1250000 3'); after-commands return their output. `reads`: "
       "addresses to read after the run ('0xA00', '0xA00:8' for a byte, ':32' for a double word). `uart`: peripheral "
       "names whose output is captured. `stimuli`: [{at: seconds, command}] run at those times. Returns values, UART text, "
-      "warnings/errors (counted), executed instructions and wall time.",
+      "warnings/errors (counted), executed instructions and wall time. `cpu`: the CPU whose PC is reported and in whose "
+      "address map `reads` are done (multi-core platforms, e.g. 'm3' or 'c28').",
       {"platform": S, "loads": {"type": "array"}, "run_for": S, "before": {"type": "array", "items": S},
        "after": {"type": "array", "items": S}, "reads": {"type": "array", "items": S},
        "uart": {"type": "array", "items": S}, "stimuli": {"type": "array"}, "extra_repl": {"type": "array", "items": S},
@@ -548,7 +554,9 @@ def renode_run(platform: str, loads: list, run_for: str = "0.1", before: list | 
     for i, r in enumerate(reads or []):
         addr, _, width = str(r).partition(":")
         op = {"8": "ReadByte", "32": "ReadDoubleWord"}.get(width, "ReadWord")
-        lines += [f'echo "@@READ {i}"', f"sysbus {op} {addr}"]
+        # multi-core platforms register memory per CPU: read in the named CPU's address map
+        ctx = f" {cpu}" if cpu != "cpu" else ""
+        lines += [f'echo "@@READ {i}"', f"sysbus {op} {addr}{ctx}"]
     lines += ['echo "@@CPU"', f"{cpu} PC", f"{cpu} ExecutedInstructions", 'echo "@@END"']
     text, wall = _run_script(lines, renode_root, timeout)
 

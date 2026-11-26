@@ -1,0 +1,80 @@
+{
+  "name": "f28m35h52c1_c28",
+  "description": "TI F28M35H52C1 (Concerto) control subsystem: C28x + FPU32 + VCU at up to 150 MHz, TI C2000 code generation tools (cl2000, EABI), booted to RAM by the M3",
+  "env_defaults": {
+    "C2000_CGT": "/opt/ti/ti-cgt-c2000_22.6.1.LTS",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "style": "ti",
+    "cc": "${C2000_CGT}/bin/cl2000",
+    "cflags": [
+      "-v28",
+      "--float_support=fpu32",
+      "--vcu_support=vcu0",
+      "--abi=eabi",
+      "--c99",
+      "-O1",
+      "-q",
+      "-I${C2000_CGT}/include"
+    ],
+    "extra_sources": [
+      "${RENODE_ROOT}/tools/concerto/tests/c28_codestart.asm"
+    ],
+    "ldflags": [
+      "-i${C2000_CGT}/lib",
+      "--retain=*(codestart)"
+    ],
+    "link_files": [
+      "${RENODE_ROOT}/tools/concerto/tests/c28.cmd"
+    ],
+    "libs": [
+      "-lrts2800_fpu32_eabi.lib"
+    ],
+    "objdump": "${C2000_CGT}/bin/dis2000",
+    "objdump_args": [
+      "-qq"
+    ]
+  },
+  "files": {},
+  "image": {
+    "loader": "c28 LoadTIProgram @{elf} false",
+    "notes": "word addressed: word a is bus address 2a in the C28 map. c28.cmd puts codestart (LB _c_int00) at the RAM boot entry word 0x0, code in L0-L1, data in L2-L3, the stack in M1. The program is loaded but not started: the M3 starts it over IPC (or 'ipc StartC28 0')."
+  },
+  "memory": {
+    "word_addressed": true,
+    "m0m1": [
+      "0x0000",
+      "0x07FF"
+    ],
+    "l0_l3": [
+      "0x8000",
+      "0xBFFF"
+    ],
+    "shared_s0_s7": [
+      "0xC000",
+      "0x13FFF"
+    ],
+    "ctom_msgram": [
+      "0x3F800",
+      "0x3FBFF"
+    ],
+    "mtoc_msgram": [
+      "0x3FC00",
+      "0x3FFFF"
+    ],
+    "flash": [
+      "0x100000",
+      "0x13FFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/ti/f28m35h52c1.repl",
+    "pc_command": "c28 PC",
+    "cpu": "c28",
+    "notes": "Two CPUs in one machine (m3 Cortex-M3, c28 C28x): every address is per CPU; monitor reads name it ('sysbus ReadDoubleWord 0x20008000 m3'). The M3 boots through the M-Boot ROM stub to flash 0x00200030 and starts the C28 with the IPC boot command (MTOCIPCCOM 0x13, MTOCIPCBOOTMODE 1 = RAM word 0x0, 2 = flash word 0x13FFF0, MTOCIPCSET 0x80000001), or 'ipc StartC28 <word>'. Shared S0-S7 RAM: M3 0x20008000 = C28 word 0xC000. Pins: 'pins RecordPin n', 'pins PinFrequency n'. Docs: tools/concerto/PERIPHERALS.md."
+  },
+  "reference": {
+    "simulator": "none; C28 peripherals shared with the F28069 models (tools/c2000), Concerto blocks checked with tools/concerto/tests"
+  }
+}

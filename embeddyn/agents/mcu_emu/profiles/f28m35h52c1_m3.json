@@ -1,0 +1,70 @@
+{
+  "name": "f28m35h52c1_m3",
+  "description": "TI F28M35H52C1 (Concerto) master subsystem: Cortex-M3 at up to 100 MHz, GNU Arm toolchain (register-level C, no TI libraries), Renode dual-core platform (use with f28m35h52c1_c28 for the control subsystem)",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m3",
+      "-mthumb",
+      "-O1",
+      "-g",
+      "-nostdlib",
+      "-ffreestanding",
+      "-T${RENODE_ROOT}/tools/concerto/tests/m3.ld"
+    ],
+    "cflags_post": [
+      "-lgcc"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump"
+  },
+  "files": {},
+  "image": {
+    "base": "0x0",
+    "loader": "sysbus LoadELF @{elf} false m3; m3 VectorTableOffset 0",
+    "notes": "m3.ld links the code at the flash entry 0x00200030 (put a naked entry function in section .entry that sets SP and branches to main) and the vector table in .vectors (set VTOR to it). See tools/concerto/tests/m3_ipc.c."
+  },
+  "memory": {
+    "boot_rom": [
+      "0x00000000",
+      "0x0000FFFF"
+    ],
+    "flash": [
+      "0x00200000",
+      "0x0027FFFF"
+    ],
+    "ram_c0_c3": [
+      "0x20000000",
+      "0x20007FFF"
+    ],
+    "shared_s0_s7": [
+      "0x20008000",
+      "0x20017FFF"
+    ],
+    "ctom_msgram": [
+      "0x2007F000",
+      "0x2007F7FF"
+    ],
+    "mtoc_msgram": [
+      "0x2007F800",
+      "0x2007FFFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x400FFFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/ti/f28m35h52c1.repl",
+    "pc_command": "m3 PC",
+    "cpu": "m3",
+    "notes": "Two CPUs in one machine (m3 Cortex-M3, c28 C28x): every address is per CPU; monitor reads name it ('sysbus ReadDoubleWord 0x20008000 m3'). The M3 boots through the M-Boot ROM stub to flash 0x00200030 and starts the C28 with the IPC boot command (MTOCIPCCOM 0x13, MTOCIPCBOOTMODE 1 = RAM word 0x0, 2 = flash word 0x13FFF0, MTOCIPCSET 0x80000001), or 'ipc StartC28 <word>'. Shared S0-S7 RAM: M3 0x20008000 = C28 word 0xC000. Pins: 'pins RecordPin n', 'pins PinFrequency n'. Docs: tools/concerto/PERIPHERALS.md."
+  },
+  "reference": {
+    "simulator": "none; checked with register-level dual-core tests (tools/concerto/tests)"
+  }
+}
