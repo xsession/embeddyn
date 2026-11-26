@@ -235,6 +235,40 @@ def test_dspic33ep128gm604_profile(monkeypatch):
     assert p["memory"]["ram"] == ["0x1000", "0x4FFF"]
 
 
+def test_rp2040_profile(monkeypatch):
+    monkeypatch.setenv("RENODE_ROOT", "/r")
+    monkeypatch.setenv("ARM_BIN", "/arm")
+    p = tools.load_profile("rp2040")
+    assert p["toolchain"]["cc"] == "/arm/arm-none-eabi-gcc"
+    assert "-T/r/tools/rp2040/tests/rp2040.ld" in p["toolchain"]["cflags"]
+    assert p["toolchain"]["cflags_post"][0] == "/r/tools/rp2040/tests/crt0.S"
+    assert p["renode"]["platform"] == "platforms/boards/raspberrypi/raspberry_pi_pico.repl"
+    assert p["memory"]["sram"] == ["0x20000000", "0x20041FFF"]
+
+
+needs_rp2040 = pytest.mark.skipif(not (os.environ.get("ARM_BIN") and os.environ.get("RENODE_BIN") and os.environ.get("RENODE_ROOT")
+                                       and shutil.which("dotnet")),
+                                  reason="ARM_BIN (arm-none-eabi with newlib), RENODE_BIN, RENODE_ROOT and dotnet needed")
+
+
+@needs_rp2040
+def test_build_and_run_rp2040_periph(tmp_path):
+    root = Path(os.environ["RENODE_ROOT"])
+    b = tools.build_firmware("rp2040", str(root / "tools/rp2040/tests/periph.c"), out_dir=str(tmp_path))
+    assert b["ok"], b
+    nm = subprocess.run([str(Path(os.environ["ARM_BIN"]) / "arm-none-eabi-nm"), b["elf"]], capture_output=True, text=True).stdout
+    r = int(re.search(r"^([0-9a-f]{8}) [bB] r$", nm, re.M).group(1), 16)
+    rom = str(root / "tools/rp2040/bootrom/rp2040_bootrom.elf")
+    res = tools.renode_run("platforms/boards/raspberrypi/raspberry_pi_pico.repl",
+                           [{"file": rom, "kind": "elf"}, {"file": b["elf"], "kind": "elf"}], run_for="0.01",
+                           before=["adc SetVoltage 0 1.65"], uart=["uart0"],
+                           reads=[f"0x{r + 4 * i:X}:32" for i in (0, 1, 4, 7, 8, 9, 10)])
+    # all 10 steps; divider 142 r 6; interpolator 0x18D; DMA sum 36; PIO ~x; ADC 1.65 V; core 1 ran
+    assert list(res["reads"].values()) == ["0x0000000A", "0x008E0006", "0x0000018D", "0x00000024", "0xF0F0F0F0",
+                                           "0x00000800", "0xC0DE0001"], res
+    assert "RP2040 OK" in res["uart"]["uart0"], res
+
+
 def test_concerto_profiles(monkeypatch):
     monkeypatch.setenv("RENODE_ROOT", "/r")
     monkeypatch.setenv("C2000_CGT", "/cgt")

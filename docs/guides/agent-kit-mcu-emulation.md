@@ -35,7 +35,10 @@ The agent kit packages that workflow so that an agent running a 27B-class open m
   `cpu LoadTIProgram`, dis2000 for disassembly), the MSPM0G3507 and MSPM0C1103 (GNU Arm with
   the MSPM0 SDK headers, startup file, linker script and DriverLib), the F28M35H52C1 Concerto as two
   profiles on one dual-core platform (`f28m35h52c1_m3`, GNU Arm; `f28m35h52c1_c28`, TI cl2000; pass both
-  load commands to `renode_run` and name the CPU with `cpu`), plus an STM32L476 example for
+  load commands to `renode_run` and name the CPU with `cpu`), the RP2040 (GNU Arm, both Cortex-M0+
+  cores; `build_firmware` makes bare-metal programs with the start-up in the Renode tree, Pico SDK
+  programs build with CMake; load the behavioural boot ROM `tools/rp2040/bootrom/rp2040_bootrom.elf`
+  before the program), plus an STM32L476 example for
   SVD-described parts. Add your own in `$MCU_EMU_PROFILES`.
 
 ## Install

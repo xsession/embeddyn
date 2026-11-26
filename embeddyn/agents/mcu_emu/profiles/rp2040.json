@@ -1,0 +1,70 @@
+{
+  "name": "rp2040",
+  "description": "Raspberry Pi RP2040 (dual Cortex-M0+, 133 MHz, 264 KB SRAM, external QSPI flash through XIP, PIO): GNU Arm toolchain with the Pico SDK (CMake), Renode RP2040 models with a behavioural boot ROM",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "PICO_SDK_PATH": "/opt/pico-sdk",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0plus",
+      "-mthumb",
+      "-O1",
+      "-g",
+      "-nostartfiles",
+      "-ffunction-sections",
+      "-T${RENODE_ROOT}/tools/rp2040/tests/rp2040.ld"
+    ],
+    "cflags_post": [
+      "${RENODE_ROOT}/tools/rp2040/tests/crt0.S",
+      "-Wl,--gc-sections",
+      "-lgcc"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "build_firmware makes bare-metal programs with the start-up and layout in the Renode tree (tools/rp2040/tests/crt0.S and rp2040.ld: a minimal boot2, vector table at 0x10000100, handlers irqN_handler); tools/rp2040/tests/periph.c is a register-level example. Pico SDK programs build with CMake instead (PICO_BOARD=pico, -Dpicotool_FOUND=0 skips fetching picotool); use the ELF of the default flash build. tools/rp2040/examples/build_examples.sh builds pico-examples."
+  },
+  "files": {
+    "header": "${PICO_SDK_PATH}/src/rp2040/hardware_regs/include/hardware/regs/addressmap.h"
+  },
+  "image": {
+    "base": "0x10000000",
+    "notes": "load the boot ROM first ({kind: elf, path: ${RENODE_ROOT}/tools/rp2040/bootrom/rp2040_bootrom.elf}), then the program ELF (flash at 0x10000000 starting with the 256-byte boot stage 2). Both cores start in the ROM; core 0 runs boot2, which jumps to the vector table at 0x10000100."
+  },
+  "memory": {
+    "rom": [
+      "0x00000000",
+      "0x0000FFFF"
+    ],
+    "flash": [
+      "0x10000000",
+      "0x101FFFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x20041FFF"
+    ],
+    "apb": [
+      "0x40000000",
+      "0x4006FFFF"
+    ],
+    "ahb": [
+      "0x50000000",
+      "0x504FFFFF"
+    ],
+    "sio": [
+      "0xD0000000",
+      "0xD00001FF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/boards/raspberrypi/raspberry_pi_pico.repl",
+    "pc_command": "cpu0 PC",
+    "notes": "Two CPUs (cpu0, cpu1), one NVIC each; every peripheral block has the atomic XOR/SET/CLR aliases at +0x1000/+0x2000/+0x3000. Pins: 'io_bank0 PinLevel <n>', 'io_bank0 RecordPin <n>' then 'io_bank0 PinEdges <n>'; drive a pin from outside with 'io_bank0 OnGPIO <n> true' ('io_bank0 Release <n>' to let it float to its pull). UART: 'uart0 CreateFileBackend @file true', input 'uart0 WriteChar <byte>'. ADC: 'adc SetVoltage <ch 0-3> <V>', 'adc Temperature <C>'; jumper wires: 'io_bank0 Wire <from> <to>' (UART pins carry real waveforms, so a UART, PIO or PWM output can feed another input). I2C devices attach as 'machine LoadPlatformDescriptionFromString \"bmp: Sensors.BMP280 @ i2c0 0x76\"'; two controllers become one bus with 'i2c0 SharedBus true' and 'i2c1 SharedBus true'. SPI devices: one per controller, the CS GPIO (csPin, GPIO17 for spi0) ends each transfer. PIO machines catch up every 'pio0 TickMicroseconds' (10 us). Watchdog reboots keep RAM and the scratch registers. Docs: tools/rp2040/README.md and PERIPHERALS.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the Pico SDK's pico-examples (tools/rp2040/examples/run_examples.py with examples.txt in the Renode tree)"
+  }
+}
