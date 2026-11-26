@@ -269,6 +269,37 @@ def test_build_and_run_rp2040_periph(tmp_path):
     assert "RP2040 OK" in res["uart"]["uart0"], res
 
 
+def test_nrf51822_profile(monkeypatch):
+    monkeypatch.setenv("NRF5_SDK", "/sdk")
+    monkeypatch.setenv("ARM_BIN", "/arm")
+    p = tools.load_profile("nrf51822")
+    assert p["toolchain"]["cc"] == "/arm/arm-none-eabi-gcc"
+    assert "-I/sdk/components/device" in p["toolchain"]["cflags"]
+    assert p["toolchain"]["cflags_post"][0] == "/sdk/components/toolchain/gcc/gcc_startup_nrf51.S"
+    assert p["renode"]["platform"] == "platforms/boards/nordic/nrf51dk.repl"
+
+
+needs_nrf51 = pytest.mark.skipif(not (os.environ.get("ARM_BIN") and os.environ.get("NRF5_SDK") and os.environ.get("RENODE_BIN")
+                                      and os.environ.get("RENODE_ROOT") and shutil.which("dotnet")),
+                                 reason="ARM_BIN (arm-none-eabi with newlib), NRF5_SDK, RENODE_BIN, RENODE_ROOT and dotnet needed")
+
+
+@needs_nrf51
+def test_build_and_run_nrf51_periph(tmp_path):
+    root = Path(os.environ["RENODE_ROOT"])
+    b = tools.build_firmware("nrf51822", str(root / "tools/nrf51/tests/periph.c"), out_dir=str(tmp_path))
+    assert b["ok"], b
+    nm = subprocess.run([str(Path(os.environ["ARM_BIN"]) / "arm-none-eabi-nm"), b["elf"]], capture_output=True, text=True).stdout
+    r = int(re.search(r"^([0-9a-f]{8}) [bB] r$", nm, re.M).group(1), 16)
+    res = tools.renode_run("platforms/boards/nordic/nrf51dk.repl", [{"file": b["elf"], "kind": "elf"}], run_for="0.1",
+                           before=['emulation SetGlobalQuantum "0.00001"', "adc SetVoltage 2 0.6", "temp Temperature 30.25"],
+                           uart=["uart0"], reads=[f"0x{r + 4 * i:X}:32" for i in (0, 2, 3, 5, 6, 8, 9)])
+    # 10 steps; 3 timer interrupts; PPI toggled P0.21 up then down; ADC 512; 30.25 C = 121 quarters; AES vector; NVMC
+    assert list(res["reads"].values()) == ["0x0000000A", "0x00000003", "0x00000002", "0x00000200", "0x00000079",
+                                           "0x69C4E0D8", "0x00000001"], res
+    assert "nRF51 OK" in res["uart"]["uart0"], res
+
+
 def test_concerto_profiles(monkeypatch):
     monkeypatch.setenv("RENODE_ROOT", "/r")
     monkeypatch.setenv("C2000_CGT", "/cgt")

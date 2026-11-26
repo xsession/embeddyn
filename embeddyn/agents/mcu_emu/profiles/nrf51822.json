@@ -1,0 +1,77 @@
+{
+  "name": "nrf51822",
+  "description": "Nordic nRF51822 (Cortex-M0, 16 MHz, 256 KB flash, 32 KB RAM, 2.4 GHz radio): GNU Arm toolchain with the nRF5 SDK 12.3 (MDK headers, CMSIS start-up, linker script), Renode nRF51 models",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "NRF5_SDK": "/opt/nRF5_SDK_12.3.0_d7731ad",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0",
+      "-mthumb",
+      "-O1",
+      "-g",
+      "-DNRF51",
+      "-DNRF51822",
+      "-I${NRF5_SDK}/components/toolchain/cmsis/include",
+      "-I${NRF5_SDK}/components/toolchain",
+      "-I${NRF5_SDK}/components/device",
+      "-I${NRF5_SDK}/components/toolchain/gcc"
+    ],
+    "cflags_post": [
+      "${NRF5_SDK}/components/toolchain/gcc/gcc_startup_nrf51.S",
+      "${NRF5_SDK}/components/toolchain/system_nrf51.c",
+      "-L${NRF5_SDK}/components/toolchain/gcc",
+      "-T${NRF5_SDK}/examples/peripheral/blinky/pca10028/blank/armgcc/blinky_gcc_nrf51.ld",
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Bare-metal programs use the SDK's MDK (#include \"nrf.h\"); tools/nrf51/tests/periph.c in the Renode tree is a register-level example. SDK examples build with their own Makefiles: tools/nrf51/examples/build_examples.sh (GCC 13 / newlib 4 adjustments)."
+  },
+  "files": {
+    "header": "${NRF5_SDK}/components/device/nrf51.h"
+  },
+  "image": {
+    "base": "0x0",
+    "notes": "load the ELF ({kind: elf}). With a SoftDevice, load its HEX too (components/softdevice/s130/hex/s130_nrf51_2.0.1_softdevice.hex); the MBR at 0 starts the SoftDevice, which starts the application at 0x1B000."
+  },
+  "memory": {
+    "flash": [
+      "0x00000000",
+      "0x0003FFFF"
+    ],
+    "ram": [
+      "0x20000000",
+      "0x20007FFF"
+    ],
+    "ficr": [
+      "0x10000000",
+      "0x10000FFF"
+    ],
+    "uicr": [
+      "0x10001000",
+      "0x10001FFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x4001FFFF"
+    ],
+    "gpio": [
+      "0x50000000",
+      "0x500007FF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/boards/nordic/nrf51dk.repl",
+    "pc_command": "cpu PC",
+    "notes": "Run with 'emulation SetGlobalQuantum \"0.00001\"' (start-then-WFE code such as an ADC conversion otherwise misses its wake-up). Pins: 'gpio0 PinLevel <n>', 'gpio0 RecordPin <n>' then 'gpio0 PinEdges <n>'; buttons on the DK are active low: 'gpio0 OnGPIO 17 false' presses, 'true' releases; 'gpio0 Wire <from> <to>' makes a jumper. Analog: 'adc SetVoltage <AIN 0-7> <V>' (also LPCOMP's inputs), 'adc Vdd <V>', 'temp Temperature <C>'. UART: 'uart0 CreateFileBackend @file true', input 'uart0 WriteChar <byte>'. TWI devices: 'machine LoadPlatformDescriptionFromString \"lm75: Sensors.LM75B @ twi0 0x48\"' (also Sensors.MMA7660); SPI: one device per spi0/spi1, 'spi0 CsPin <n>' names its chip-select GPIO; SD card: 'machine SdCardFromFile @img spi0 <size> false \"sd\"'. SYSRESETREQ and the watchdog reset the chip keeping flash and RAM; System OFF wakes on a GPIO DETECT. Erased flash/UICR read 0xFF. Docs: tools/nrf51/README.md and PERIPHERALS.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the nRF5 SDK 12.3 peripheral examples (tools/nrf51/examples/run_examples.py, examples.txt) and tools/nrf51/tests/periph.c"
+  }
+}

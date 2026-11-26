@@ -38,7 +38,8 @@ The agent kit packages that workflow so that an agent running a 27B-class open m
   load commands to `renode_run` and name the CPU with `cpu`), the RP2040 (GNU Arm, both Cortex-M0+
   cores; `build_firmware` makes bare-metal programs with the start-up in the Renode tree, Pico SDK
   programs build with CMake; load the behavioural boot ROM `tools/rp2040/bootrom/rp2040_bootrom.elf`
-  before the program), plus an STM32L476 example for
+  before the program), the nRF51822 (GNU Arm with the nRF5 SDK 12.3 MDK; run with a 10 us quantum; load the
+  S130 SoftDevice HEX too for SoftDevice applications), plus an STM32L476 example for
   SVD-described parts. Add your own in `$MCU_EMU_PROFILES`.
 
 ## Install
