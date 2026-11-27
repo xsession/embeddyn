@@ -1,5 +1,5 @@
 // Graph editing operations: add/delete nodes, connect/disconnect pins, refresh ports.
-import { api, findNode, markDirty, state, toast } from './store.js';
+import { api, emit, findNode, markDirty, state, toast } from './store.js';
 
 let wireCounter = 1;
 const newWireId = () => {
@@ -19,10 +19,72 @@ const PART_BASE = {
   servo_pulse_gen: 'pulsegen', function_generator: 'fgen', stm32l476_servo_fw: 'mcu', renode_mcu: 'mcu',
   ngspice_circuit: 'circuit', webots_world: 'world', fmu: 'fmu', replay_csv: 'replay', slider: 'slider',
   switch: 'switch', oscilloscope: 'scope', multimeter: 'dmm', logic_analyser: 'logic', xy_plotter: 'xy',
-  gauge: 'gauge', led: 'led', data_table: 'watch',
+  gauge: 'gauge', led: 'led', data_table: 'watch', tmp102: 'tmp', lis3dh: 'acc', em4100: 'card', gps: 'gps',
+  can_bus: 'canbus', i2c_master: 'i2cmcu', spi_master: 'spimcu', eth_plc: 'plc', eth_io: 'io', modbus_master: 'plc',
+  modbus_slave: 'drive',
 };
 
+// Re-derive the graph from its project document: bus nodes and bus wires follow the boards' event options.
+export async function regraph() {
+  const selection = state.selection;
+  const { graph } = await api('regraph', { graph: state.graph });
+  state.graph = graph;
+  state.selection = selection && (selection.type === 'node' ? findNode(selection.id) : null) ? selection : null;
+  markDirty();
+  emit('selection');
+}
+
+const busId = (topic) => 'bus_' + topic.replace(/[^A-Za-z0-9_]/g, '_');
+
+async function addBus(x, y) {
+  const topic = (prompt('Bus topic: the event topic boards publish on and subscribe to (can, uart, i2c, eth, ble…)', 'can') || '').trim();
+  if (!topic) return null;
+  if (findNode(busId(topic))) { toast(`Bus ${topic} exists already`, true); return null; }
+  state.graph.nodes.push({ id: busId(topic), kind: 'bus', part: 'bus', label: topic, topic, icon: 'bus',
+    x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, ports: [] });
+  await regraph();
+  state.selection = { type: 'node', id: busId(topic) };
+  toast(`Bus ${topic}: wire event outputs to its tx pin, its rx pin to event inputs`);
+  return findNode(busId(topic));
+}
+
+// Publish/subscribe an event pin on a topic (null: take it off its bus).
+function setEvent(node, port, topic, previous = port.signal) {
+  if (!node || node.kind !== 'instance') return;
+  const options = node.spec.options = node.spec.options || {};
+  if (port.name.startsWith('event:')) {
+    const key = port.direction === 'out' ? 'events' : 'subscribe';
+    options[key] = options[key] || {};
+    if (topic) options[key][port.event] = topic; else delete options[key][port.event];
+    if (!Object.keys(options[key]).length) delete options[key];
+  } else if (port.name === 'can:tx') {
+    options.can = options.can || {};
+    if (topic) options.can.publish = topic; else delete options.can.publish;
+  } else if (port.name.startsWith('can:rx')) {
+    options.can = options.can || {};
+    let list = [].concat(options.can.subscribe || []).filter((t) => t !== previous);
+    if (topic && !list.includes(topic)) list.push(topic);
+    if (!list.length) delete options.can.subscribe; else options.can.subscribe = list.length === 1 ? list[0] : list;
+  }
+}
+
+async function connectEvent(src, dst) {
+  const srcNode = findNode(src.node), dstNode = findNode(dst.node);
+  const srcPort = srcNode.ports.find((p) => p.name === src.port), dstPort = dstNode.ports.find((p) => p.name === dst.port);
+  if (srcPort.kind !== 'event' || dstPort.kind !== 'event') return toast('Event pins (bus connections) connect only to event pins or buses', true);
+  if (srcNode.kind === 'bus' && dstNode.kind === 'bus') return toast('Connect boards to a bus, not two buses', true);
+  if (srcPort.name.startsWith('uart:') || dstPort.name.startsWith('uart:')) return toast('A UART console goes to a serial monitor, not a bus', true);
+  const topic = srcNode.kind === 'bus' ? srcNode.topic || srcNode.label
+    : dstNode.kind === 'bus' ? dstNode.topic || dstNode.label
+      : srcPort.signal || dstPort.signal || `${srcNode.id}.${srcPort.event || 'tx'}`;
+  if (srcNode.kind !== 'bus') setEvent(srcNode, srcPort, topic);
+  if (dstNode.kind !== 'bus') setEvent(dstNode, dstPort, topic, dstPort.name.startsWith('can:rx') ? null : dstPort.signal);
+  await regraph();
+  toast(`${src.node}.${src.port} → ${topic} → ${dst.node}.${dst.port}`);
+}
+
 export async function addPart(partId, x, y) {
+  if (partId === 'bus') return addBus(x, y);
   const part = state.partsById[partId];
   const id = uniqueNodeId(PART_BASE[partId] || partId.replace(/^scene_/, ''));
   const result = await api('instantiate', { part: partId, id, root: state.graph.root, signals: state.graph.signals });
@@ -32,7 +94,8 @@ export async function addPart(partId, x, y) {
   Object.assign(state.graph.signals, result.signals);
   state.graph.nodes.push(node);
   state.selection = { type: 'node', id: node.id };
-  markDirty();
+  if (node.ports.some((p) => p.kind === 'event' && p.signal)) await regraph();      // it joins its usual bus
+  else markDirty();
   toast(`Added ${part?.name || partId} as ${id}`);
   return node;
 }
@@ -51,6 +114,14 @@ function cleanupWire(wire) {
 export function deleteWire(id) {
   const wire = state.graph.wires.find((w) => w.id === id);
   if (!wire) return;
+  if (wire.kind === 'bus') {                     // take the board's pin off the bus
+    const end = findNode(wire.source.node)?.kind === 'bus' ? wire.target : wire.source;
+    const node = findNode(end.node);
+    setEvent(node, node.ports.find((p) => p.name === end.port), null, wire.signal);
+    if (state.selection?.id === id) state.selection = null;
+    regraph().catch((error) => toast(error.message, true));
+    return;
+  }
   cleanupWire(wire);
   state.graph.wires = state.graph.wires.filter((w) => w.id !== id);
   if (state.selection?.id === id) state.selection = null;
@@ -65,6 +136,16 @@ function signalInUse(name) {
 export function deleteNode(id) {
   const node = findNode(id);
   if (!node) return;
+  if (node.kind === 'bus') {                     // every board leaves the bus
+    const topic = node.topic || node.label;
+    for (const other of state.graph.nodes) {
+      for (const port of other.ports || []) if (port.kind === 'event' && port.signal === topic) setEvent(other, port, null, topic);
+    }
+    state.graph.nodes = state.graph.nodes.filter((n) => n.id !== id);
+    if (state.selection?.id === id) state.selection = null;
+    regraph().catch((error) => toast(error.message, true));
+    return;
+  }
   for (const wire of state.graph.wires.filter((w) => w.source.node === id || w.target.node === id)) cleanupWire(wire);
   state.graph.wires = state.graph.wires.filter((w) => w.source.node !== id && w.target.node !== id);
   state.graph.nodes = state.graph.nodes.filter((n) => n.id !== id);
@@ -95,6 +176,7 @@ export function connect(a, b) {
   if (pa.direction === pb.direction) return toast('Connect an output pin (right side) to an input pin (left side)', true);
   if (pa.direction === 'in') { src = b; dst = a; }
   if (src.node === dst.node) return toast('A part cannot feed itself directly', true);
+  if (pa.kind === 'event' || pb.kind === 'event') { connectEvent(src, dst).catch((error) => toast(error.message, true)); return; }
   const srcNode = findNode(src.node), dstNode = findNode(dst.node);
   const srcPort = srcNode.ports.find((p) => p.name === src.port);
   const dstPort = dstNode.ports.find((p) => p.name === dst.port);
@@ -117,6 +199,9 @@ export function connect(a, b) {
     dstNode.spec.options.inputs = dstNode.spec.options.inputs || {};
     dstNode.spec.options.inputs[dstPort.name] = signal;
     if (!dstPort.unit) dstPort.unit = srcPort.unit;
+    else if (srcPort.unit && srcPort.unit !== dstPort.unit) {
+      toast(`Units differ: ${srcPort.unit} → ${dstPort.unit}. Check (or a coupling with a gain) shows the conversion.`, true);
+    }
     wire = { kind: 'net', signal };
   } else if (dstPort.signal) {
     if (dstPort.signal === signal) wire = { kind: 'net', signal };
@@ -137,12 +222,15 @@ export async function refreshPorts(node) {
   const { ports } = await api('ports', { spec: node.spec, root: state.graph.root, signals: state.graph.signals, couplings });
   node.ports = ports;
   const names = new Set(ports.map((p) => p.name));
-  state.graph.wires = state.graph.wires.filter((w) =>
-    !((w.source.node === node.id && !names.has(w.source.port)) || (w.target.node === node.id && !names.has(w.target.port))));
+  const gone = state.graph.wires.filter((w) =>
+    (w.source.node === node.id && !names.has(w.source.port)) || (w.target.node === node.id && !names.has(w.target.port)));
+  for (const wire of gone) if (wire.target.node !== node.id) cleanupWire(wire);   // the reader keeps no stale mapping
+  state.graph.wires = state.graph.wires.filter((w) => !gone.includes(w));
   for (const port of ports) {
-    if (port.signal && !state.graph.signals[port.signal]) {
+    if (port.signal && port.kind !== 'event' && !state.graph.signals[port.signal]) {
       state.graph.signals[port.signal] = { domain: node.domain || 'environment', unit: port.unit || '', initial: 0 };
     }
   }
+  if (ports.some((p) => p.kind === 'event') || gone.some((w) => w.kind === 'bus')) return regraph();
   markDirty();
 }

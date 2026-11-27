@@ -52,11 +52,38 @@ the built-in mocks.
   * **probe** (orange, dashed): an instrument or 3-D body observes a signal. Probes never
     change the simulation. An instrument can also pick any signal from the inspector,
     even one no part exposes as a pin.
+  * **bus** (thick brown): an event connection through a bus node (see below).
+
+  A wire between pins of different units is drawn red and dashed. Check names the
+  conversion when it knows one (rad → deg: gain 57.2958); put a coupling with that gain
+  between them.
 * **Edit a part:** the inspector shows python plant parameters, with defaults as
   placeholders, and every backend option as YAML. **Apply options** re-derives the pins;
   for example, set `bindings:` on a Renode MCU and its ADC, GPIO, PWM and memory
   bindings appear as pins.
 * **Delete:** select a part or wire, then press Delete, or use the button in the inspector.
+* **Buses:** boards that exchange frames (CAN, BLE, Wi-Fi, UART, I2C, SPI, RS-485,
+  Ethernet…) have square **⇄ event pins**, labelled with their topic. Each topic is a
+  **bus node** (`═`, brown): publishers' event outputs wire to its *from boards* pin, and
+  its *to boards* pin wires to the subscribers' event inputs. Under the hood these wires
+  are the boards' `events:` / `subscribe:` options; a Renode MCU's CAN bridge shows
+  `can:tx` / `can:rx`.
+  * **Connect:** wire an event pin to a bus, or straight to another board's event pin
+    (they share the publisher's topic).
+  * **Disconnect:** delete the wire, or delete the bus to take every board off it.
+  * **Add:** drag **Bus / radio channel** from *Buses* and name the topic. A bus with no
+    boards yet is kept in `metadata.gui.buses`.
+  * **Inspect:** select a bus to see its publishers, subscribers and medium (impairments).
+    **Decode in the analyzer** adds its topic to `metadata.analyzer.topics`.
+  Boards from the library join their usual topic as they are dropped: an I2C master and
+  a TMP102 land on the `i2c` bus together, CANopen nodes on `can.tx` / `can` with the
+  CAN bus model.
+* **Check** also reviews the wiring:
+  * outputs that write the same signal (an error);
+  * inputs that read a signal nothing writes (they stay at its initial value);
+  * unit mismatches, with the conversion;
+  * buses with publishers but no subscribers, or the other way round;
+  * event pins on no bus.
 * **Pan / zoom / fit:** drag the background, use the mouse wheel, press **F** or click **Fit**.
 
 | Library category | Parts |
@@ -65,6 +92,9 @@ the built-in mocks.
 | Electrical | DC motor armature, SPICE circuit (ngspice-shared) |
 | Mechanical | RC servo, geared drivetrain, MuJoCo model (pins from the MJCF), Webots world, FMU |
 | Thermal | winding thermal RC |
+| Buses | bus / radio channel, CAN bus (arbitration), CAN restbus |
+| Wired boards | CANopen master, axis and sensor nodes; I2C master + TMP102; SPI master + LIS3DH; GPS → NMEA reader (UART); Modbus RTU master and slave (RS-485); Ethernet PLC and remote I/O (Modbus/TCP) |
+| Radio boards | CANopen → BLE gateway, BLE → Wi-Fi bridge, open and WPA2 access points, WPA2 station, deauther, BLE beacon / sensor / phone, NFC reader and NTAG213, EM4100 card, UHF Gen2 reader and tags, LoRaWAN node and gateway |
 | Sources | function generator (sine, square, triangle, sawtooth, step, ramp, pulse, DC), CSV replay, slider, switch |
 | Instruments | oscilloscope, multimeter, logic analyser, X-Y plotter, gauge, LED, watch table, serial monitor (Renode UART console with a send box) |
 | 3-D bodies | servo + arm, motor shaft, pendulum, wheeled cart, linear slide, lamp, bar |
@@ -114,7 +144,16 @@ solderless breadboard, in the manner of Fritzing:
   refer to;
 * ceramic and electrolytic capacitors, inductors, diodes and LEDs (IR LEDs glow violet) are
   drawn as such;
-* transistors are TO-92 packages, power MOSFETs TO-220;
+* transistors are TO-92 packages, power MOSFETs TO-220, with their legs in the real
+  part's order, so a part plugged in as drawn is wired as simulated:
+  * E-B-C for 2N3904, 2N3906 and 2N2222A, but C-B-E for BC547 and BC557;
+  * S-G-D for the 2N7000, D-G-S for BS170 and BS250;
+  * G-D-S for TO-220 MOSFETs;
+  * D-S-G for JFETs.
+
+  Leg order is left to right with the flat or labelled face toward you; the part's
+  tooltip repeats it.
+* LEDs show their flat (cathode) rim and a + on the anode side;
 * switches, dependent sources and subcircuits are DIP chips across the trench;
 * behavioural `B` sources are small `ƒ` chips;
 * zero-volt sense sources are yellow ammeters.

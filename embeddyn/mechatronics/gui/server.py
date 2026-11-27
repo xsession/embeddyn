@@ -223,6 +223,19 @@ def make_handler(state: LabState):
             return {"ports": instance_ports(spec, Path(str(body.get("root") or os.getcwd())),
                                             dict(body.get("signals") or {}), list(body.get("couplings") or []))}
 
+        def _post_regraph(self, body: dict[str, Any]) -> dict[str, Any]:
+            """The graph re-derived from its project document (after bus edits): bus nodes and wires follow
+            the boards' event options; layout, view and the path are kept."""
+            graph = body["graph"]
+            path = Path(graph["path"]) if graph.get("path") else None
+            fresh = graph_from_raw(raw_from_graph(graph), Path(str(graph.get("root") or os.getcwd())), path)
+            fresh["path"] = graph.get("path")
+            return {"graph": fresh}
+
+        def _post_wiring(self, body: dict[str, Any]) -> dict[str, Any]:
+            from .document import wiring_issues
+            return {"issues": wiring_issues(body["graph"])}
+
         def _post_yaml(self, body: dict[str, Any]) -> dict[str, Any]:
             return {"yaml": to_yaml(raw_from_graph(body["graph"]))}
 
@@ -252,6 +265,9 @@ def make_handler(state: LabState):
                         warnings.append(f"{node['id']}.{port['name']} is unconnected (plant default applies)")
                     if node.get("kind") in {"instrument", "scene"} and not port.get("signal") and port["name"] == "A":
                         warnings.append(f"{node['id']} has no signal on channel A")
+            from .document import wiring_issues
+            for issue in wiring_issues(graph):
+                (errors if issue["severity"] == "error" else warnings).append(issue["text"])
             return {"ok": not errors, "errors": errors, "warnings": warnings}
 
         def _post_save(self, body: dict[str, Any]) -> dict[str, Any]:

@@ -40,7 +40,8 @@ export function render() {
   const sel = state.selection;
   if (sel?.type === 'node') {
     const node = findNode(sel.id);
-    if (node) return node.kind === 'instance' ? instancePanel(node) : node.kind === 'terminal' ? terminalPanel(node) : gadgetPanel(node);
+    if (node) return node.kind === 'instance' ? instancePanel(node) : node.kind === 'terminal' ? terminalPanel(node)
+      : node.kind === 'bus' ? busPanel(node) : gadgetPanel(node);
   }
   if (sel?.type === 'wire') {
     const wire = graph.wires.find((w) => w.id === sel.id);
@@ -146,6 +147,30 @@ function terminalPanel(node) {
     `Signal ${port.signal} is ${port.direction === 'out' ? 'read by a coupling' : 'driven by a coupling'} but no part exposes it as a pin.`));
 }
 
+function busPanel(node) {
+  const topic = node.topic || node.label;
+  const boards = (end) => state.graph.wires.filter((w) => w.kind === 'bus' && w[end].node === node.id)
+    .map((w) => { const other = end === 'target' ? w.source : w.target; return `${other.node}.${other.port.replace(/^event:/, '')}`; });
+  const metadata = state.graph.extra.metadata = state.graph.extra.metadata || {};
+  const analyzer = metadata.analyzer = metadata.analyzer || {};
+  const decoded = (analyzer.topics || []).includes(topic);
+  const medium = (state.graph.extra.media || {})[topic];
+  body.append(
+    h('h3', {}, h('span', { class: 'tag', style: `background:${nodeColor(node)}` }, 'bus'), ' ', topic),
+    field('protocol', h('span', {}, node.protocol || '— (from the topic name: can, uart, i2c, spi, rs485, eth, ble…)')),
+    field('publishers', h('code', {}, boards('target').join(', ') || 'none')),
+    field('subscribers', h('code', {}, boards('source').join(', ') || 'none')),
+    field('medium', h('code', { title: medium ? JSON.stringify(medium, null, 1) : '' }, medium
+      ? Object.keys(medium).filter((k) => k !== 'seed').join(', ') || 'clean' : 'ideal (no impairments)')),
+    h('div', { class: 'note' }, 'Wire a board\'s ⇄ event output to "from boards" and "to boards" to its ⇄ event inputs. '
+      + 'Noise, cables and faults for this bus: Analyzer → ⚡ Medium (topic ' + topic + ').'),
+    h('div', { class: 'btn-row' },
+      h('button', { disabled: decoded, title: 'Add this topic to metadata.analyzer.topics', onclick: () => {
+        analyzer.topics = [...(analyzer.topics || []), topic]; markDirty(); render(); toast(`The analyzer decodes ${topic} on the next run`);
+      } }, decoded ? 'Decoded in the analyzer' : 'Decode in the analyzer'),
+      h('button', { class: 'danger', onclick: () => { deleteNode(node.id); emit('selection'); } }, 'Delete bus')));
+}
+
 function gadgetPanel(node) {
   const part = state.partsById[node.part];
   node.settings = node.settings || {};
@@ -229,6 +254,9 @@ function wirePanel(wire) {
         markDirty();
       }, 'text', { placeholder: k === 'gain' ? '1 or @param' : k === 'offset' ? '0 or @param' : '' }))),
       field('delay steps', input(spec.delay_steps ?? 0, (v) => { spec.delay_steps = v || 0; markDirty(); }, 'number', { min: 0, step: 1 })));
+  } else if (wire.kind === 'bus') {
+    body.append(h('div', { class: 'note' }, `Event connection on bus ${wire.signal}: frames (CAN, UART, I2C, Ethernet…) as events, `
+      + 'not a sampled signal. Deleting the wire takes the pin off the bus.'));
   } else if (wire.kind === 'net') {
     body.append(h('div', { class: 'note' }, 'The input reads this signal directly. To scale it, map the input to its own signal in the options and add a coupling.'));
   } else {

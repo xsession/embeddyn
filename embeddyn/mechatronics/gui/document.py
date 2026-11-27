@@ -16,6 +16,16 @@ The graph is what the Lab edits:
 * ``coupling``: an entry of ``couplings:`` (source signal -> target signal,
   with its transform).
 * ``probe``: a signal shown by an instrument or 3-D body; no effect on the run.
+* ``bus``: an event connection: a board's event output publishes on a topic (a
+  bus node), the bus hands the frames to every subscribed event input.
+
+**Buses.** Event ports of python plants (``events:`` / ``subscribe:`` options,
+``event_outputs`` / ``event_inputs`` of the class) and a Renode MCU's CAN bridge
+(``can: {publish, subscribe}``) are pins of kind ``event`` named ``event:<port>``
+(``can:tx``, ``can:rx``). Every topic becomes a ``bus`` node with a ``tx`` pin (the
+publishers' wires end there) and an ``rx`` pin (to the subscribers). Bus nodes are
+derived from those options; buses without boards yet are kept in
+``metadata.gui.buses``.
 
 Ports of instances are derived from the instance itself: plant inputs and
 outputs, replay columns, binding files (Renode, Webots, ngspice) or, for
@@ -114,6 +124,8 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
                   "unit": _unit(signals, inputs.get(n)) or units.get(n, "")} for n in names_in]
         ports += [{"name": n, "direction": "out", "signal": outputs.get(n), "mappable": True,
                    "unit": _unit(signals, outputs.get(n)) or units.get(n, "")} for n in names_out]
+        if backend == "python":
+            ports += _event_ports(spec, root)
         return ports
     if backend == "mujoco":
         return _mujoco_ports(spec, root, signals)
@@ -137,8 +149,9 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
         for field, signal in dict(entry.get("outputs") or {}).items():
             spi.append({"name": f"spi:{device}.{field}", "direction": "out", "signal": signal, "mappable": False,
                         "label": f"{device} {field}", "unit": _unit(signals, signal)})
-    if bound is not None or uarts or spi:
-        return (bound or []) + uarts + spi
+    can = _renode_can_ports(options) if backend == "renode" else []
+    if bound is not None or uarts or spi or can:
+        return (bound or []) + uarts + spi + can
     domain = str(spec.get("domain") or domain_fallback or "")
     targets = {c.get("target") for c in couplings}
     ports = []
@@ -148,6 +161,80 @@ def instance_ports(spec: dict[str, Any], root: Path, signals: dict[str, Any],
         ports.append({"name": name, "direction": "in" if name in targets else "out", "signal": name,
                       "unit": _unit(signals, name), "mappable": False})
     return ports
+
+
+def _event_ports(spec: dict[str, Any], root: Path) -> list[dict[str, Any]]:
+    """Event pins of a python plant: its declared event ports plus the mapped ones."""
+    options = spec.get("options") or {}
+    published, subscribed = dict(options.get("events") or {}), dict(options.get("subscribe") or {})
+    outs, ins = list(published), list(subscribed)
+    if spec.get("model"):
+        try:
+            from ..adapters.python_model import load_plant_class
+            cls = load_plant_class(str(spec["model"]), root)
+            outs = [*getattr(cls, "event_outputs", ()), *[n for n in published if n not in getattr(cls, "event_outputs", ())]]
+            ins = [*getattr(cls, "event_inputs", ()), *[n for n in subscribed if n not in getattr(cls, "event_inputs", ())]]
+        except Exception:            # noqa: BLE001
+            pass
+    ports = [{"name": f"event:{n}", "direction": "in", "signal": subscribed.get(n), "kind": "event", "event": n,
+              "mappable": False, "unit": "", "label": f"event input {n}"} for n in ins]
+    ports += [{"name": f"event:{n}", "direction": "out", "signal": published.get(n), "kind": "event", "event": n,
+               "mappable": False, "unit": "", "label": f"event output {n}"} for n in outs]
+    return ports
+
+
+def _topics(value: Any) -> list[str]:
+    if not value:
+        return []
+    return [str(v) for v in value] if isinstance(value, (list, tuple)) else [str(value)]
+
+
+def _renode_can_ports(options: dict[str, Any]) -> list[dict[str, Any]]:
+    can = options.get("can")
+    if not isinstance(can, dict):
+        return []
+    label = f"CAN bridge {can.get('bus', '')}".strip()
+    ports = [{"name": "can:tx", "direction": "out", "signal": can.get("publish"), "kind": "event", "event": "publish",
+              "mappable": False, "unit": "", "label": f"{label}: frames the firmware sends"}]
+    subscribed = _topics(can.get("subscribe"))
+    for index, topic in enumerate(subscribed or [None]):
+        ports.append({"name": "can:rx" if index == 0 else f"can:rx{index + 1}", "direction": "in", "signal": topic,
+                      "kind": "event", "event": "subscribe", "mappable": False, "unit": "",
+                      "label": f"{label}: frames delivered to the firmware"})
+    return ports
+
+
+BUS_PROTOCOLS = {"can": "CAN", "ble": "BLE", "wifi": "Wi-Fi", "nfc": "NFC", "rfid": "RFID", "lora": "LoRa", "i2c": "I2C",
+                 "spi": "SPI", "uart": "UART", "rs485": "RS-485", "eth": "Ethernet"}
+
+
+def bus_node_id(topic: str) -> str:
+    return "bus_" + re.sub(r"[^A-Za-z0-9_]", "_", topic)
+
+
+def _bus_nodes(nodes: list[dict[str, Any]], declared: list[Any], media: dict[str, Any]) -> list[dict[str, Any]]:
+    """One bus node per event topic (from the boards' event pins and the declared buses)."""
+    topics: list[str] = []
+    for node in nodes:
+        for port in node["ports"]:
+            if port.get("kind") == "event" and port.get("signal") and not str(port["name"]).startswith("uart:") \
+                    and port["signal"] not in topics:
+                topics.append(str(port["signal"]))
+    for item in declared:
+        topic = str(item.get("topic") if isinstance(item, dict) else item)
+        if topic and topic not in topics:
+            topics.append(topic)
+    buses = []
+    for topic in topics:
+        head = topic.split(".")[0]
+        spec = media.get(topic)
+        buses.append({"id": bus_node_id(topic), "kind": "bus", "part": "bus", "label": topic, "topic": topic,
+                      "icon": "bus", "protocol": BUS_PROTOCOLS.get(head, ""), "impaired": bool(spec),
+                      "ports": [{"name": "tx", "direction": "in", "signal": topic, "kind": "event", "mappable": False,
+                                 "unit": "", "label": "publishers"},
+                                {"name": "rx", "direction": "out", "signal": topic, "kind": "event", "mappable": False,
+                                 "unit": "", "label": "subscribers"}]})
+    return buses
 
 
 def mujoco_addresses(model_file: Path) -> tuple[list[str], list[str]]:
@@ -238,6 +325,7 @@ def graph_from_raw(raw: dict[str, Any], root: Path, path: Path | None = None) ->
                           "icon": "net", "ports": [{"name": signal, "direction": side, "signal": signal,
                                                     "unit": _unit(signals, signal), "mappable": False}]})
             exposed.add((signal, side))
+    nodes += _bus_nodes(nodes, list(gui.get("buses") or []), dict(raw.get("media") or {}))
     _place(nodes, layout)
     wires = _wires(nodes, couplings)
     extra = {k: v for k, v in raw.items()
@@ -258,7 +346,8 @@ def graph_from_raw(raw: dict[str, Any], root: Path, path: Path | None = None) ->
 
 def _place(nodes: list[dict[str, Any]], layout: dict[str, Any]) -> None:
     """Saved positions, else columns by role: sources | firmware | electrical | mechanical | observers."""
-    rows: dict[int, int] = {}
+    rows: dict[float, int] = {}
+    buses = any(node["kind"] == "bus" for node in nodes)
     for node in nodes:
         saved = layout.get(node["id"])
         if isinstance(saved, (list, tuple)) and len(saved) == 2:
@@ -269,6 +358,8 @@ def _place(nodes: list[dict[str, Any]], layout: dict[str, Any]) -> None:
         if node["kind"] in {"source", "terminal"}:
             column = 0
         elif node["kind"] in {"instrument", "scene"}:
+            column = 6 if buses else 5
+        elif node["kind"] == "bus":
             column = 5
         else:
             column = DOMAIN_COLUMNS.get(str(node.get("domain")), 2)
@@ -284,8 +375,8 @@ def _wires(nodes: list[dict[str, Any]], couplings: list[dict[str, Any]]) -> list
     consumers: dict[str, list[tuple[str, str]]] = {}
     for node in nodes:
         for port in node["ports"]:
-            if not port.get("signal"):
-                continue
+            if not port.get("signal") or (port.get("kind") == "event" and not str(port["name"]).startswith("uart:")):
+                continue                               # bus pins are wired through bus nodes; a UART console is a signal
             if port["direction"] == "out":
                 producers.setdefault(port["signal"], (node["id"], port["name"]))
             else:
@@ -303,6 +394,18 @@ def _wires(nodes: list[dict[str, Any]], couplings: list[dict[str, Any]]) -> list
             wires.append({"id": f"w{len(wires)}", "kind": kind, "signal": signal,
                           "source": {"node": source[0], "port": source[1]},
                           "target": {"node": reader[0], "port": reader[1]}})
+    for node in nodes:                                 # event pins <-> bus nodes
+        if node["kind"] == "bus":
+            continue
+        for port in node["ports"]:
+            if port.get("kind") != "event" or not port.get("signal") or str(port["name"]).startswith("uart:"):
+                continue
+            bus = bus_node_id(str(port["signal"]))
+            if port["direction"] == "out":
+                ends = {"source": {"node": node["id"], "port": port["name"]}, "target": {"node": bus, "port": "tx"}}
+            else:
+                ends = {"source": {"node": bus, "port": "rx"}, "target": {"node": node["id"], "port": port["name"]}}
+            wires.append({"id": f"w{len(wires)}", "kind": "bus", "signal": port["signal"], **ends})
     for coupling in couplings:
         source = producers.get(coupling["source"])
         target = next(iter(consumers.get(coupling["target"], [])), None)
@@ -355,10 +458,15 @@ def raw_from_graph(graph: dict[str, Any]) -> dict[str, Any]:
             "ports": [{k: v for k, v in port.items() if k != "signal"} for port in node["ports"]],
             "channels": {port["name"]: port["signal"] for port in node["ports"] if port.get("signal")},
         })
+    used = {str(port.get("signal")) for node in nodes if node.get("kind") not in {"bus", "terminal"}
+            for port in node.get("ports") or [] if port.get("kind") == "event"}
+    buses = [node.get("topic") or node.get("label") for node in nodes if node.get("kind") == "bus"
+             and (node.get("topic") or node.get("label")) not in used]
     metadata["gui"] = {
         "layout": {node["id"]: [round(float(node.get("x", 0)), 1), round(float(node.get("y", 0)), 1)]
                    for node in nodes if node.get("kind") != "terminal"},
         "nodes": gui_nodes,
+        **({"buses": buses} if buses else {}),
         **({"view": graph["view"]} if graph.get("view") else {}),
     }
     raw["metadata"] = metadata
@@ -389,3 +497,100 @@ def controls(graph: dict[str, Any]) -> dict[str, float]:
             if signal:
                 result[signal] = float((node.get("settings") or {}).get("value", 0.0))
     return result
+
+
+# Unit pairs the check can convert: (from, to) -> (gain, offset) of to = gain * from + offset
+UNIT_CONVERSIONS: dict[tuple[str, str], tuple[float, float]] = {
+    ("rad", "deg"): (57.29577951308232, 0.0), ("rad/s", "rpm"): (9.549296585513721, 0.0),
+    ("rad/s", "deg/s"): (57.29577951308232, 0.0), ("m", "mm"): (1000.0, 0.0), ("m/s", "mm/s"): (1000.0, 0.0),
+    ("A", "mA"): (1000.0, 0.0), ("V", "mV"): (1000.0, 0.0), ("s", "ms"): (1000.0, 0.0), ("s", "us"): (1e6, 0.0),
+    ("W", "mW"): (1000.0, 0.0), ("K", "degC"): (1.0, -273.15), ("N*m", "mN*m"): (1000.0, 0.0), ("Hz", "kHz"): (1e-3, 0.0),
+}
+
+
+def unit_conversion(source: str, target: str) -> tuple[float, float] | None:
+    """(gain, offset) that turns a value in `source` units into `target` units, if known."""
+    if source == target:
+        return (1.0, 0.0)
+    if (source, target) in UNIT_CONVERSIONS:
+        return UNIT_CONVERSIONS[(source, target)]
+    if (target, source) in UNIT_CONVERSIONS:
+        gain, offset = UNIT_CONVERSIONS[(target, source)]
+        return (1.0 / gain, -offset / gain)
+    return None
+
+
+def wiring_issues(graph: dict[str, Any]) -> list[dict[str, Any]]:
+    """What the schematic's wiring gets wrong or leaves to chance:
+
+    * ``units``: a wire joins pins with different units (with the conversion, if known);
+    * ``drivers``: a signal written by more than one output;
+    * ``undriven``: an input reads a signal nothing writes (it stays at its initial value);
+    * ``bus``: a topic with publishers but no subscriber, or subscribers but no publisher;
+    * ``event``: an event pin of a board on no bus.
+    """
+    nodes = {node["id"]: node for node in graph.get("nodes") or []}
+    signals = graph.get("signals") or {}
+    issues: list[dict[str, Any]] = []
+
+    def port(end: dict[str, Any]) -> dict[str, Any] | None:
+        node = nodes.get(end["node"])
+        return next((p for p in (node or {}).get("ports") or [] if p["name"] == end["port"]), None)
+
+    for wire in graph.get("wires") or []:
+        if wire.get("kind") not in {"net", "probe"}:
+            continue
+        a, b = port(wire["source"]), port(wire["target"])
+        ua, ub = (a or {}).get("unit") or "", (b or {}).get("unit") or ""
+        if ua and ub and ua != ub:
+            conversion = unit_conversion(ua, ub)
+            hint = (f": add a coupling with gain {conversion[0]:.6g}" + (f" and offset {conversion[1]:g}" if conversion[1] else "")
+                    if conversion else ": no known conversion")
+            issues.append({"kind": "units", "wire": wire["id"], "severity": "warning" if wire["kind"] == "net" else "info",
+                           "text": f"{wire['source']['node']}.{wire['source']['port']} [{ua}] → "
+                                   f"{wire['target']['node']}.{wire['target']['port']} [{ub}]{hint}"})
+    writers: dict[str, list[str]] = {}
+    for node in nodes.values():
+        if node["kind"] in {"bus", "terminal"}:
+            continue
+        for p in node.get("ports") or []:
+            if p["direction"] == "out" and p.get("signal") and p.get("kind") != "event" and not str(p["name"]).startswith("uart:"):
+                writers.setdefault(str(p["signal"]), []).append(f"{node['id']}.{p['name']}")
+    targets = {w.get("target_signal") for w in graph.get("wires") or [] if w.get("kind") == "coupling"}
+    for signal, who in writers.items():
+        if len(who) > 1:
+            issues.append({"kind": "drivers", "severity": "error", "signal": signal,
+                           "text": f"{signal} is written by {len(who)} outputs: {', '.join(who)}"})
+    for node in nodes.values():
+        if node["kind"] != "instance":
+            continue
+        for p in node.get("ports") or []:
+            signal = p.get("signal")
+            if p["direction"] != "in" or not signal or p.get("kind") == "event":
+                continue
+            if signal not in writers and signal not in targets:
+                initial = (signals.get(signal) or {}).get("initial", 0.0) if isinstance(signals.get(signal), dict) else 0.0
+                issues.append({"kind": "undriven", "severity": "info", "signal": signal,
+                               "text": f"{node['id']}.{p['name']} reads {signal}, which nothing writes: it stays at {initial}"})
+    for node in nodes.values():
+        if node["kind"] != "bus":
+            continue
+        topic = node.get("topic") or node["label"]
+        pubs = [w for w in graph.get("wires") or [] if w.get("kind") == "bus" and w["target"]["node"] == node["id"]]
+        subs = [w for w in graph.get("wires") or [] if w.get("kind") == "bus" and w["source"]["node"] == node["id"]]
+        if pubs and not subs:
+            issues.append({"kind": "bus", "severity": "warning", "topic": topic,
+                           "text": f"bus {topic}: {len(pubs)} publisher(s), nobody subscribes (the analyzer can still show it)"})
+        if subs and not pubs:
+            issues.append({"kind": "bus", "severity": "warning", "topic": topic,
+                           "text": f"bus {topic}: {len(subs)} subscriber(s) but no publisher"})
+        if not pubs and not subs:
+            issues.append({"kind": "bus", "severity": "info", "topic": topic, "text": f"bus {topic} has no boards yet"})
+    for node in nodes.values():
+        if node["kind"] != "instance":
+            continue
+        for p in node.get("ports") or []:
+            if p.get("kind") == "event" and not p.get("signal") and not str(p["name"]).startswith("uart:"):
+                issues.append({"kind": "event", "severity": "info", "port": f"{node['id']}.{p['name']}",
+                               "text": f"{node['id']}.{p['name']} is on no bus"})
+    return issues

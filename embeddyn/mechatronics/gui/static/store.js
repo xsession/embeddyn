@@ -15,11 +15,11 @@ export const state = {
 export const DOMAIN_COLORS = {
   firmware: '#8e5bd6', electrical: '#e67e22', mechanical: '#2f80d1', thermal: '#d64541', environment: '#27ae60',
 };
-export const KIND_COLORS = { source: '#16a085', instrument: '#3d4b5c', scene: '#7a6f9b', terminal: '#6b7380' };
+export const KIND_COLORS = { source: '#16a085', instrument: '#3d4b5c', scene: '#7a6f9b', terminal: '#6b7380', bus: '#b5651d' };
 export const GLYPHS = {
   mcu: '▣', chip: '◧', servo: '⟲', gear: '⚙', motor: 'M', circuit: '⏚', thermo: '♨', wave: '∿', table: '☷',
   robot: '⛭', box: '▢', slider: '⊶', switch: '⏻', scope: '⌁', meter: 'Ω', logic: '⫶', xy: '⌗', gauge: '◔',
-  led: '●', terminal: '⌨', pendulum: '⊥', cart: '⛟', linear: '⇿', lamp: '☀', bar: '▮', net: '⏛',
+  led: '●', terminal: '⌨', pendulum: '⊥', cart: '⛟', linear: '⇿', lamp: '☀', bar: '▮', net: '⏛', bus: '═', radio: '📶',
 };
 export const TRACE_COLORS = ['#ffd60a', '#3fd0ff', '#ff6bd6', '#6bff8b', '#ff9f43', '#a29bfe', '#ff5c5c', '#e0e0e0'];
 

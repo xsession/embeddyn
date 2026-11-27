@@ -20,14 +20,16 @@ const el = (tag, attrs = {}, parent) => {
 export function nodeSize(node) {
   const ins = node.ports.filter((p) => p.direction === 'in').length;
   const outs = node.ports.filter((p) => p.direction === 'out').length;
-  const wide = node.kind === 'instance' && node.ports.some((p) => !p.mappable);
-  const width = node.kind === 'terminal' ? 170 : node.kind === 'instance' ? (wide ? 250 : 210) : 160;
+  const wide = node.kind === 'instance' && node.ports.some((p) => !p.mappable && p.kind !== 'event');
+  const width = node.kind === 'terminal' ? 170 : node.kind === 'bus' ? 150 : node.kind === 'instance' ? (wide ? 250 : 210) : 160;
   return { width, height: HEAD + Math.max(ins, outs, 1) * PITCH + PAD };
 }
 
 function pinLabel(node, port) {
   let text = port.mappable || node.kind !== 'instance' ? port.name : (port.signal || port.name);
   if (node.kind === 'terminal') text = port.signal;
+  if (port.kind === 'event' && node.kind === 'instance') text = `⇄ ${port.name.replace(/^event:/, '')}${port.signal ? ' · ' + port.signal : ''}`;
+  if (node.kind === 'bus') text = port.name === 'tx' ? 'from boards' : 'to boards';
   if (text.length > 28) text = '…' + text.slice(-27);
   return text;
 }
@@ -101,7 +103,10 @@ function drawNode(node, connected) {
   const part = state.partsById[node.part];
   sub.textContent = node.kind === 'instance'
     ? `${node.domain} · ${node.spec?.options?.backend || 'auto'}${part ? ' · ' + part.name : ''}`
-    : (part?.name || node.kind);
+    : node.kind === 'bus'
+      ? `${node.protocol ? node.protocol + ' ' : ''}bus · ${busBoards(node)} boards${node.impaired ? ' · ⚡ impaired' : ''}`
+      : (part?.name || node.kind);
+  if (node.kind === 'bus') g.classList.add('sch-bus');
   const ins = node.ports.filter((p) => p.direction === 'in');
   const outs = node.ports.filter((p) => p.direction === 'out');
   ins.forEach((port, i) => drawPin(g, node, port, 0, HEAD + PITCH / 2 + i * PITCH, -1, width, connected));
@@ -114,7 +119,9 @@ function drawPin(g, node, port, x, y, side, width, connected) {
   el('line', { class: 'pin-line', x1: x, y1: y, x2: x + side * 14, y2: y }, g);
   const isConnected = connected.has(node.id + '\u0000' + port.name);
   const cls = 'pin' + (isConnected ? ' connected' : '') + (!port.signal ? ' unmapped' : '');
-  const pin = el('circle', { class: cls, cx: x + side * 14, cy: y, r: 4.2 }, g);
+  const pin = port.kind === 'event'
+    ? el('rect', { class: cls + ' event', x: x + side * 14 - 4, y: y - 4, width: 8, height: 8, transform: `rotate(45 ${x + side * 14} ${y})` }, g)
+    : el('circle', { class: cls, cx: x + side * 14, cy: y, r: 4.2 }, g);
   pin.dataset.node = node.id; pin.dataset.port = port.name;
   const label = el('text', { class: 'pin-label', x: x - side * 5, y: y + 3.5, 'text-anchor': side < 0 ? 'start' : 'end' }, g);
   label.textContent = pinLabel(node, port);
@@ -133,10 +140,14 @@ function drawWire(wire) {
   const p = pinPosition(a, wire.source.port), q = pinPosition(b, wire.target.port);
   const d = wirePath(p, q);
   const selected = state.selection?.type === 'wire' && state.selection.id === wire.id;
-  el('path', { d, class: `sch-wire ${wire.kind}${selected ? ' selected' : ''}` }, wireLayer);
+  const pa = a.ports.find((x) => x.name === wire.source.port), pb = b.ports.find((x) => x.name === wire.target.port);
+  const mismatch = (wire.kind === 'net' || wire.kind === 'probe') && pa?.unit && pb?.unit && pa.unit !== pb.unit;
+  el('path', { d, class: `sch-wire ${wire.kind}${selected ? ' selected' : ''}${mismatch ? ' mismatch' : ''}` }, wireLayer);
   const hit = el('path', { d, class: 'sch-wire-hit' }, wireLayer);
   const tip = el('title', {}, hit);
-  tip.textContent = wire.kind === 'coupling' ? `${wire.signal} → ${wire.target_signal}` : `${wire.signal} (${wire.kind})`;
+  tip.textContent = wire.kind === 'coupling' ? `${wire.signal} → ${wire.target_signal}`
+    : wire.kind === 'bus' ? `bus ${wire.signal}: ${wire.source.node}.${wire.source.port} → ${wire.target.node}.${wire.target.port}`
+      : `${wire.signal} (${wire.kind})${mismatch ? `\nunits differ: ${pa.unit} → ${pb.unit}` : ''}`;
   hit.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     state.selection = { type: 'wire', id: wire.id };
@@ -148,6 +159,16 @@ function drawWire(wire) {
     const label = el('text', { class: 'sch-wire-label', x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - 4, 'text-anchor': 'middle' }, wireLayer);
     label.textContent = `×${t.gain ?? 1}${Number(t.offset ?? 0) ? ' + ' + t.offset : ''}`;
   }
+}
+
+function busBoards(node) {
+  const ids = new Set();
+  for (const wire of state.graph.wires) {
+    if (wire.kind !== 'bus') continue;
+    if (wire.source.node === node.id) ids.add(wire.target.node);
+    if (wire.target.node === node.id) ids.add(wire.source.node);
+  }
+  return ids.size;
 }
 
 export function updateValues() {

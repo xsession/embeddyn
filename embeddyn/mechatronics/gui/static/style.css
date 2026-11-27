@@ -150,6 +150,11 @@ label { user-select: none; }
 .sch-wire { fill: none; stroke-width: 2; }
 .sch-wire.net { stroke: #1d8a3a; } .sch-wire.coupling { stroke: #1b5fc1; } .sch-wire.probe { stroke: #d9822b; stroke-dasharray: 6 4; }
 .sch-wire.selected { stroke-width: 4; }
+.sch-wire.bus { stroke: #b5651d; stroke-width: 3; stroke-linecap: round; }
+.sch-wire.mismatch { stroke: #d62828; stroke-dasharray: 3 3; }
+.sch-node .pin.event { fill: #fff3e0; stroke: #b5651d; }
+.sch-node .pin.event.connected { fill: #b5651d; }
+.sch-bus .body { fill: #fbf1e6; stroke: #b5651d; stroke-width: 1.6; }
 .sch-wire-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
 .sch-wire-label { font-size: 10px; fill: #1b5fc1; }
 .sch-drag { fill: none; stroke: #d9822b; stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
@@ -311,3 +316,6 @@ label { user-select: none; }
 .am-row b { color: #c8d3e0; font-size: 11px; text-transform: uppercase; }
 .am-json { flex: 1; min-width: 240px; font-family: var(--mono, monospace); font-size: 11px; }
 .am-json.bad { outline: 1px solid #e74c3c; }
+
+.bb-led-flat { stroke: #1b1b1b; stroke-width: 1.6; stroke-linecap: round; }
+.bb-pol { font-size: 7px; font-weight: 700; fill: #c0392b; text-anchor: middle; }

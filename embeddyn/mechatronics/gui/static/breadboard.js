@@ -376,6 +376,11 @@ function drawAxial(g, part, a, b) {
       const halo = el('circle', { cx: 0, cy: 0, r: 1.3 * P, fill: ir ? '#b06cff' : color, opacity: 0, filter: 'url(#bb-glow)' }, body);
       el('circle', { cx: 0, cy: 0, r: 0.66 * P, fill: color, class: 'bb-led' }, body);
       el('circle', { cx: -0.2 * P, cy: -0.2 * P, r: 0.2 * P, fill: '#ffffff', opacity: 0.45 }, body);
+      // Polarity as on the real part: the rim is flat on the cathode side, the anode leg is the long one (+).
+      const ux = (b.x - a.x) / (len || 1), uy = (b.y - a.y) / (len || 1);
+      el('line', { x1: 0.62 * P * ux - 0.45 * P * uy, y1: 0.62 * P * uy + 0.45 * P * ux, x2: 0.62 * P * ux + 0.45 * P * uy,
+        y2: 0.62 * P * uy - 0.45 * P * ux, class: 'bb-led-flat' }, body);
+      text(body, -1.05 * P * ux, -1.05 * P * uy + 2.5, '+', { class: 'bb-pol' });
       if (part.type === 'led') live.push(() => {
         const i = ledCurrent(part);
         halo.setAttribute('opacity', i === null ? 0 : Math.min(0.95, Math.abs(i) / 0.02).toFixed(3));
@@ -424,7 +429,9 @@ function drawTransistor(g, part, pts) {
   const power = part.type.endsWith('_power');
   const by = top - (power ? 2.2 : 1.35) * P;
   const spread = Math.min(0.85 * P, ((pts.length - 1) / 2) * 0.85 * P);
-  const anchors = pts.map((_, i) => ({ x: cx - spread + (pts.length > 1 ? (2 * spread * i) / (pts.length - 1) : 0), y: by + (power ? 0.6 : 0.5) * P }));
+  // Legs leave the body in the order of their holes (the package pinout), so they never cross.
+  const rank = pts.map((p, i) => pts.filter((q, j) => q.x < p.x || (q.x === p.x && j < i)).length);
+  const anchors = pts.map((_, i) => ({ x: cx - spread + (pts.length > 1 ? (2 * spread * rank[i]) / (pts.length - 1) : 0), y: by + (power ? 0.6 : 0.5) * P }));
   legs(g, part, anchors);
   const body = el('g', { transform: `translate(${cx},${by})` }, g);
   if (power) {
@@ -438,6 +445,8 @@ function drawTransistor(g, part, pts) {
   const kind = { npn: 'NPN', pnp: 'PNP', nmos: 'N-FET', pmos: 'P-FET', nmos_power: 'N-FET', pmos_power: 'P-FET', jfet: 'JFET', phototransistor: 'PT' }[part.type];
   text(body, 0, power ? -0.2 * P : 0.25 * P, part.spice?.model || kind, { class: 'bb-chip-text small' });
   text(g, cx, by - (power ? 2.95 : 1.25) * P, `${part.ref} ${kind}`, { class: 'bb-ref' });
+  const order = [...part.pins].sort((a, b) => holeXY(a.hole).x - holeXY(b.hole).x).map((pin) => pin.name).join(' ');
+  el('title', {}, body).textContent = `${part.ref} ${part.spice?.model || kind}: legs ${order} (left to right, ${power ? 'labelled face' : 'flat face'} toward you)`;
   part.pins.forEach((pin, i) => text(g, anchors[i].x, anchors[i].y + 0.75 * P, pin.name, { class: 'bb-pinname' }));
 }
 
@@ -837,8 +846,10 @@ function addPart(item) {
     part.pins = names.map((name) => ({ name }));
   } else {
     const c = freeSpot(names.length);
-    const holes = names.length === 2 ? [`d${c}`, `d${c + 3}`] : names.map((_, i) => `c${c + i}`);
+    const order = item.pinout || names;              // a transistor's legs in its package order (E B C, G D S...)
+    const holes = names.length === 2 ? [`d${c}`, `d${c + 3}`] : names.map((name, i) => `c${c + (order.includes(name) ? order.indexOf(name) : i)}`);
     part.pins = names.map((name, i) => ({ name, hole: holes[i] }));
+    if (item.pinout) part.pinout = item.pinout.join(' ');
   }
   bb.board.parts.push(part);
   bb.selection = { type: 'part', id: ref };

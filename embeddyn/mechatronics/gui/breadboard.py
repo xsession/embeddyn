@@ -304,6 +304,29 @@ PIN_NAMES = {
     "current_source": ["+", "-"], "current_signal": ["+", "-"],
 }
 
+# Real leg order of the packages, left to right with the flat (TO-92) or labelled (TO-220) face toward you.
+# The breadboard puts the legs in that order so a real part plugged in as drawn is wired as simulated.
+PACKAGE_ORDER: dict[str, list[str]] = {
+    "npn": ["E", "B", "C"], "pnp": ["E", "B", "C"],          # 2N3904, 2N3906, 2N2222A, PN2222 (TO-92)
+    "nmos": ["D", "G", "S"], "pmos": ["D", "G", "S"],        # BS170, BS250 (TO-92)
+    "nmos_power": ["G", "D", "S"], "pmos_power": ["G", "D", "S"],   # TO-220 MOSFETs (IRF540, IRF9540...)
+    "jfet": ["D", "S", "G"],                                 # J201, 2N5457
+}
+MODEL_PACKAGE_ORDER: dict[str, list[str]] = {             # parts whose pinout differs from their family's
+    "2n7000": ["S", "G", "D"], "n2n7000": ["S", "G", "D"], "2n7002": ["G", "S", "D"],
+    "bc547": ["C", "B", "E"], "bc548": ["C", "B", "E"], "bc549": ["C", "B", "E"], "bc557": ["C", "B", "E"],
+    "bc558": ["C", "B", "E"], "bc337": ["C", "B", "E"], "bc327": ["C", "B", "E"], "j310": ["G", "S", "D"],
+}
+
+
+def package_order(kind: str, model: str | None, names: list[str]) -> list[str]:
+    """The pin names in the package's physical order (pins the package does not have, e.g. a substrate, last)."""
+    key = (model or "").lower()
+    order = next((v for k, v in MODEL_PACKAGE_ORDER.items() if key == k or key.startswith(k)), None) \
+        or PACKAGE_ORDER.get(kind) or names
+    return [n for n in order if n in names] + [n for n in names if n not in order]
+
+
 # Parts the palette can add: type -> (letter, default value, model, .model card or None)
 PALETTE: dict[str, dict[str, Any]] = {
     "resistor": {"letter": "R", "value": "10k", "label": "Resistor"},
@@ -650,6 +673,11 @@ def auto_layout(netlist: Netlist, name: str = "", bindings: dict[str, Any] | Non
             half = "t"
             start = layout.cursor
             holes = []
+            physical = package_order(kind, element.model, names[:len(nets)])
+            part["pinout"] = " ".join(physical)
+            spice_nets = dict(zip(names, nets))
+            nets = [spice_nets[n] for n in physical]
+            names = physical
             for offset, net in enumerate(nets):
                 strip = (start + offset, half)
                 while strip in layout.strips:
@@ -661,12 +689,12 @@ def auto_layout(netlist: Netlist, name: str = "", bindings: dict[str, Any] | Non
                 layout.net_strips[net].append((column, half))
             layout.cursor = max(layout.cursor, holes[-1][0] + 2)
             layout.tall.update(range(holes[0][0] - 1, holes[-1][0] + 2))
-            pins = []
+            placed = {}
             for (column, _), net, pin in zip(holes, nets, names):
-                hole = layout.take((column, half), row="e")
-                pins.append({"name": pin, "hole": hole})
+                placed[pin] = layout.take((column, half), row="e")
                 layout.connect_strip(net, (column, half))
-            part["pins"] = pins
+            spice_order = _pin_names(kind, len(nets))
+            part["pins"] = [{"name": pin, "hole": placed[pin]} for pin in spice_order]   # SPICE order: pin i = node i
         elif kind in DIP_TYPES:
             count = len(nets) + (len(nets) % 2)
             width = count // 2
@@ -954,9 +982,15 @@ def open_board(netlist_path: Path) -> dict[str, Any]:
 
 
 def palette() -> list[dict[str, Any]]:
-    return [{"id": key, "type": spec.get("type", key), "label": spec["label"], "letter": spec["letter"],
-             "value": spec.get("value", ""), "model": spec.get("model")}
-            for key, spec in PALETTE.items()]
+    items = []
+    for key, spec in PALETTE.items():
+        kind = spec.get("type", key)
+        item = {"id": key, "type": kind, "label": spec["label"], "letter": spec["letter"],
+                "value": spec.get("value", ""), "model": spec.get("model")}
+        if kind in TRANSISTOR_TYPES:
+            item["pinout"] = package_order(kind, spec.get("model"), PIN_NAMES[kind][:3])
+        items.append(item)
+    return items
 
 
 def iter_holes(columns: int) -> Iterable[str]:

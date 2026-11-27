@@ -36,7 +36,73 @@ PORT_UNITS: dict[str, dict[str, str]] = {
                          "shaft_torque": "N*m", "friction_torque": "N*m", "dissipated_power": "W", "stored_energy": "J"},
     "ThermalRC": {"current": "A", "ambient": "degC", "temperature": "degC", "resistance": "ohm", "copper_loss": "W"},
     "ServoPulseGenerator": {"angle_deg": "deg", "pulse_width": "s"},
+    "HBridgePWM": {"in1": "1", "in2": "1", "duty": "1"},
+    "PIController": {},
+    "FunctionGenerator": {"gate": "1"},
+    "I2cMaster": {"temperature": "degC"}, "Tmp102": {"temperature": "degC"},
+    "ModbusMaster": {"setpoint": "degC", "temperature": "degC", "pressure": "bar"},
+    "ModbusSlave": {"temperature": "degC", "pressure": "bar", "setpoint": "degC"},
+    "NmeaReader": {"lat": "deg", "lon": "deg", "speed_kn": "kn"},
+    "SpiMaster": {"ax": "g", "ay": "g", "az": "g"}, "Lis3dh": {"ax": "g", "ay": "g", "az": "g"},
+    "EthIo": {"value": "bar"}, "EthPlc": {"value": "bar"},
 }
+
+# Comms boards: (class, part id, name, category, icon, description, {event port: default topic}). Event
+# outputs publish on, event inputs subscribe to the topic, so boards dropped together share a bus at once.
+_C = "embeddyn.mechatronics.comms."
+_BOARDS = [
+    (_C + "can:CanBus", "can_bus", "CAN bus (arbitration)", "Buses", "bus",
+     "Arbitrates the boards' frames (exact bit timing) and puts them on the wire topic.", {"tx": "can.tx", "wire": "can"}),
+    (_C + "can:CanRestbus", "can_restbus", "CAN restbus", "Buses", "bus",
+     "Sends the frames of absent nodes on a schedule.", {"tx": "can.tx", "rx": "can"}),
+    (_C + "boards:CanopenMaster", "canopen_master", "CANopen master", "Wired boards", "chip",
+     "NMT master, SYNC, SDO client, heartbeat watch.", {"can_tx": "can.tx", "can_rx": "can"}),
+    (_C + "boards:AxisNode", "canopen_axis", "CANopen axis node", "Wired boards", "chip",
+     "Follows the RPDO set-point, reports status and position on SYNC.", {"can_tx": "can.tx", "can_rx": "can"}),
+    (_C + "boards:SensorNode", "canopen_sensor", "CANopen sensor node", "Wired boards", "chip",
+     "Distance and temperature TPDOs, EMCY on over-temperature.", {"can_tx": "can.tx", "can_rx": "can"}),
+    (_C + "boards:BleGateway", "ble_gateway", "CANopen → BLE gateway", "Radio boards", "radio",
+     "Listens to the CANopen network and advertises a status record over BLE.",
+     {"can_tx": "can.tx", "can_rx": "can", "ble": "ble"}),
+    (_C + "boards:WifiBridge", "wifi_bridge", "BLE → Wi-Fi bridge", "Radio boards", "radio", "",
+     {"ble": "ble", "wifi_tx": "wifi", "wifi_rx": "wifi"}),
+    (_C + "boards:AccessPoint", "wifi_ap", "Wi-Fi access point (open)", "Radio boards", "radio", "",
+     {"wifi_tx": "wifi", "wifi_rx": "wifi"}),
+    (_C + "rf_boards:WpaAccessPoint", "wpa_ap", "Wi-Fi access point (WPA2)", "Radio boards", "radio",
+     "WPA2-PSK access point with the 4-way handshake and CCMP data.", {"wifi_tx": "wifi", "wifi_rx": "wifi"}),
+    (_C + "rf_boards:WpaStation", "wpa_station", "Wi-Fi station (WPA2)", "Radio boards", "radio",
+     "Joins a WPA2 network and sends encrypted data.", {"wifi_tx": "wifi", "wifi_rx": "wifi"}),
+    (_C + "rf_boards:Deauther", "deauther", "Wi-Fi deauther", "Radio boards", "radio", "", {"wifi_tx": "wifi"}),
+    (_C + "rf_boards:BleBeacon", "ble_beacon", "BLE beacon", "Radio boards", "radio",
+     "iBeacon / Eddystone advertiser.", {"ble": "ble"}),
+    (_C + "rf_boards:BleSensor", "ble_sensor", "BLE sensor", "Radio boards", "radio",
+     "Advertises readings, answers scan requests.", {"ble": "ble", "ble_rx": "ble"}),
+    (_C + "rf_boards:BlePhone", "ble_phone", "BLE phone (scanner)", "Radio boards", "radio",
+     "Scans and connects (CONNECT_IND).", {"ble": "ble", "ble_rx": "ble"}),
+    (_C + "rf_boards:NfcReader", "nfc_reader", "NFC reader (ISO 14443-A)", "Radio boards", "radio",
+     "REQA, anticollision, SELECT, READ of a Type 2 tag.", {"tx": "nfc", "rx": "nfc"}),
+    (_C + "rf_boards:Type2Tag", "nfc_tag", "NFC tag (NTAG213)", "Radio boards", "radio",
+     "Type 2 tag with an NDEF record.", {"tx": "nfc", "rx": "nfc"}),
+    (_C + "rf_boards:Em4100Card", "em4100", "125 kHz card (EM4100)", "Radio boards", "radio", "", {"tx": "rfid"}),
+    (_C + "rf_boards:Gen2Reader", "gen2_reader", "UHF RFID reader (Gen2)", "Radio boards", "radio",
+     "EPC Gen2 inventory: Query, RN16, ACK, EPC.", {"tx": "rfid", "rx": "rfid"}),
+    (_C + "rf_boards:Gen2Tags", "gen2_tags", "UHF RFID tags (Gen2)", "Radio boards", "radio", "", {"tx": "rfid", "rx": "rfid"}),
+    (_C + "rf_boards:LoraNode", "lora_node", "LoRaWAN node", "Radio boards", "radio",
+     "Class A end device: encrypted uplinks, MIC.", {"tx": "lora", "rx": "lora"}),
+    (_C + "rf_boards:LoraGateway", "lora_gateway", "LoRaWAN gateway", "Radio boards", "radio", "", {"tx": "lora", "rx": "lora"}),
+    (_C + "i2c:I2cMaster", "i2c_master", "I2C master (MCU)", "Wired boards", "chip", "", {"tx": "i2c", "rx": "i2c"}),
+    (_C + "i2c:Tmp102", "tmp102", "TMP102 sensor (I2C)", "Wired boards", "thermo", "", {"tx": "i2c", "rx": "i2c"}),
+    (_C + "spi:SpiMaster", "spi_master", "SPI master (MCU)", "Wired boards", "chip", "", {"tx": "spi", "rx": "spi"}),
+    (_C + "spi:Lis3dh", "lis3dh", "LIS3DH accelerometer (SPI)", "Wired boards", "chip", "", {"tx": "spi", "rx": "spi"}),
+    (_C + "serial:GpsReceiver", "gps", "GPS module (UART NMEA)", "Wired boards", "radio", "", {"tx": "uart"}),
+    (_C + "serial:NmeaReader", "nmea_reader", "NMEA reader (MCU UART)", "Wired boards", "chip", "", {"rx": "uart"}),
+    (_C + "serial:ModbusMaster", "modbus_master", "Modbus RTU master (PLC)", "Wired boards", "chip", "",
+     {"tx": "rs485", "rx": "rs485"}),
+    (_C + "serial:ModbusSlave", "modbus_slave", "Modbus RTU slave (drive)", "Wired boards", "chip", "",
+     {"tx": "rs485", "rx": "rs485"}),
+    (_C + "ethernet:EthPlc", "eth_plc", "Ethernet PLC (Modbus/TCP)", "Wired boards", "chip", "", {"tx": "eth", "rx": "eth"}),
+    (_C + "ethernet:EthIo", "eth_io", "Ethernet remote I/O", "Wired boards", "chip", "", {"tx": "eth", "rx": "eth"}),
+]
 
 _PLANTS = [
     # (class reference, part id, name, category, domain, icon, description)
@@ -93,7 +159,7 @@ _SCENE = [
 
 
 def _plant_part(reference: str, part_id: str, name: str, category: str, domain: str, icon: str,
-                description: str) -> dict[str, Any]:
+                description: str, topics: dict[str, str] | None = None) -> dict[str, Any]:
     from ..adapters.python_model import load_plant_class
     cls = load_plant_class(reference)
     units = PORT_UNITS.get(cls.__name__, {})
@@ -108,17 +174,31 @@ def _plant_part(reference: str, part_id: str, name: str, category: str, domain: 
             parameters[pname] = list(value)
     ports = [{"name": p, "direction": "in", "unit": units.get(p, "")} for p in getattr(cls, "inputs", ())]
     ports += [{"name": p, "direction": "out", "unit": units.get(p, "")} for p in getattr(cls, "outputs", ())]
+    topics = topics or {}
+    events = {p: topics[p] for p in getattr(cls, "event_outputs", ()) if p in topics}
+    subscribe = {p: topics[p] for p in getattr(cls, "event_inputs", ()) if p in topics}
+    ports += [{"name": f"event:{p}", "direction": "in", "unit": "", "kind": "event"} for p in getattr(cls, "event_inputs", ())]
+    ports += [{"name": f"event:{p}", "direction": "out", "unit": "", "kind": "event"} for p in getattr(cls, "event_outputs", ())]
+    options: dict[str, Any] = {"backend": "python", "max_step": 1.0e-4, "parameters": {}, "inputs": {}, "outputs": {}}
+    if events:
+        options["events"] = events
+    if subscribe:
+        options["subscribe"] = subscribe
     return {
         "id": part_id, "name": name, "category": category, "kind": "instance", "domain": domain, "icon": icon,
-        "description": (description or (cls.__doc__ or "").strip().splitlines()[0]),
-        "template": {"domain": domain, "model": reference,
-                     "options": {"backend": "python", "max_step": 1.0e-4, "parameters": {}, "inputs": {}, "outputs": {}}},
+        "description": (description or ((cls.__doc__ or "").strip().splitlines() or [name])[0]),
+        "template": {"domain": domain, "model": reference, "options": options},
         "parameters": parameters, "ports": ports,
     }
 
 
 def part_library() -> list[dict[str, Any]]:
     parts = [_plant_part(*spec) for spec in _PLANTS]
+    parts += [_plant_part(ref, pid, name, category, "firmware" if category != "Buses" else "electrical", icon, text, topics)
+              for ref, pid, name, category, icon, text, topics in _BOARDS]
+    parts.append({"id": "bus", "name": "Bus / radio channel", "category": "Buses", "kind": "bus", "icon": "bus",
+                  "description": "An event topic boards publish on and subscribe to (CAN, UART, I2C, SPI, RS-485, "
+                                 "Ethernet, BLE, Wi-Fi…). Wire ⇄ pins to it.", "ports": []})
     servo_fw = EXAMPLES / "firmware" / "rc-servo-l476.elf"
     parts += [
         {"id": "stm32l476_servo_fw", "name": "STM32L476 servo firmware", "category": "Controllers", "kind": "instance",
@@ -206,6 +286,8 @@ def instantiate_part(part_id: str, node_id: str, root: Path, signals: dict[str, 
     new_signals: dict[str, Any] = {}
     node: dict[str, Any] = {"id": node_id, "kind": part["kind"], "part": part_id, "label": node_id,
                             "icon": part.get("icon", "box"), "x": 0, "y": 0}
+    if part["kind"] == "bus":
+        raise ValueError("a bus is added by the Lab (its topic is its name)")
     if part["kind"] == "instance":
         spec = copy.deepcopy(part["template"])
         options = spec.setdefault("options", {})
@@ -216,7 +298,7 @@ def instantiate_part(part_id: str, node_id: str, root: Path, signals: dict[str, 
             spec["model"] = _relative(str(spec["model"]), root)
         if options.get("backend") == "python":
             for port in part["ports"]:
-                if port["direction"] == "out":
+                if port["direction"] == "out" and port.get("kind") != "event":
                     name = f"{node_id}.{port['name']}"
                     options["outputs"][port["name"]] = name
                     new_signals[name] = {"domain": spec["domain"], "unit": port["unit"], "initial": 0.0}

@@ -20,6 +20,7 @@ from embeddyn.mechatronics.orchestrator import CoSimulationOrchestrator
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = sorted((ROOT / "examples/mechatronics").glob("*.yaml"))
 LAB = ROOT / "examples/mechatronics/rc-servo-lab.yaml"
+EXAMPLE_DIR = ROOT / "examples/mechatronics"
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.name)
@@ -68,13 +69,18 @@ def test_every_part_instantiates(tmp_path):
     parts = part_library()
     assert {"Controllers", "Electrical", "Mechanical", "Sources", "Instruments", "3-D bodies"} <= {p["category"] for p in parts}
     for part in parts:
+        if part["kind"] == "bus":                       # the Lab adds buses itself (topic = name)
+            continue
         result = instantiate_part(part["id"], "x1", tmp_path)
         node = result["node"]
         assert node["kind"] == part["kind"] and node["ports"] is not None
         if part["kind"] == "instance" and part["template"]["options"]["backend"] == "python":
-            outputs = [p for p in node["ports"] if p["direction"] == "out"]
-            assert outputs and all(p["signal"] == f"x1.{p['name']}" for p in outputs)
+            outputs = [p for p in node["ports"] if p["direction"] == "out" and p.get("kind") != "event"]
+            events = [p for p in node["ports"] if p.get("kind") == "event"]
+            assert outputs or events
+            assert all(p["signal"] == f"x1.{p['name']}" for p in outputs)
             assert set(result["signals"]) == {p["signal"] for p in outputs}
+            assert all(p["signal"] for p in events), part["id"]   # boards join their usual bus
     servo_fw = instantiate_part("stm32l476_servo_fw", "mcu", tmp_path)["node"]
     assert not Path(servo_fw["spec"]["options"]["bindings"]).is_absolute()     # relative to the project
     with pytest.raises(ValueError, match="invalid part name"):
@@ -243,3 +249,74 @@ def test_ports_endpoint_follows_option_edits(lab, tmp_path):
     by_name = {p["name"]: p for p in ports}
     assert by_name["duty"]["signal"] == "a.duty" and by_name["supply"]["signal"] is None
     assert by_name["current"]["unit"] == "A"
+
+
+# -- buses, pinouts, wiring check -----------------------------------------------------------------------------
+def test_buses_are_pins_nodes_and_wires():
+    from embeddyn.mechatronics.gui.document import graph_from_raw, raw_from_graph
+    graph = load_graph(EXAMPLE_DIR / "multiboard-canopen-ble.yaml")
+    buses = {n["topic"]: n for n in graph["nodes"] if n["kind"] == "bus"}
+    assert set(buses) == {"can.tx", "can", "ble", "wifi"} and buses["can"]["protocol"] == "CAN"
+    bus_wires = [w for w in graph["wires"] if w["kind"] == "bus"]
+    into_can = {w["source"]["node"] for w in bus_wires if w["target"]["node"] == "bus_can"}
+    out_of_can = {w["target"]["node"] for w in bus_wires if w["source"]["node"] == "bus_can"}
+    assert into_can == {"can"} and {"master", "axis", "sensor", "gateway"} <= out_of_can     # CanBus puts frames on can
+    assert not any(w["kind"] == "net" and w["signal"] in buses for w in graph["wires"])   # events are not nets
+    raw = raw_from_graph(graph)
+    assert "buses" not in raw["metadata"]["gui"] and "bus_can" in raw["metadata"]["gui"]["layout"]
+    # a bus without boards survives a save
+    graph["nodes"].append({"id": "bus_spare", "kind": "bus", "label": "spare", "topic": "spare", "ports": []})
+    again = graph_from_raw(raw_from_graph(graph), EXAMPLE_DIR)
+    assert any(n["kind"] == "bus" and n["topic"] == "spare" for n in again["nodes"])
+    renode = load_graph(EXAMPLE_DIR / "rc-servo-l476-canbus.yaml")
+    mcu_pins = {p["name"]: p["signal"] for n in renode["nodes"] if n["id"] == "mcu" for p in n["ports"] if p.get("kind") == "event"}
+    assert mcu_pins.get("can:tx") and mcu_pins.get("can:rx")
+
+
+def test_wiring_check_finds_units_drivers_and_lonely_buses():
+    from embeddyn.mechatronics.gui.document import unit_conversion, wiring_issues
+    assert unit_conversion("rad", "deg")[0] == pytest.approx(57.29578) and unit_conversion("deg", "rad")[0] == pytest.approx(0.0174533)
+    assert unit_conversion("degC", "K") == pytest.approx((1.0, 273.15)) and unit_conversion("V", "A") is None
+    graph = {"signals": {"a": {"initial": 2.5}}, "nodes": [
+        {"id": "p", "kind": "instance", "ports": [{"name": "angle", "direction": "out", "signal": "s", "unit": "rad"},
+                                                   {"name": "tx", "direction": "out", "signal": "x", "unit": ""},
+                                                   {"name": "event:tx", "direction": "out", "signal": "lonely", "kind": "event"}]},
+        {"id": "q", "kind": "instance", "ports": [{"name": "deg", "direction": "in", "signal": "s", "unit": "deg"},
+                                                   {"name": "x", "direction": "out", "signal": "x"},
+                                                   {"name": "a", "direction": "in", "signal": "a"},
+                                                   {"name": "event:rx", "direction": "in", "signal": None, "kind": "event"}]},
+        {"id": "bus_lonely", "kind": "bus", "topic": "lonely", "label": "lonely", "ports": []}],
+        "wires": [{"id": "w0", "kind": "net", "signal": "s", "source": {"node": "p", "port": "angle"}, "target": {"node": "q", "port": "deg"}},
+                  {"id": "w1", "kind": "bus", "signal": "lonely", "source": {"node": "p", "port": "event:tx"}, "target": {"node": "bus_lonely", "port": "tx"}}]}
+    issues = {i["kind"]: i for i in wiring_issues(graph)}
+    assert "gain 57.2958" in issues["units"]["text"]
+    assert issues["drivers"]["severity"] == "error" and "x is written by 2 outputs" in issues["drivers"]["text"]
+    assert "stays at 2.5" in issues["undriven"]["text"]
+    assert "nobody subscribes" in issues["bus"]["text"] and "q.event:rx is on no bus" in issues["event"]["text"]
+
+
+def test_transistor_legs_follow_the_package():
+    from embeddyn.mechatronics.gui import breadboard as bb
+    text = """* pinout
+V1 vcc 0 dc 5
+R1 vcc c 1k
+R2 vcc b 100k
+Q1 c b 0 Q2N3904
+M1 d g 0 N2N7000
+M2 d2 g 0 NPOWER
+R3 vcc d 1k
+R4 vcc d2 1k
+R5 vcc g 10k
+.model Q2N3904 NPN(Is=6.734f Bf=416.4)
+.model N2N7000 VDMOS(Vto=2.1 Kp=0.3)
+.model NPOWER VDMOS(Vto=3 Kp=60)
+.end
+"""
+    board = bb.auto_layout(bb.parse_netlist(text), "pinout")
+    order = {}
+    for part in board["parts"]:
+        if part["type"] in bb.TRANSISTOR_TYPES:
+            assert [p["name"] for p in part["pins"]] == bb.PIN_NAMES[part["type"]][:3]          # pin i is still node i
+            order[part["ref"]] = [p["name"] for p in sorted(part["pins"], key=lambda p: int(p["hole"][1:]))]
+    assert order == {"Q1": ["E", "B", "C"], "M1": ["S", "G", "D"], "M2": ["G", "D", "S"]}
+    assert bb.check_board(board)["ok"]

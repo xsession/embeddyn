@@ -13,7 +13,8 @@ let frameDirty = true;
 let replayTimer = null;
 
 // -- library ------------------------------------------------------------------------
-const CATEGORY_ORDER = ['Controllers', 'Electrical', 'Mechanical', 'Thermal', 'Sources', 'Instruments', '3-D bodies'];
+const CATEGORY_ORDER = ['Controllers', 'Electrical', 'Mechanical', 'Thermal', 'Buses', 'Wired boards', 'Radio boards',
+  'Sources', 'Instruments', '3-D bodies'];
 
 function renderLibrary() {
   const query = $('part-search').value.trim().toLowerCase();
