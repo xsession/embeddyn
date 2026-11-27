@@ -484,6 +484,7 @@ class _Layout:
         self.wires: list[dict[str, Any]] = []
         self.color: dict[str, str] = {}
         self.cursor = 2
+        self.tall: set[int] = set()                                   # top-half columns under a TO-92/TO-220 body
 
     # -- nets ----------------------------------------------------------------
     def rail(self, net: str) -> str | None:
@@ -659,6 +660,7 @@ def auto_layout(netlist: Netlist, name: str = "", bindings: dict[str, Any] | Non
                 layout.strips[(column, half)] = net
                 layout.net_strips[net].append((column, half))
             layout.cursor = max(layout.cursor, holes[-1][0] + 2)
+            layout.tall.update(range(holes[0][0] - 1, holes[-1][0] + 2))
             pins = []
             for (column, _), net, pin in zip(holes, nets, names):
                 hole = layout.take((column, half), row="e")
@@ -776,8 +778,13 @@ def _pin_names(kind: str, count: int) -> list[str]:
 
 
 def _common_row(layout: _Layout, a: tuple[int, str], b: tuple[int, str]) -> str | None:
+    """A row free in both strips; outer rows when a transistor body stands between them."""
     rows_b = set(layout.free_rows(*b))
-    return next((r for r in layout.free_rows(*a) if r in rows_b), None)
+    rows = layout.free_rows(*a)
+    low, high = sorted((a[0], b[0]))
+    if a[1] == "t" and any(c in layout.tall for c in range(low, high + 1)):
+        rows = [r for r in "ba" if r in rows] + [r for r in rows if r not in "ba"]
+    return next((r for r in rows if r in rows_b), None)
 
 
 # ---------------------------------------------------------------------------

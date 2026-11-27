@@ -522,6 +522,7 @@ function representativeHole(netName) {
 
 function drawProbes(layer) {
   const outputs = bb.circuit?.outputs || [];
+  const placed = [];
   let k = 0;
   for (const out of outputs) {
     const m = PROBE_RE.exec(out.vector.trim());
@@ -530,7 +531,13 @@ function drawProbes(layer) {
     const p = holeXY(hole);
     if (!p) continue;
     const g = el('g', { class: 'bb-probe' }, layer);
-    const fx = p.x + (k % 2 ? 1.2 : -1.2) * P, fy = (p.y < 9 * P ? -2.6 - (k % 3) * 1.5 : 20 + (k % 3) * 1.5) * P;
+    // Flags above (top half) or below the board, stacked so their boxes never overlap.
+    const above = p.y < 9 * P;
+    const fx = p.x - 1.2 * P;
+    let fy = above ? -2.6 * P : 20 * P;
+    const width = (out.vector.length + 18) * 5.2;
+    while (placed.some((b) => Math.abs(b.y - fy) < 1.4 * P && fx < b.x + b.w && b.x < fx + width)) fy += (above ? -1.5 : 1.5) * P;
+    placed.push({ x: fx, y: fy, w: width });
     k++;
     el('line', { x1: p.x, y1: p.y, x2: fx, y2: fy, class: 'bb-probe-lead' }, g);
     el('circle', { cx: p.x, cy: p.y, r: 0.28 * P, class: 'bb-probe-tip' }, g);
