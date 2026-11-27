@@ -1,6 +1,6 @@
 {
   "name": "mkl05z32",
-  "description": "NXP Kinetis KL05Z32 (MKL05Z32VFM4: Cortex-M0+ 48 MHz, 32 KB flash, 4 KB SRAM, UART0, SPI0, I2C0, TPM0/TPM1, PIT, LPTMR, RTC, 12-bit ADC and DAC): GNU Arm toolchain with the KL05 CMSIS device files (Keil Kinetis_KLxx_DFP) or Mbed OS 5.15 bare metal, Renode mkl05z32 platform (board FRDM-KL05Z)",
+  "description": "NXP Kinetis KL05Z32 (MKL05Z32VFM4: Cortex-M0+ 48 MHz, 32 KB flash, 4 KB SRAM, UART0, SPI0, I2C0, TPM0/TPM1, PIT, LPTMR, RTC, 12-bit ADC and DAC): GNU Arm toolchain with the KL05 CMSIS device files (Keil Kinetis_KLxx_DFP) or Mbed OS 5.15 bare metal, Renode mkl05z32 platform (board FRDM-KL05Z; 17 Mbed HAL test programs pass)",
   "env_defaults": {
     "ARM_BIN": "/usr/bin",
     "KLXX_DFP": "/opt/Kinetis_KLxx_DFP",
@@ -45,7 +45,7 @@
   "renode": {
     "platform": "platforms/cpus/nxp/mkl05z32.repl",
     "pc_command": "cpu PC",
-    "notes": "Board: platforms/boards/nxp/frdm_kl05z.repl (RGB LED red PTB8 = portb.ledRed, green PTB9 = portb.ledGreen, blue PTB10 = portb.ledBlue, active low; MMA8451Q at I2C0 0x1D = i2c0.accelerometer, set 'sysbus.i2c0.accelerometer AccelerationX 0.5' in g; OpenSDA console on uart0). Clock tree: KinetisL_MCG (FEI/FEE/FBI/FBE, slow and fast IRC, the 32.768 kHz crystal) -> KinetisL_SIM (OUTDIV1 core clock to SysTick, OUTDIV4 bus clock to the PIT, SOPT2 TPM/UART0 clock, SOPT1 ERCLK32K). Pins: 'sysbus.porta OnGPIO 11 true' drives PTA11 (inputs 0-31 per port; 32-63 are the alternate-function inputs fed by the TPM channels). ADC: 'sysbus.adc0 SetChannelVoltage 11 1.65' (channel, volts); AD23 reads the DAC output. SPI0 takes a GPIO chip select on input 0 (test fixture tools/mbed2/fixtures/spi_flash_kl05z.repl). Not modelled: TSI0 touch slider, CMP0, DMA/DMAMUX, COP watchdog, LLWU. Docs: tools/mbed2/README.md."
+    "notes": "Board: platforms/boards/nxp/frdm_kl05z.repl (RGB LED red PTB8 = portb.ledRed, green PTB9 = portb.ledGreen, blue PTB10 = portb.ledBlue, active low; MMA8451Q at I2C0 0x1D = i2c0.accelerometer, set 'sysbus.i2c0.accelerometer AccelerationX 0.5' in g; OpenSDA console on uart0). Clock tree: KinetisL_MCG (FEI/FEE/FBI/FBE, slow and fast IRC, the 32.768 kHz crystal) -> KinetisL_SIM (OUTDIV1 core clock to SysTick, OUTDIV4 bus clock to the PIT, SOPT2 TPM/UART0 clock, SOPT1 ERCLK32K). Pins: 'sysbus.porta OnGPIO 11 true' drives PTA11 (inputs 0-31 per port; 32-63 are the alternate-function inputs fed by the TPM channels). ADC: 'sysbus.adc0 SetChannelVoltage 11 1.65' (channel, volts); AD23 reads the DAC output. SPI0 takes a GPIO chip select on input 0 (test fixture tools/mbed2/fixtures/spi_flash_kl05z.repl). Also modelled: DMA (4 channels) with DMAMUX0 (UART0, SPI0, ADC0, CMP0, TSI0, PORTA/B, TPM overflow sources), TSI0 ('sysbus.tsi0 Touch 9 true', 'sysbus.tsi0 Slide 9 8 0.25' on the board's slider electrodes IN9/IN8), CMP0 with its 6-bit DAC ('sysbus.cmp0 SetInputVoltage 0 1.2'; IN3 is DAC0), LLWU (wake-up pins and LPTMR/CMP/TSI/RTC sources in LLS/VLLS), the COP watchdog (resets the machine; RCM_SRS0 reports WDOG) and the FTFA flash commands. Not modelled: DMAMUX periodic triggers, MTB. Docs: tools/mbed2/README.md."
   },
   "reference": {
     "simulator": "none; the models are checked with Mbed OS 5.15 bare-metal programs on the vendor KL05Z HAL (tools/mbed2/run_mbed_tests.py with tests_kl05z.txt in the Renode tree)"
