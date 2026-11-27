@@ -37,14 +37,14 @@ export async function regraph() {
 const busId = (topic) => 'bus_' + topic.replace(/[^A-Za-z0-9_]/g, '_');
 
 async function addBus(x, y) {
-  const topic = (prompt('Bus topic: the event topic boards publish on and subscribe to (can, uart, i2c, eth, ble…)', 'can') || '').trim();
-  if (!topic) return null;
-  if (findNode(busId(topic))) { toast(`Bus ${topic} exists already`, true); return null; }
+  let n = 1;                                     // named bus1, bus2…: rename it in the inspector (can, uart, eth…)
+  while (findNode(busId(`bus${n}`))) n++;
+  const topic = `bus${n}`;
   state.graph.nodes.push({ id: busId(topic), kind: 'bus', part: 'bus', label: topic, topic, icon: 'bus',
     x: Math.round(x / 10) * 10, y: Math.round(y / 10) * 10, ports: [] });
   await regraph();
   state.selection = { type: 'node', id: busId(topic) };
-  toast(`Bus ${topic}: wire event outputs to its tx pin, its rx pin to event inputs`);
+  toast(`Bus ${topic}: name its topic in the inspector, then wire ⇄ event pins to it`);
   return findNode(busId(topic));
 }
 
@@ -66,6 +66,26 @@ function setEvent(node, port, topic, previous = port.signal) {
     if (topic && !list.includes(topic)) list.push(topic);
     if (!list.length) delete options.can.subscribe; else options.can.subscribe = list.length === 1 ? list[0] : list;
   }
+}
+
+// Rename a bus: every board on it, its medium and the analyzer's topic list follow.
+export async function renameBus(oldTopic, newTopic) {
+  newTopic = (newTopic || '').trim();
+  if (!newTopic || newTopic === oldTopic) return;
+  if (!/^[A-Za-z0-9_.\-]+$/.test(newTopic)) return toast('A topic is letters, digits, _ . -', true);
+  if (findNode(busId(newTopic))) return toast(`Bus ${newTopic} exists already: delete one of them first`, true);
+  for (const node of state.graph.nodes) {
+    for (const port of node.ports || []) if (port.kind === 'event' && port.signal === oldTopic && node.kind === 'instance') setEvent(node, port, newTopic, oldTopic);
+  }
+  const bus = findNode(busId(oldTopic));
+  if (bus) Object.assign(bus, { id: busId(newTopic), topic: newTopic, label: newTopic });
+  const extra = state.graph.extra || {};
+  if (extra.media?.[oldTopic]) { extra.media[newTopic] = extra.media[oldTopic]; delete extra.media[oldTopic]; }
+  const analyzer = extra.metadata?.analyzer;
+  if (analyzer?.topics) analyzer.topics = analyzer.topics.map((t) => (t === oldTopic ? newTopic : t));
+  if (analyzer?.inject) for (const [k, v] of Object.entries(analyzer.inject)) if (v === oldTopic) analyzer.inject[k] = newTopic;
+  if (state.selection?.id === busId(oldTopic)) state.selection = { type: 'node', id: busId(newTopic) };
+  await regraph();
 }
 
 async function connectEvent(src, dst) {

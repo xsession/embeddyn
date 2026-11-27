@@ -320,3 +320,28 @@ R5 vcc g 10k
             order[part["ref"]] = [p["name"] for p in sorted(part["pins"], key=lambda p: int(p["hole"][1:]))]
     assert order == {"Q1": ["E", "B", "C"], "M1": ["S", "G", "D"], "M2": ["G", "D", "S"]}
     assert bb.check_board(board)["ok"]
+
+
+def test_bus_activity_counts_frames_rate_and_damage():
+    from embeddyn.mechatronics.gui.server import _bus_activity
+
+    class Session:
+        def __init__(self):
+            self.events = []
+
+        def events_since(self, cursor):
+            return self.events[cursor:], len(self.events)
+
+        def info(self):
+            return {"status": "running"}
+
+    session = Session()
+    session.events += [{"topic": "can", "time_seconds": i * 0.001, "payload": {"proto": "can", "id": 1, "data": ""}} for i in range(200)]
+    session.events.append({"topic": "can", "time_seconds": 0.2, "payload": {"proto": "can", "medium": {"lost": "noise"}}})
+    session.events.append({"topic": "uart", "time_seconds": 0.2, "payload": {"proto": "uart", "medium": {"faults": ["x"]}}})
+    first = _bus_activity(session)["topics"]
+    assert first["can"]["frames"] == 201 and first["can"]["lost"] == 1 and first["can"]["rate_hz"] == pytest.approx(1000, rel=0.02)
+    assert first["uart"]["impaired"] == 1
+    session.events.append({"topic": "can", "time_seconds": 0.5, "payload": {"proto": "can", "error": "bit error"}})
+    again = _bus_activity(session)["topics"]                 # incremental: only the new event is read
+    assert again["can"]["frames"] == 202 and again["can"]["errors"] == 1 and again["can"]["rate_hz"] == 10.0

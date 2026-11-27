@@ -167,6 +167,8 @@ def make_handler(state: LabState):
                     return self._json(state.session(query.get("session", "")).info())
                 if url.path == "/api/analyzer":
                     return self._json(_analyzer_rows(state.session(query.get("session", "")), int(query.get("from", 0))))
+                if url.path == "/api/buses":
+                    return self._json(_bus_activity(state.session(query.get("session", ""))))
                 if url.path == "/api/pcap":
                     session = state.session(query.get("session", ""))
                     return self._send(200, _pcap(session, query.get("proto", "can")), "application/vnd.tcpdump.pcap",
@@ -546,6 +548,37 @@ def _decode_new(session: RunSession, cache: dict[str, Any], config: dict[str, An
             "pending": len(cache.get("held", [])), "injections": session.injection_list(),
             "media": (session._orchestrator.media.specs() if getattr(session, "_orchestrator", None) is not None else None),
             "capture": getattr(session, "path", None)}
+
+
+def _bus_activity(session: RunSession) -> dict[str, Any]:
+    """Traffic per event topic of a run, for the schematic's bus nodes: frames, frames per second over the
+    last 0.1 s of simulated time, frames the medium lost, error frames and frames it corrupted."""
+    cache = session.__dict__.setdefault("_buses", {"cursor": 0, "topics": {}, "lock": threading.Lock()})
+    with cache["lock"]:
+        events, cursor = session.events_since(cache["cursor"])
+        cache["cursor"] = cursor
+        for event in events:
+            topic = str(event.get("topic") or "")
+            payload = event.get("payload")
+            if not topic or not isinstance(payload, dict):
+                continue
+            t = float(event.get("time_seconds", 0.0))
+            item = cache["topics"].setdefault(topic, {"frames": 0, "lost": 0, "errors": 0, "impaired": 0, "recent": [], "last": 0.0})
+            item["frames"] += 1
+            item["last"] = max(item["last"], t)
+            medium = payload.get("medium") or {}
+            item["lost"] += bool(medium.get("lost"))
+            item["errors"] += bool(payload.get("error"))
+            item["impaired"] += bool(medium) and not medium.get("lost") and not payload.get("error")
+            item["recent"].append(t)
+        window = 0.1
+        out = {}
+        last = max((i["last"] for i in cache["topics"].values()), default=0.0)
+        for topic, item in cache["topics"].items():
+            item["recent"] = [t for t in item["recent"] if t > last - window]
+            out[topic] = {k: item[k] for k in ("frames", "lost", "errors", "impaired", "last")}
+            out[topic]["rate_hz"] = round(len(item["recent"]) / window, 1)
+    return {"status": session.info().get("status"), "topics": out}
 
 
 def _pcap(session: RunSession, proto: str) -> bytes:

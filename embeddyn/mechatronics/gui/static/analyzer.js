@@ -12,7 +12,7 @@ const COLORS = { CANopen: '#e67e22', CAN: '#d35400', BLE: '#2f80d1', '802.11': '
   SPI: '#8d6e63', UART: '#78909c', Modbus: '#ad1457', Ethernet: '#1e88e5' };
 const PROTO_KEYS = ['CANopen', 'BLE', '802.11', 'NFC', 'RFID', 'LoRa', 'I2C', 'SPI', 'UART', 'Modbus', 'Ethernet'];
 // Fault presets of the medium panel (comms.faults): merged into the faults JSON.
-const FAULT_PRESETS = {
+export const FAULT_PRESETS = {
   'UART: receiver clock 5 % off': { baud_error_pct: 5 },
   'UART: wrong baud rate (9600)': { rx_baud: 9600 },
   'UART: receiver expects 8E1': { rx_format: '8E1' },

@@ -71,10 +71,19 @@ the built-in mocks.
   * **Connect:** wire an event pin to a bus, or straight to another board's event pin
     (they share the publisher's topic).
   * **Disconnect:** delete the wire, or delete the bus to take every board off it.
-  * **Add:** drag **Bus / radio channel** from *Buses* and name the topic. A bus with no
-    boards yet is kept in `metadata.gui.buses`.
-  * **Inspect:** select a bus to see its publishers, subscribers and medium (impairments).
-    **Decode in the analyzer** adds its topic to `metadata.analyzer.topics`.
+  * **Add:** drag **Bus / radio channel** from *Buses*. It starts as `bus1`, `bus2`… A bus
+    with no boards yet is kept in `metadata.gui.buses`.
+  * **Inspect and edit:** select a bus to see its publishers and subscribers. There you can:
+    * rename its **topic**: the boards, its medium and the analyzer's topic follow;
+    * pick its **protocol** when the topic name does not say it (stored as
+      `media.<topic>.protocol`; cable checks and faults follow it);
+    * set a bit error rate, a loss and **faults** (the same presets as the analyzer's
+      Medium panel), or clean the medium;
+    * click **Decode in the analyzer** to add its topic to `metadata.analyzer.topics`.
+  * **Watch:** during a run every bus node counts its traffic: frames, frames per second
+    (over the last 0.1 s of simulated time), frames the medium lost, error frames and
+    impaired frames (⚡). The count turns red when frames are lost
+    (`GET /api/buses?session=…`).
   Boards from the library join their usual topic as they are dropped: an I2C master and
   a TMP102 land on the `i2c` bus together, CANopen nodes on `can.tx` / `can` with the
   CAN bus model.

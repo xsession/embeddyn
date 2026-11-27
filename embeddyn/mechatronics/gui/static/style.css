@@ -319,3 +319,6 @@ label { user-select: none; }
 
 .bb-led-flat { stroke: #1b1b1b; stroke-width: 1.6; stroke-linecap: round; }
 .bb-pol { font-size: 7px; font-weight: 700; fill: #c0392b; text-anchor: middle; }
+.sch-bus .bus-traffic { font-size: 9.5px; fill: #7a4a14; }
+.sch-bus .bus-traffic.bad { fill: #d62828; font-weight: 600; }
+.json.bad { outline: 1px solid #e74c3c; }

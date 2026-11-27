@@ -227,9 +227,11 @@ def _bus_nodes(nodes: list[dict[str, Any]], declared: list[Any], media: dict[str
     buses = []
     for topic in topics:
         head = topic.split(".")[0]
-        spec = media.get(topic)
+        spec = media.get(topic) or {}
+        protocol = str(spec.get("protocol") or head) if isinstance(spec, dict) else head
+        impaired = isinstance(spec, dict) and any(k not in {"seed", "protocol", "kind"} for k in spec)
         buses.append({"id": bus_node_id(topic), "kind": "bus", "part": "bus", "label": topic, "topic": topic,
-                      "icon": "bus", "protocol": BUS_PROTOCOLS.get(head, ""), "impaired": bool(spec),
+                      "icon": "bus", "protocol": BUS_PROTOCOLS.get(protocol, ""), "impaired": impaired,
                       "ports": [{"name": "tx", "direction": "in", "signal": topic, "kind": "event", "mappable": False,
                                  "unit": "", "label": "publishers"},
                                 {"name": "rx", "direction": "out", "signal": topic, "kind": "event", "mappable": False,

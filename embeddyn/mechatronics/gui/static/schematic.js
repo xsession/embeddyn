@@ -8,6 +8,8 @@ const svg = document.getElementById('schematic');
 const view = { x: 20, y: 20, scale: 1 };
 let root, wireLayer, nodeLayer, dragLayer;
 let valueTags = [];          // [{el, signal}]
+let busTags = [];            // [{el, topic}]: live traffic of bus nodes
+let busTraffic = {};         // topic -> {frames, rate_hz, lost, errors, impaired}
 let showValues = true;
 
 const el = (tag, attrs = {}, parent) => {
@@ -22,7 +24,7 @@ export function nodeSize(node) {
   const outs = node.ports.filter((p) => p.direction === 'out').length;
   const wide = node.kind === 'instance' && node.ports.some((p) => !p.mappable && p.kind !== 'event');
   const width = node.kind === 'terminal' ? 170 : node.kind === 'bus' ? 150 : node.kind === 'instance' ? (wide ? 250 : 210) : 160;
-  return { width, height: HEAD + Math.max(ins, outs, 1) * PITCH + PAD };
+  return { width, height: HEAD + Math.max(ins, outs, 1) * PITCH + PAD + (node.kind === 'bus' ? 16 : 0) };
 }
 
 function pinLabel(node, port) {
@@ -67,6 +69,7 @@ function applyView() {
 export function render() {
   svg.innerHTML = '';
   valueTags = [];
+  busTags = [];
   root = el('g', {}, svg);
   wireLayer = el('g', {}, root);
   nodeLayer = el('g', {}, root);
@@ -106,7 +109,11 @@ function drawNode(node, connected) {
     : node.kind === 'bus'
       ? `${node.protocol ? node.protocol + ' ' : ''}bus · ${busBoards(node)} boards${node.impaired ? ' · ⚡ impaired' : ''}`
       : (part?.name || node.kind);
-  if (node.kind === 'bus') g.classList.add('sch-bus');
+  if (node.kind === 'bus') {
+    g.classList.add('sch-bus');
+    const traffic = el('text', { class: 'bus-traffic', x: width / 2, y: height - 7, 'text-anchor': 'middle' }, g);
+    busTags.push({ el: traffic, topic: node.topic || node.label });
+  }
   const ins = node.ports.filter((p) => p.direction === 'in');
   const outs = node.ports.filter((p) => p.direction === 'out');
   ins.forEach((port, i) => drawPin(g, node, port, 0, HEAD + PITCH / 2 + i * PITCH, -1, width, connected));
@@ -175,7 +182,32 @@ export function updateValues() {
   for (const tag of valueTags) {
     tag.el.textContent = showValues ? formatValue(signalValue(tag.signal), signalUnit(tag.signal)) : '';
   }
+  for (const tag of busTags) {
+    const t = busTraffic[tag.topic];
+    tag.el.textContent = !t ? (state.session ? 'no traffic' : '') : `${t.frames} frames · ${t.rate_hz} /s`
+      + (t.lost ? ` · ${t.lost} lost` : '') + (t.errors ? ` · ${t.errors} err` : '') + (t.impaired ? ` · ${t.impaired} ⚡` : '');
+    tag.el.classList.toggle('bad', !!(t && (t.lost || t.errors)));
+  }
 }
+
+// Live bus traffic while a run goes (and once more when it ends): frames, rate, lost and error frames.
+let busSession = null, busDone = false, busBusy = false;
+setInterval(async () => {
+  const session = state.session?.session;
+  if (!session || !state.graph?.nodes.some((n) => n.kind === 'bus') || busBusy) return;
+  if (session !== busSession) { busSession = session; busDone = false; busTraffic = {}; }
+  if (busDone) return;
+  busBusy = true;
+  try {
+    const response = await fetch(`/api/buses?session=${session}`);
+    const result = await response.json();
+    if (!result.error && session === busSession) {
+      busTraffic = result.topics || {};
+      busDone = ['done', 'stopped', 'error'].includes(result.status);
+      updateValues();
+    }
+  } catch { /* the server restarted */ } finally { busBusy = false; }
+}, 700);
 
 // -- interaction --------------------------------------------------------------
 function startNodeDrag(e, node) {

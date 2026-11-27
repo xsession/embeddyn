@@ -1,5 +1,6 @@
 // Property inspector: project, part, wire.
-import { deleteNode, deleteWire, refreshPorts } from './ops.js';
+import { deleteNode, deleteWire, refreshPorts, regraph, renameBus } from './ops.js';
+import { FAULT_PRESETS } from './analyzer.js';
 import { inspectorPanel } from './breadboard.js';
 import { api, data, emit, findNode, formatValue, markDirty, nodeColor, on, signalUnit, state, toast } from './store.js';
 
@@ -154,21 +155,73 @@ function busPanel(node) {
   const metadata = state.graph.extra.metadata = state.graph.extra.metadata || {};
   const analyzer = metadata.analyzer = metadata.analyzer || {};
   const decoded = (analyzer.topics || []).includes(topic);
-  const medium = (state.graph.extra.media || {})[topic];
+  const extra = state.graph.extra;
+  const medium = (extra.media || {})[topic];
   body.append(
     h('h3', {}, h('span', { class: 'tag', style: `background:${nodeColor(node)}` }, 'bus'), ' ', topic),
-    field('protocol', h('span', {}, node.protocol || '— (from the topic name: can, uart, i2c, spi, rs485, eth, ble…)')),
+    field('topic', input(topic, (v) => renameBus(topic, v).catch((error) => toast(error.message, true)), 'text',
+      { title: 'Renaming moves every board on the bus, its medium and the analyzer topic to the new name' })),
+    field('protocol', (() => {
+      const names = { can: 'CAN', ble: 'BLE', wifi: 'Wi-Fi', nfc: 'NFC', rfid: 'RFID', lora: 'LoRa', i2c: 'I2C', spi: 'SPI', uart: 'UART', rs485: 'RS-485', eth: 'Ethernet' };
+      const set = (extra.media || {})[topic]?.protocol || '';
+      const s = h('select', { title: 'Which bus this is, when the topic name does not say (cable checks and faults follow it)' },
+        h('option', { value: '' }, `from the topic${node.protocol && !set ? ' (' + node.protocol + ')' : ''}`),
+        Object.entries(names).map(([k, v]) => h('option', { value: k, selected: k === set }, v)));
+      s.onchange = () => {
+        extra.media = extra.media || {};
+        const spec = { ...(extra.media[topic] || {}) };
+        if (s.value) spec.protocol = s.value; else delete spec.protocol;
+        if (Object.keys(spec).length) extra.media[topic] = spec; else delete extra.media[topic];
+        regraph().catch((error) => toast(error.message, true));
+      };
+      return s;
+    })()),
     field('publishers', h('code', {}, boards('target').join(', ') || 'none')),
     field('subscribers', h('code', {}, boards('source').join(', ') || 'none')),
     field('medium', h('code', { title: medium ? JSON.stringify(medium, null, 1) : '' }, medium
-      ? Object.keys(medium).filter((k) => k !== 'seed').join(', ') || 'clean' : 'ideal (no impairments)')),
+      ? Object.keys(medium).filter((k) => !['seed', 'protocol', 'kind'].includes(k)).join(', ') || 'ideal (no impairments)' : 'ideal (no impairments)')),
     h('div', { class: 'note' }, 'Wire a board\'s ⇄ event output to "from boards" and "to boards" to its ⇄ event inputs. '
-      + 'Noise, cables and faults for this bus: Analyzer → ⚡ Medium (topic ' + topic + ').'),
+      + 'Cables, radio links and the full set of impairments: Analyzer → ⚡ Medium (topic ' + topic + ').'),
+    mediumEditor(topic),
     h('div', { class: 'btn-row' },
       h('button', { disabled: decoded, title: 'Add this topic to metadata.analyzer.topics', onclick: () => {
         analyzer.topics = [...(analyzer.topics || []), topic]; markDirty(); render(); toast(`The analyzer decodes ${topic} on the next run`);
       } }, decoded ? 'Decoded in the analyzer' : 'Decode in the analyzer'),
       h('button', { class: 'danger', onclick: () => { deleteNode(node.id); emit('selection'); } }, 'Delete bus')));
+}
+
+// Quick impairments of a bus (the project's media: section): bit error rate, loss and wired-bus faults.
+function mediumEditor(topic) {
+  const extra = state.graph.extra;
+  const get = () => (extra.media || {})[topic] || {};
+  const put = (spec) => {
+    const clean = Object.fromEntries(Object.entries(spec).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+    extra.media = extra.media || {};
+    if (Object.keys(clean).filter((k) => k !== 'seed').length) extra.media[topic] = { seed: 1, ...clean };
+    else delete extra.media[topic];
+    if (!Object.keys(extra.media).length) delete extra.media;
+    regraph().catch((error) => toast(error.message, true));        // the bus node's ⚡ follows
+  };
+  const spec = get();
+  const faults = h('textarea', { rows: 3, class: 'json', spellcheck: 'false', placeholder: '{"baud_error_pct": 5}' },
+    spec.faults ? JSON.stringify(spec.faults) : '');
+  faults.addEventListener('change', () => {
+    const text = faults.value.trim();
+    try { put({ ...get(), faults: text ? JSON.parse(text) : undefined }); faults.classList.remove('bad'); }
+    catch { faults.classList.add('bad'); toast('faults: a JSON object', true); }
+  });
+  const presets = h('select', {}, h('option', { value: '' }, 'add a fault preset…'),
+    Object.keys(FAULT_PRESETS).map((name) => h('option', { value: name }, name)));
+  presets.addEventListener('change', () => {
+    const preset = FAULT_PRESETS[presets.value];
+    if (preset) put({ ...get(), kind: get().kind || 'wired', faults: { ...(get().faults || {}), ...preset } });
+  });
+  return h('div', {},
+    h('h4', {}, 'Impairments'),
+    field('bit error rate', input(spec.bit_error_rate ?? '', (v) => put({ ...get(), bit_error_rate: v ?? undefined }), 'number', { step: 'any', min: 0 })),
+    field('loss (0..1)', input(spec.loss ?? '', (v) => put({ ...get(), loss: v ?? undefined }), 'number', { step: 'any', min: 0, max: 1 })),
+    field('faults', presets), faults,
+    h('div', { class: 'btn-row' }, h('button', { disabled: !Object.keys(spec).some((k) => !['seed', 'protocol'].includes(k)), onclick: () => put({ protocol: get().protocol }) }, 'Clean medium')));
 }
 
 function gadgetPanel(node) {
