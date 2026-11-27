@@ -98,7 +98,9 @@ and a saved project behaves the same from the CLI.
   one row per message with the changed bytes highlighted, bit flip counts, and any byte
   range read as an integer and plotted, for reverse engineering. It can also find the bytes
   that follow a signal, name them into the decoder, export a DBC, open real captures
-  (pcap, pcapng, candump) and send or replay frames into the run. See
+  (pcap, pcapng, candump) and send or replay frames into the run. It decodes CAN/CANopen,
+  BLE, Wi-Fi, NFC, RFID (EM4100, EPC Gen2) and LoRaWAN, and its **⚡ Medium** panel adds
+  noise, loss, fading, interference and crosstalk to any bus or radio, live. See
   [Multi-board buses, radios and the analyzer](multiboard-comms.md#in-the-lab).
 * **3-D view:** drag to orbit, shift- or right-drag to pan, wheel to zoom, double-click to
   re-frame. Angles follow the signal unit (deg or rad) unless the body's `unit` is set.

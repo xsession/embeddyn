@@ -109,12 +109,17 @@
       <label class="an-proto" style="--c:#e67e22"><input type="checkbox" id="an-p-CANopen" checked> CAN/CANopen <span id="an-c-CANopen">0</span></label>
       <label class="an-proto" style="--c:#2f80d1"><input type="checkbox" id="an-p-BLE" checked> BLE <span id="an-c-BLE">0</span></label>
       <label class="an-proto" style="--c:#27ae60"><input type="checkbox" id="an-p-80211" checked> Wi-Fi <span id="an-c-80211">0</span></label>
+      <label class="an-proto" style="--c:#c0392b"><input type="checkbox" id="an-p-NFC" checked> NFC <span id="an-c-NFC">0</span></label>
+      <label class="an-proto" style="--c:#8e44ad"><input type="checkbox" id="an-p-RFID" checked> RFID <span id="an-c-RFID">0</span></label>
+      <label class="an-proto" style="--c:#16a085"><input type="checkbox" id="an-p-LoRa" checked> LoRa <span id="an-c-LoRa">0</span></label>
+      <label class="an-proto" style="--c:#b7950b"><input type="checkbox" id="an-p-I2C" checked> I2C <span id="an-c-I2C">0</span></label>
       <input id="an-filter" placeholder="filter: text · id==0x182 · src==gateway · type==SDO · ch==37 · rssi<-60">
       <label class="small" title="Select the packet at the run's time cursor while scrubbing or replaying"><input type="checkbox" id="an-sync" checked> follow cursor</label>
       <span id="an-count" class="small"></span>
       <button id="an-open" title="Open a capture from real hardware: pcap, pcapng or candump log">Open capture…</button>
       <button id="an-send-toggle" title="Send frames into the running simulation">Send…</button>
       <button id="an-dbc" title="CAN messages and named fields as a DBC file">DBC</button>
+      <button id="an-medium-toggle" title="Noise, loss, fading, interference and crosstalk on a bus or radio channel">⚡ Medium…</button>
       <span class="small">pcap:</span>
       <a id="an-pcap-can" class="button" download>CAN</a><a id="an-pcap-ble" class="button" download>BLE</a><a id="an-pcap-wifi" class="button" download>Wi-Fi</a>
     </div>
@@ -127,6 +132,56 @@
       <label class="small">× <input id="an-s-count" type="number" min="0" step="1" value="0" title="0 = until stopped"></label>
       <button id="an-s-send" class="primary">Send</button><button id="an-s-stop">Stop all</button>
       <span id="an-s-list" class="small"></span>
+    </div>
+    <div id="an-medium" class="hidden">
+      <div class="am-row">
+        <label>topic <input id="am-topic" list="am-topics" placeholder="can"></label><datalist id="am-topics"></datalist>
+        <label title="Bit error rate: probability that each payload bit flips">BER <input id="am-ber" type="number" step="any" min="0" value="0"></label>
+        <label title="Probability that a frame is lost">loss % <input id="am-loss" type="number" step="any" min="0" max="100" value="0"></label>
+        <label title="Extra random delay">jitter µs <input id="am-jitter" type="number" step="any" min="0" value="0"></label>
+        <label title="Radio: dB added to RSSI/SNR (distance, walls)">RSSI Δ dB <input id="am-rssi" type="number" step="any" value="0"></label>
+        <label title="Radio: per-packet Gaussian fading">fading σ dB <input id="am-fading" type="number" step="any" min="0" value="0"></label>
+        <label title="Radio: packets weaker than this are lost (empty = none)">sensitivity dBm <input id="am-sens" type="number" step="any"></label>
+      </div>
+      <div class="am-row">
+        <label title="Impairment strength over time">modulation <select id="am-mod"><option value="">none</option><option value="sine">sine</option><option value="square">square</option></select></label>
+        <label>f Hz <input id="am-modf" type="number" step="any" min="0" value="2"></label>
+        <label>depth <input id="am-modd" type="number" step="0.05" min="0" max="1" value="1"></label>
+        <label title="Periodic interferer: loses frames inside its on-time">interferer every ms <input id="am-ifp" type="number" step="any" min="0" value="0"></label>
+        <label>on µs <input id="am-ifd" type="number" step="any" min="0" value="1000"></label>
+        <label title="Crosstalk from frames on another topic">xtalk topic <input id="am-xt" list="am-topics" placeholder="—"></label>
+        <label>p <input id="am-xtp" type="number" step="0.05" min="0" max="1" value="0.3"></label>
+        <label title="Crosstalk from an analog signal: BER per unit of |signal|">xtalk signal <select id="am-xs"><option value="">—</option></select></label>
+        <label>BER/unit <input id="am-xsg" type="number" step="any" min="0" value="1e-4"></label>
+      </div>
+      <div class="am-row" title="Radio link budget: RSSI and errors follow the distance (log-distance path loss, receiver sensitivity)">
+        <b>radio link</b>
+        <label>distance m <input id="am-dist" type="number" step="any" min="0" placeholder="—"></label>
+        <label title="Transmit power (empty: the radio's typical value)">Ptx dBm <input id="am-ptx" type="number" step="any" placeholder="auto"></label>
+        <label title="Path-loss exponent: 2 free space, 2.7-3.5 indoors, 3-4 urban">exponent <input id="am-exp" type="number" step="0.1" min="1.5" value="2.0"></label>
+        <label title="Walls and obstacles">walls dB <input id="am-walls" type="number" step="any" min="0" value="0"></label>
+        <label title="Per-sender distances, e.g. gateway=1500, beacon=8">per sender <input id="am-srcs" placeholder="name=m, …"></label>
+      </div>
+      <div class="am-row" title="Cable: length, construction and shield set the delay, EMI pickup, CAN bit-timing limit and I2C capacitance">
+        <b>cable</b>
+        <label>length m <input id="am-len" type="number" step="any" min="0" placeholder="—"></label>
+        <label>type <select id="am-ctype"><option value="twisted">twisted pair</option><option value="untwisted">untwisted</option><option value="ribbon">ribbon</option><option value="coax">coax</option></select></label>
+        <label><input type="checkbox" id="am-shield"> shielded</label>
+        <label title="EMI environment: bit error rate per metre of unprotected cable">EMI BER/m <input id="am-emi" type="number" step="any" min="0" value="2e-7"></label>
+        <label title="CAN bit rate (for the cable-length timing check)">bitrate <input id="am-rate" type="number" step="any" min="0" value="500000"></label>
+        <b>I2C</b>
+        <label><select id="am-i2cmode"><option value="">—</option><option value="standard">100 kHz</option><option value="fast">400 kHz</option><option value="fast-plus">1 MHz</option></select></label>
+        <label>pull-up Ω <input id="am-rp" type="number" step="any" min="0" value="4700"></label>
+        <label>VDD <input id="am-vdd" type="number" step="0.1" min="0" value="3.3"></label>
+        <label>devices <input id="am-dev" type="number" step="1" min="1" value="2"></label>
+      </div>
+      <div id="am-derived" class="small"></div>
+      <div class="am-row">
+        <button id="am-apply" class="primary" title="Apply now to the running simulation (and to the next run)">Apply</button>
+        <button id="am-save" title="Keep these settings in the project file (media:)">Save to project</button>
+        <button id="am-clear" title="Remove this topic's impairments">Clear</button>
+        <span id="am-stats" class="small"></span>
+      </div>
     </div>
     <canvas id="an-lanes" title="One lane per sender; click to jump to a packet"></canvas>
     <div id="an-diff" class="hidden">

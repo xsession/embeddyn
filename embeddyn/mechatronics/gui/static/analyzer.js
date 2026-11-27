@@ -8,7 +8,8 @@ import { api, data, emit, markDirty, state, toast } from './store.js';
 import { buildStats, correlate, messageKey, readingOf, readings } from './bytediff.js';
 
 const $ = (id) => document.getElementById(id);
-const COLORS = { CANopen: '#e67e22', CAN: '#d35400', BLE: '#2f80d1', '802.11': '#27ae60' };
+const COLORS = { CANopen: '#e67e22', CAN: '#d35400', BLE: '#2f80d1', '802.11': '#27ae60', NFC: '#c0392b', RFID: '#8e44ad', LoRa: '#16a085', I2C: '#b7950b' };
+const PROTO_KEYS = ['CANopen', 'BLE', '802.11', 'NFC', 'RFID', 'LoRa', 'I2C'];
 const TYPE_TINT = { EMCY: '#ff5c5c', 'SDO abort': '#ff5c5c', NMT: '#c39bd3', SYNC: '#8d96a5', heartbeat: '#6b7380', SDO: '#f0b429' };
 const an = { packets: [], session: null, polling: null, selected: null, field: null, visible: false, follow: true,
   shown: [], lastCursor: -1, rowHeight: 20,
@@ -75,7 +76,7 @@ function render() {
   an.shown = filtered();
   const counts = {};
   for (const p of an.packets) counts[p.proto === 'CAN' ? 'CANopen' : p.proto] = (counts[p.proto === 'CAN' ? 'CANopen' : p.proto] || 0) + 1;
-  for (const key of ['CANopen', 'BLE', '802.11']) $(`an-c-${key.replace('.', '')}`).textContent = counts[key] || 0;
+  for (const key of PROTO_KEYS) $(`an-c-${key.replace('.', '')}`).textContent = counts[key] || 0;
   $('an-count').textContent = `${an.shown.length} of ${an.packets.length} packets`;
   renderLanes();
   if (an.mode === 'diff') return renderDiff();
@@ -282,7 +283,7 @@ function renderList() {
   body.innerHTML = '';
   for (let i = first; i < last; i++) {
     const p = an.shown[i];
-    const row = html('div', { class: 'an-row' + (an.selected === p.no ? ' selected' : '') + (p.ok ? '' : ' bad'),
+    const row = html('div', { class: 'an-row' + (an.selected === p.no ? ' selected' : '') + (p.ok ? '' : ' bad') + (p.impaired ? ' imp' : ''),
       style: `top:${i * an.rowHeight}px; border-left-color:${TYPE_TINT[p.type] || COLORS[p.proto]}`, onclick: () => select(p) },
     html('span', { class: 'c-no' }, p.no), html('span', { class: 'c-t' }, p.time.toFixed(6)),
     html('span', { class: 'c-proto', style: `color:${COLORS[p.proto]}` }, p.proto),
@@ -338,7 +339,9 @@ function renderDetail() {
     for (let j = i; j < Math.min(i + 16, bytes.length); j++) {
       const on = range && j >= range[0] && j < range[1];
       const changed = previous && previous[j] !== undefined && previous[j] !== bytes[j];
-      hexPart.append(html('span', { class: (on ? 'on ' : '') + (changed ? 'chg' : ''), title: changed ? `was ${previous[j]}` : '' }, bytes[j] + ' '));
+      const flipped = p.flipped_bytes?.includes(j);
+      hexPart.append(html('span', { class: (on ? 'on ' : '') + (flipped ? 'flip ' : '') + (changed ? 'chg' : ''),
+        title: flipped ? 'bit error from the medium' : changed ? `was ${previous[j]}` : '' }, bytes[j] + ' '));
       const c = parseInt(bytes[j], 16);
       ascii.append(html('span', { class: on ? 'on' : '' }, c >= 32 && c < 127 ? String.fromCharCode(c) : '.'));
     }
@@ -372,7 +375,8 @@ function renderLanes() {
   for (const p of an.packets) {
     const i = senders.indexOf(p.source || '?');
     const x = left + (p.time / t1) * (w - left - 6);
-    g.fillStyle = shown.has(p.no) ? (TYPE_TINT[p.type] && p.type !== 'heartbeat' && p.type !== 'SYNC' ? TYPE_TINT[p.type] : COLORS[p.proto]) : '#3a4049';
+    g.fillStyle = !shown.has(p.no) ? '#3a4049' : p.impaired ? '#ff3bd6'
+      : (TYPE_TINT[p.type] && p.type !== 'heartbeat' && p.type !== 'SYNC' ? TYPE_TINT[p.type] : COLORS[p.proto]);
     g.fillRect(x, 5 + i * laneH, p.type === 'EMCY' ? 3 : 1.2, laneH - 2);
   }
   if (data.length) {
@@ -435,6 +439,7 @@ async function poll() {
     if (result.error) return;
     if (result.packets.length) { an.packets.push(...result.packets); render(); }
     renderInjections(result.injections || []);
+    renderMediaStats(result.media);
     for (const proto of ['can', 'ble', 'wifi']) $(`an-pcap-${proto}`).href = `/api/pcap?session=${session}&proto=${proto}`;
     if (['done', 'stopped', 'error'].includes(result.status) && result.total === an.packets.length) stopPolling();
   } catch { /* the server restarted or the run is gone */ }
@@ -539,10 +544,143 @@ async function showDbc() {
   } catch (error) { toast(error.message, true); }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Medium panel: impairments of a topic (comms/medium.py), live during a run and saved as `media:`.
+
+function mediaConfig() {
+  const extra = (state.graph.extra = state.graph.extra || {});
+  return (extra.media = extra.media || {});
+}
+
+function readMedium() {
+  const n = (id) => { const v = $(id).value; return v === '' ? null : Number(v); };
+  const spec = {};
+  if (n('am-ber')) spec.bit_error_rate = n('am-ber');
+  if (n('am-loss')) spec.loss = n('am-loss') / 100;
+  if (n('am-jitter')) spec.jitter_us = n('am-jitter');
+  if (n('am-rssi')) spec.rssi_offset = n('am-rssi');
+  if (n('am-fading')) spec.fading_std = n('am-fading');
+  if (n('am-sens') !== null) spec.sensitivity = n('am-sens');
+  if ($('am-mod').value) spec.modulation = { shape: $('am-mod').value, frequency: n('am-modf') || 1, depth: n('am-modd') ?? 1 };
+  if (n('am-ifp')) spec.interferer = { period_ms: n('am-ifp'), duration_us: n('am-ifd') || 1000, loss: 0.9 };
+  const crosstalk = [];
+  if ($('am-xt').value.trim()) crosstalk.push({ topic: $('am-xt').value.trim(), probability: n('am-xtp') ?? 0.3, bits: 1, window_us: 400 });
+  if ($('am-xs').value) crosstalk.push({ signal: $('am-xs').value, ber_per_unit: n('am-xsg') || 1e-4 });
+  if (crosstalk.length) spec.crosstalk = crosstalk;
+  if (n('am-dist') !== null) {
+    spec.kind = 'radio';
+    spec.link = { distance_m: n('am-dist'), exponent: n('am-exp') ?? 2, walls_db: n('am-walls') || 0 };
+    if (n('am-ptx') !== null) spec.link.tx_dbm = n('am-ptx');
+    const sources = {};
+    for (const part of $('am-srcs').value.split(',')) {
+      const [name, value] = part.split('=').map((x) => x.trim());
+      if (name && Number.isFinite(Number(value))) sources[name] = { distance_m: Number(value) };
+    }
+    if (Object.keys(sources).length) spec.link.sources = sources;
+  }
+  if (n('am-len') !== null) {
+    spec.kind = 'wired';
+    spec.cable = { length_m: n('am-len'), type: $('am-ctype').value, shielded: $('am-shield').checked, emi_ber_per_m: n('am-emi') ?? 2e-7 };
+    if (n('am-rate')) spec.bitrate = n('am-rate');
+    if ($('am-i2cmode').value) spec.cable.i2c = { mode: $('am-i2cmode').value, pullup_ohm: n('am-rp') || 4700, vdd: n('am-vdd') || 3.3, devices: n('am-dev') || 2 };
+  }
+  spec.seed = 1;
+  return spec;
+}
+
+function showMedium(topic) {
+  const spec = mediaConfig()[topic] || {};
+  const set = (id, v) => { $(id).value = v ?? ''; };
+  set('am-ber', spec.bit_error_rate ?? 0); set('am-loss', (spec.loss ?? 0) * 100); set('am-jitter', spec.jitter_us ?? 0);
+  set('am-rssi', spec.rssi_offset ?? 0); set('am-fading', spec.fading_std ?? 0); set('am-sens', spec.sensitivity);
+  $('am-mod').value = spec.modulation?.shape || ''; set('am-modf', spec.modulation?.frequency ?? 2); set('am-modd', spec.modulation?.depth ?? 1);
+  set('am-ifp', spec.interferer?.period_ms ?? 0); set('am-ifd', spec.interferer?.duration_us ?? 1000);
+  const xt = (spec.crosstalk || []).find((c) => c.topic), xs = (spec.crosstalk || []).find((c) => c.signal);
+  set('am-xt', xt?.topic); set('am-xtp', xt?.probability ?? 0.3); $('am-xs').value = xs?.signal || ''; set('am-xsg', xs?.ber_per_unit ?? 1e-4);
+  const link = spec.link || {}, cable = spec.cable || {};
+  set('am-dist', link.distance_m); set('am-ptx', link.tx_dbm); set('am-exp', link.exponent ?? 2); set('am-walls', link.walls_db ?? 0);
+  $('am-srcs').value = Object.entries(link.sources || {}).map(([k, v]) => `${k}=${v.distance_m}`).join(', ');
+  set('am-len', cable.length_m); $('am-ctype').value = cable.type || 'twisted'; $('am-shield').checked = !!cable.shielded;
+  set('am-emi', cable.emi_ber_per_m ?? 2e-7); set('am-rate', spec.bitrate ?? 500000);
+  $('am-i2cmode').value = cable.i2c?.mode || ''; set('am-rp', cable.i2c?.pullup_ohm ?? 4700); set('am-vdd', cable.i2c?.vdd ?? 3.3); set('am-dev', cable.i2c?.devices ?? 2);
+  checkMedium(topic, spec);
+}
+
+async function applyMedium(save, clear = false) {
+  const topic = $('am-topic').value.trim();
+  if (!topic) return toast('Name the topic: the event topic of a bus wire or radio channel (can, ble, wifi, lora…)', true);
+  const spec = clear ? null : readMedium();
+  if (save || clear) {
+    if (spec) mediaConfig()[topic] = spec; else delete mediaConfig()[topic];
+    markDirty();
+  }
+  const live = state.session && ['running', 'paused', 'starting'].includes(state.session.status) && !an.capture;
+  if (live) {
+    try { renderMediaStats((await api('analyzer/medium', { session: state.session.session, topic, spec })).media); }
+    catch (error) { return toast(error.message, true); }
+  } else if (!save && !clear) {
+    mediaConfig()[topic] = spec; markDirty();
+  }
+  toast(clear ? `${topic}: clean medium` : live ? `${topic}: applied to the running simulation` : `${topic}: applies to the next run`);
+}
+
+// Link budget, cable and I2C checks for the settings in the panel (computed on the server, no run needed).
+async function checkMedium(topic, spec) {
+  try { renderDerived((await api('analyzer/medium_check', { topic, spec: spec || readMedium() })).derived); } catch { /* not important */ }
+}
+
+function renderDerived(derived) {
+  const box = $('am-derived');
+  box.innerHTML = '';
+  if (!derived) return;
+  const parts = [];
+  for (const [src, l] of Object.entries(derived.links || {})) {
+    parts.push(html('span', { class: l.lost ? 'bad' : '' }, `${src}: ${l.distance_m} m → ` + (l.rssi !== undefined ? `RSSI ${l.rssi} dBm` : `margin ${l.margin_db} dB`)
+      + (l.tag_power_dbm !== undefined ? `, tag ${l.tag_power_dbm} dBm` : '') + `, BER ${Number(l.ber).toExponential(1)}${l.lost ? ' (lost: ' + l.why + ')' : ''}`), ' · ');
+  }
+  const c = derived.cable;
+  if (c) {
+    parts.push(`cable ${c.length_m} m ${c.type}${c.shielded ? ' shielded' : ''}: delay ${(c.delay_s * 1e9).toFixed(0)} ns, EMI BER ${c.emi_ber.toExponential(1)}`);
+    if (c.max_length_m !== undefined) parts.push(' · ', html('span', { class: c.timing_margin_ns < 0 ? 'bad' : 'good' },
+      `CAN ${c.bitrate / 1000} kbit/s: max ${c.max_length_m} m, timing margin ${c.timing_margin_ns} ns`));
+    if (c.i2c) parts.push(html('div', { class: c.i2c.ok ? 'good' : 'bad' },
+      `I2C ${c.i2c.mode} (${c.i2c.scl_hz / 1000} kHz): ${c.i2c.pf_per_m} pF/m → bus ${c.i2c.bus_pf} pF (max ${c.i2c.cb_max_pf}), `
+      + `rise ${c.i2c.rise_ns} ns (max ${c.i2c.rise_max_ns}) with ${c.i2c.pullup_ohm} Ω · ${c.i2c.ok ? 'OK' : c.i2c.problems.join('; ')} · ${c.i2c.advice}`
+      + (c.i2c.ber ? ` · BER ${c.i2c.ber.toExponential(1)}` : '')));
+  }
+  box.append(...parts);
+}
+
+function renderMediaStats(media) {
+  if (!media) return;
+  const topic = $('am-topic')?.value?.trim();
+  if (topic && media[topic]?.derived && Object.keys(media[topic].derived).length) renderDerived(media[topic].derived);
+  $('am-stats').textContent = Object.entries(media).map(([topic, m]) => {
+    const st = m.stats || {};
+    return `${topic}: ${st.frames || 0} frames, ${st.corrupted || 0} corrupted (${st.flipped_bits || 0} bits), ${st.lost || 0} lost`
+      + (st.errors ? `, ${st.errors} error frames, ${st.retransmissions} retransmissions` : '');
+  }).join(' · ');
+}
+
 function bind() {
+  $('an-medium-toggle').onclick = () => {
+    $('an-medium').classList.toggle('hidden');
+    const topics = new Set([...(config().topics || []), ...an.packets.map((p) => p.topic), ...Object.keys(mediaConfig())]);
+    $('am-topics').innerHTML = '';
+    for (const t of topics) $('am-topics').append(html('option', { value: t }));
+    $('am-xs').innerHTML = '';
+    $('am-xs').append(html('option', { value: '' }, '—'), Object.keys(state.graph?.signals || {}).sort().map((n) => html('option', { value: n }, n)));
+    if (!$('am-topic').value) $('am-topic').value = [...topics][0] || '';
+    showMedium($('am-topic').value);
+  };
+  $('am-topic').addEventListener('change', () => showMedium($('am-topic').value.trim()));
+  $('an-medium').addEventListener('change', (e) => { if (e.target.id !== 'am-topic') checkMedium($('am-topic').value.trim()); });
+  $('am-apply').onclick = () => applyMedium(false);
+  $('am-save').onclick = () => applyMedium(true);
+  $('am-clear').onclick = () => applyMedium(false, true);
   const refilter = () => { render(); const p = current(); if (p) scrollTo(p); };   // keep the selection in view
   $('an-filter').addEventListener('input', refilter);
-  for (const key of ['CANopen', 'BLE', '80211']) $(`an-p-${key}`).addEventListener('change', refilter);
+  for (const key of PROTO_KEYS) $(`an-p-${key.replace('.', '')}`).addEventListener('change', refilter);
   $('an-list').addEventListener('scroll', renderList);
   const setMode = (mode) => {
     an.mode = mode;

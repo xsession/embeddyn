@@ -61,6 +61,199 @@ share of each 0.5 ms step, near 100 % in the SYNC bursts), `master.nodes_operati
 `sensor.temperature_c` against `bridge.temperature_c` (the same value after CAN → BLE →
 Wi-Fi), `bridge.ble_seen`, `bridge.udp_sent`.
 
+## The RF lab: NFC, RFID, LoRa, BLE and Wi-Fi
+
+`examples/mechatronics/rf-lab.yaml` runs 2 s at 0.25 ms steps (about 8 s of wall time).
+Every radio below is a python plant in `comms/rf_boards.py`, and the analyzer decodes all
+of them.
+
+| Radio | Boards | What the traffic shows |
+|---|---|---|
+| NFC 13.56 MHz (`comms.nfc`) | `NfcReader`, `Type2Tag` (NTAG213) | REQA (7-bit), ATQA, anticollision and select at two cascade levels for a 7-byte UID (cascade tag 0x88, BCC), SAK, READ of 4 pages at a time with CRC_A, HLTA. The tag answers only while `nfc.tag_present` is high. The analyzer collects the pages read and parses the NDEF message (URI and text records). |
+| RFID 125 kHz (`comms.rfid`) | `Em4100Card` | The 64-bit EM4100 frame every 32.8 ms: header, row and column parity, the card number in printed form (`180,51170`). |
+| RFID UHF EPC Gen2 | `Gen2Reader`, `Gen2Tags` | Inventory rounds: Query (CRC-5), QueryRep, RN16, ACK, then PC + EPC + CRC-16. Tags pick slots at random, so some slots are collisions that resolve in a later round. |
+| LoRa / LoRaWAN 1.0.x (`comms.lora`) | `LoraNode`, `LoraGateway` | AES-encrypted uplinks on port 2 (temperature, humidity, battery), every third one confirmed. The gateway answers with ACKs and once with a LinkADRReq (FOpts), and the node answers with LinkADRAns. With the session keys in `analyzer.lorawan`, the MIC is checked and the payload decrypted and decoded. Time on air uses Semtech's formula. |
+| BLE | `BleBeacon`, `BleSensor`, `BlePhone` | iBeacon, Eddystone-UID and Eddystone-TLM adverts. A connectable sensor sends Environmental Sensing service data; a phone scans it actively (SCAN_REQ / SCAN_RSP with its name), then sends CONNECT_IND (access address, interval, channel map). |
+| Wi-Fi WPA2 | `WpaAccessPoint`, `WpaStation`, `Deauther` | Beacons with privacy and an RSN element (CCMP, PSK); open authentication and association; the EAPOL-Key 4-way handshake (messages 1–4 recognised from the key-info bits); CCMP-encrypted data (PN shown, payload not decodable). A spoofed deauthentication (reason 7) at 1.2 s makes the station join again: two handshakes in the run. |
+
+The codecs are checked against published values:
+
+* CRC_A of `50 00` (HLTA) is `57 CD`;
+* the LoRaWAN example frame `40F17DBE…` from the `lora-packet` project decrypts to
+  "test" with a valid MIC;
+* the time on air of 13 bytes at SF7 / 125 kHz is 46.3 ms.
+
+LoRaWAN decryption needs the `cryptography` package. Without it, frames decode without
+the MIC check and the payload.
+
+## Impaired media: noise, fading, interference, crosstalk
+
+For stress tests, a project's `media:` section degrades the traffic on any event topic,
+wired or radio. The orchestrator passes every published event through the topic's medium
+(`comms.medium.Media`) before any receiver or the analyzer sees it. All receivers
+therefore see the same spoiled frame, and the capture shows what happened:
+
+```yaml
+media:
+  can:                                   # the CAN wire
+    bit_error_rate: 1.0e-4
+    bursts: [{start: 1.0, end: 1.2, bit_error_rate: 3.0e-3}]
+    crosstalk: [{signal: axis.current_a, ber_per_unit: 2.0e-4}]   # EMI that grows with the motor current
+  ble:
+    rssi_offset: -20                     # dB: distance, walls
+    fading_std: 6                        # dB per packet: multipath
+    sensitivity: -90                     # weaker packets are lost
+    interferer: {period_ms: 10, duration_us: 1500, loss: 0.9}
+  lora:
+    modulation: {shape: sine, frequency: 0.5, depth: 1.0}   # error rate and loss swing over time
+    loss: 0.3
+```
+
+| Setting | Effect |
+|---|---|
+| `bit_error_rate` | each payload bit flips with this probability (Poisson count, random positions) |
+| `loss` | the frame is lost |
+| `jitter_us` | random extra delay |
+| `bursts` | windows (`start`, `end`, or `period` and `duty`) with their own `bit_error_rate` and `loss` |
+| `modulation` | scales the error rate and the loss by `1 − depth + depth·w(t)`, where `w` is a sine or a square of `frequency` Hz (fading, periodic EMI) |
+| `crosstalk` | `{signal, ber_per_unit}`: the error rate grows with an analog signal's magnitude (motor current, PWM). `{topic, window_us, probability, bits}`: a frame within `window_us` after a frame on another topic gets `bits` flipped |
+| `rssi_offset`, `fading_std`, `sensitivity` | radio: shift and Gaussian fading of RSSI (and SNR); packets below the sensitivity are lost |
+| `interferer` | a periodic interferer: frames during its on-time are lost with `loss` |
+| `can_errors` (default on) | CAN: a frame with bit errors is replaced by an error frame and retransmitted (up to `max_retries`, 8), timed at the bus `bitrate`. Frames that fail every retry count as `abandoned` |
+| `seed` | makes the noise repeatable |
+
+What receivers see:
+
+* **Lost frames and CAN error frames** stay in the capture, flagged, but are delivered to
+  no board.
+* **Corrupted frames** are delivered with the flipped bits, and the board's own integrity
+  check decides, as in hardware:
+  * CRC-24 for BLE, FCS for Wi-Fi, MIC for LoRaWAN;
+  * CRC_A and BCC for NFC. An NFC tag that gets an invalid frame goes back to IDLE
+    (ISO 14443-3), so the reader polls again.
+
+  Stress runs therefore show retries, timeouts, missed adverts and rejoins, not just bad
+  bytes.
+
+**In the analyzer:**
+
+* impaired frames carry a ⚡ tag in the summary (bit errors, lost and why, error frame,
+  retransmission) and a *⚡ medium* branch listing the flipped bits, the bytes as they
+  were sent, and the crosstalk source;
+* their rows and lane ticks are magenta, and the damaged bytes are red in the hex dump;
+* the filter `⚡` lists only the impaired traffic.
+
+The **⚡ Medium…** panel sets all of the above for a topic:
+
+* **Apply** changes the running simulation at once (the next published frame) or, when
+  nothing runs, the next run;
+* **Save to project** writes it under `media:`;
+* the status line counts frames, corrupted and flipped bits, losses, error frames and
+  retransmissions per topic.
+
+In the example, `can` at BER 1e-3 produces error frames and retransmissions while the
+CANopen network stays operational. BLE with −20 dB and 6 dB fading loses about a sixth
+of the adverts, and the Wi-Fi bridge still forwards the status.
+
+### Distance, cables and I2C (`comms.physical`)
+
+Instead of fixed numbers, a medium can describe where the devices are and how they are
+wired. The physical models then work out RSSI, bit errors, delays and losses.
+
+**Radio distance (`link:`).** The model is log-distance path loss:
+
+    PL = 20·log10(f / MHz) − 27.55 + 10·n·log10(d / m) + walls
+
+* **RSSI** = transmit power − PL, plus `fading_std` if set.
+* **Bit errors** follow a waterfall around the receiver sensitivity: 1e-3 at the
+  sensitivity, ten times fewer for every 1.5 dB above it.
+* **Losses:** packets more than 3 dB below the sensitivity are not detected.
+
+Each radio has typical defaults:
+
+* **BLE:** 0 dBm, −94 dBm sensitivity.
+* **Wi-Fi:** 18 dBm, −82 dBm; the frequency comes from the channel.
+* **LoRa:** 14 dBm; sensitivity −123 dBm (SF7) to −137 dBm (SF12), taken from each packet,
+  so a higher SF reaches further.
+* **NFC and 125 kHz RFID:** inductive near field, 60 dB per decade, reaching about 5 cm and
+  8 cm.
+* **UHF Gen2:** 33 dBm EIRP. A tag needs −18 dBm on the forward link to answer, so tags
+  past about 10 m go silent.
+
+```yaml
+media:
+  lora: {link: {distance_m: 1500, exponent: 2.9}}                       # 1.5 km suburban
+  ble:  {link: {distance_m: 3, exponent: 2.7, sources: {beacon: {distance_m: 12}}}, fading_std: 4}
+  wifi: {link: {distance_m: 8, exponent: 3.0, walls_db: 5, tx_dbm: 15}}
+```
+
+* `sources` gives each sender its own distance, keyed by the payload's `src`.
+* The computed RSSI and SNR replace the transmitter's numbers in the packets.
+* The analyzer shows a *link* line (distance, RSSI, BER) for each packet, and the Medium
+  panel shows the budget per sender.
+
+The RF lab ships with realistic placements: tag at 2 cm, EM4100 at 3 cm, UHF tags at
+3–6 m, LoRa at 1.5 km, BLE phone at 3 m and beacon at 12 m, Wi-Fi at 8 m through one
+wall. Moving NFC to 9 cm, or LoRa to 9 km, breaks those links, as the tests check.
+
+**Cables (`cable:`).**
+
+* **Delay:** 5 ns/m.
+* **EMI pickup:** `emi_ber_per_m` × length, multiplied by 0.05 for a twisted pair, 0.5
+  for ribbon cable, 0.02 for coax and 0.1 for a shield. The same factor scales
+  `crosstalk` from signals.
+* **CAN bit timing:** twice the cable delay plus the transceiver and controller delays
+  must fit in about 70 % of a bit. The limit comes out at about 30 m at 1 Mbit/s, 100 m at
+  500 kbit/s and 520 m at 125 kbit/s. Past it, a share of the frames (growing with the
+  overrun) fail arbitration or ACK on every attempt and become error frames.
+
+**I2C bus capacitance (`cable: {i2c: {...}}`).**
+
+* **Bus capacitance** = cable (pF/m: twisted 52, untwisted 40, ribbon 45, coax 100, +60
+  with a shield) + 10 pF per device + 10 pF.
+* **Rise time** t_r = 0.8473·Rp·Cb, checked against UM10204:
+
+  | mode | max rise time | max bus capacitance |
+  |---|---|---|
+  | 100 kHz | 1000 ns | 400 pF |
+  | 400 kHz | 300 ns | 400 pF |
+  | 1 MHz | 120 ns | 550 pF |
+
+* **Pull-up range:** from (VDD − 0.4 V) / I_OL up to the value that still meets the rise
+  time.
+* **Bit errors:** an edge too slow for the spec causes bit errors that grow as it eats the
+  SCL high time. I2C has no checksum: a flipped data bit is a wrong reading, and a flipped
+  address bit is a NACK.
+
+```yaml
+media:
+  can: {kind: wired, bitrate: 500000, cable: {length_m: 130, type: twisted}}
+  i2c:
+    kind: wired
+    cable: {length_m: 2, type: untwisted, shielded: true, i2c: {mode: fast, pullup_ohm: 4700, vdd: 3.3, devices: 2}}
+```
+
+`examples/mechatronics/cable-lab.yaml` wires exactly that.
+
+* **CAN:** three CANopen boards on 130 m of twisted pair at 500 kbit/s (limit 100 m), with
+  the axis current coupling in. Hundreds of error frames and retransmissions; the network
+  stays up but is busy recovering.
+* **I2C:** an MCU polling a TMP102-style sensor (`comms.i2c`) over 2 m of shielded cable in
+  fast mode with 4.7 kΩ pull-ups. 230 pF and a 916 ns rise time against 300 ns cause
+  NACKs and readings off by up to 128 °C (flipped sign bits). The advice is 967–1539 Ω.
+* **The fix:** 1.2 kΩ pull-ups and a 40 m CAN cable, set in the panel, clear every error.
+
+The Medium panel has the matching fields:
+
+* **radio link:** distance, Ptx, exponent, walls, per-sender distances;
+* **cable:** length, twisted / untwisted / ribbon / coax, shielded, EMI, CAN bit rate;
+* **I2C:** mode, pull-up, VDD, devices.
+
+The checks (link budget per sender, cable delay and EMI, the CAN length limit and timing
+margin, the I2C capacitance, rise time, verdict and pull-up advice) update as you type,
+before any run (`POST /api/analyzer/medium_check`). During a run they show what the run
+measures.
+
 ## Event ports of python plants
 
 A python plant can send and receive events besides its signals:
@@ -302,6 +495,22 @@ order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`, plus 
 * the example (network up, EMCY, the BLE → Wi-Fi path, bus load);
 * the decoded traffic of every kind, pcap headers, Renode-style CAN events, and the
   analyzer and pcap API;
+* `tests/mechatronics/test_physical.py`:
+  * path loss, the waterfall, RSSI and errors growing with distance;
+  * the LoRa SF reach, the NFC and UHF limits, per-sender distances and walls;
+  * cable twist and shield, the CAN length limits against the textbook table;
+  * I2C capacitance, rise time and pull-up advice, the I2C decoder and boards;
+  * the cable lab failing as wired and clean when fixed, the RF lab with a device moved
+    out of range, and the check endpoint;
+* `tests/mechatronics/test_rf.py`:
+  * NFC (CRC_A, NDEF, the exchange), EM4100 and Gen2 (parity and CRC errors);
+  * the LoRaWAN reference frame and time on air;
+  * BLE CONNECT_IND, iBeacon and Eddystone, the four EAPOL messages, deauthentication
+    and RSN;
+  * the RF lab with every radio working;
+  * medium strength, bit-error statistics, radio loss, signal and topic crosstalk, CAN
+    retransmission and abandonment, a noisy CAN bus that keeps the network up, lost
+    frames that reach no receiver, and the live medium API;
 * candump, pcap and pcapng reading, named fields and DBC output, injection through the
   orchestrator (a node obeys an injected NMT stop), and the send, import and config
   endpoints.

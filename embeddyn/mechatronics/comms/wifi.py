@@ -22,6 +22,12 @@ SUBTYPES = {
 ELEMENTS = {0: "SSID", 1: "Supported Rates", 3: "DS Parameter Set", 5: "TIM", 48: "RSN", 50: "Extended Rates",
             221: "Vendor Specific"}
 BROADCAST = "FF:FF:FF:FF:FF:FF"
+REASONS = {1: "unspecified", 2: "previous authentication no longer valid", 3: "station leaving (deauth)",
+           4: "inactivity", 5: "AP cannot handle all stations", 6: "class 2 frame from non-authenticated station",
+           7: "class 3 frame from non-associated station", 8: "station leaving (disassoc)", 14: "MIC failure",
+           15: "4-way handshake timeout", 23: "IEEE 802.1X authentication failed"}
+SUITES = {1: "WEP-40", 2: "TKIP", 4: "CCMP-128", 5: "WEP-104", 8: "GCMP-128", 9: "GCMP-256", 10: "CCMP-256"}
+AKMS = {1: "802.1X", 2: "PSK", 6: "PSK-SHA256", 8: "SAE (WPA3)", 18: "OWE"}
 
 
 def mac(text: str) -> bytes:
@@ -52,10 +58,15 @@ def element(eid: int, value: bytes) -> bytes:
     return bytes([eid, len(value)]) + value
 
 
-def beacon(bssid: str, ssid: str, channel: int, sequence: int, timestamp_us: int, interval_tu: int = 100) -> bytes:
-    body = struct.pack("<QHH", timestamp_us, interval_tu, 0x0401)  # ESS, short slot
+def beacon(bssid: str, ssid: str, channel: int, sequence: int, timestamp_us: int, interval_tu: int = 100,
+           rsn: bytes | None = None) -> bytes:
+    """A beacon; with `rsn` (an RSN element body) the network is protected (privacy bit, RSN element)."""
+    capability = 0x0401 | (0x0010 if rsn else 0)                 # ESS, short slot, privacy
+    body = struct.pack("<QHH", timestamp_us, interval_tu, capability)
     body += element(0, ssid.encode()) + element(1, bytes([0x82, 0x84, 0x8B, 0x96, 0x0C, 0x12, 0x18, 0x24]))
     body += element(3, bytes([channel]))
+    if rsn:
+        body += element(48, rsn)
     return frame(0, 8, BROADCAST, bssid, bssid, body, sequence=sequence)
 
 
@@ -132,7 +143,14 @@ def decode(data: bytes, config: Mapping[str, Any] | None = None) -> dict[str, An
         if subtype == 8:
             fields.append(_field("QoS control", data[pos:pos + 2].hex(), pos, pos + 2))
             pos += 2
-        body, info = _payload(data, pos, body_end)
+        if control & 0x4000 and body_end - pos >= 8:     # protected: CCMP header, encrypted body, MIC
+            ccmp = data[pos:pos + 8]
+            pn = ccmp[0] | ccmp[1] << 8 | ccmp[4] << 16 | ccmp[5] << 24 | ccmp[6] << 32 | ccmp[7] << 40
+            body = [_field("CCMP header", f"PN {pn}, key id {ccmp[3] >> 6}", pos, pos + 8),
+                    _field("encrypted data + MIC", f"{body_end - pos - 8} bytes", pos + 8, body_end)]
+            info = f" encrypted (CCMP PN {pn})"
+        else:
+            body, info = _payload(data, pos, body_end)
         fields += body
         summary += info
         if to_ds and len(addresses) > 2:
@@ -157,6 +175,11 @@ def _management(subtype: int, data: bytes, pos: int, end: int) -> tuple[list, st
         fields.append(_field("authentication", f"{'open' if algorithm == 0 else algorithm}, seq {sequence}, status {status}", pos, pos + 6))
         info = f" seq {sequence}" + (" (success)" if status == 0 and sequence == 2 else "")
         pos += 6
+    elif subtype in (10, 12) and end - pos >= 2:
+        (reason,) = struct.unpack_from("<H", data, pos)
+        fields.append(_field("reason", f"{reason} {REASONS.get(reason, '')}".strip(), pos, pos + 2))
+        info = f" reason {reason} ({REASONS.get(reason, '?')})"
+        pos += 2
     elif subtype == 0 and end - pos >= 4:
         fields.append(_field("capability / listen interval", data[pos:pos + 4].hex(" "), pos, pos + 4))
         pos += 4
@@ -175,6 +198,9 @@ def _management(subtype: int, data: bytes, pos: int, end: int) -> tuple[list, st
             info = (info + f" SSID={ssid!r}") if ssid else info + " SSID=*"
         elif eid == 3 and value:
             shown = f"channel {value[0]}"
+        elif eid == 48 and len(value) >= 8:
+            shown = _rsn(value)
+            info += f" [{shown}]"
         elif eid in (1, 50):
             shown = ", ".join(f"{(b & 0x7F) / 2:g}" + ("*" if b & 0x80 else "") for b in value) + " Mb/s"
         else:
@@ -192,6 +218,9 @@ def _payload(data: bytes, pos: int, end: int) -> tuple[list, str]:
         (ethertype,) = struct.unpack_from("!H", data, pos + 6)
         fields.append(_field("LLC/SNAP", f"EtherType 0x{ethertype:04X}" + (" IPv4" if ethertype == 0x0800 else ""), pos, pos + 8))
         pos += 8
+        if ethertype == 0x888E and end - pos >= 4:
+            body, text = _eapol(data, pos, end)
+            return fields + body, text
         if ethertype == 0x0800 and end - pos >= 20:
             ihl = (data[pos] & 15) * 4
             total, ident, _, ttl, proto, checksum = struct.unpack_from("!HHHBBH", data, pos + 2)
@@ -222,3 +251,58 @@ def _payload(data: bytes, pos: int, end: int) -> tuple[list, str]:
                 return fields, info
     fields.append(_field("data", data[pos:end].hex(" "), pos, end))
     return fields, info
+
+
+def _rsn(value: bytes) -> str:
+    try:
+        version, group = struct.unpack_from("<H4s", value)
+        pos = 6
+        (count,) = struct.unpack_from("<H", value, pos)
+        pairwise = [SUITES.get(value[pos + 2 + 4 * i + 3], "?") for i in range(count)]
+        pos += 2 + 4 * count
+        (count,) = struct.unpack_from("<H", value, pos)
+        akms = [AKMS.get(value[pos + 2 + 4 * i + 3], "?") for i in range(count)]
+        return f"RSN v{version}: group {SUITES.get(group[3], '?')}, pairwise {'/'.join(pairwise)}, AKM {'/'.join(akms)}"
+    except (struct.error, IndexError):
+        return "RSN (truncated)"
+
+
+def eapol_key(message: int, replay: int, nonce: bytes, mic: bytes = bytes(16), key_data: bytes = b"") -> bytes:
+    """An EAPOL-Key frame (802.1X-2004, RSN, HMAC-SHA1/AES) of the 4-way handshake, message 1..4."""
+    info = 0x0002 | 0x0008                                  # descriptor version 2, pairwise
+    info |= {1: 0x0080, 2: 0x0100, 3: 0x0080 | 0x0100 | 0x0040 | 0x1000, 4: 0x0100 | 0x0200}[message]
+    if message == 4:
+        info |= 0x0200                                      # secure
+    if message == 3:
+        info |= 0x0200
+    body = struct.pack(">BHHQ", 2, info, 16, replay) + nonce.ljust(32, b"\0")[:32] + bytes(16) + bytes(8) + bytes(8)
+    body += mic.ljust(16, b"\0")[:16] + struct.pack(">H", len(key_data)) + key_data
+    return struct.pack(">BBH", 2, 3, len(body)) + body
+
+
+def _eapol(data: bytes, pos: int, end: int) -> tuple[list, str]:
+    version, kind, length = struct.unpack_from(">BBH", data, pos)
+    fields = [_field("802.1X", f"version {version}, type {kind} ({'EAPOL-Key' if kind == 3 else kind}), length {length}", pos, pos + 4)]
+    if kind != 3 or end - pos < 99:
+        return fields, " EAPOL"
+    key = pos + 4
+    info = struct.unpack_from(">H", data, key + 1)[0]
+    replay = struct.unpack_from(">Q", data, key + 5)[0]
+    ack, mic_set, install, secure = bool(info & 0x0080), bool(info & 0x0100), bool(info & 0x0040), bool(info & 0x0200)
+    nonce_zero = data[key + 13:key + 45] == bytes(32)
+    if ack and not mic_set:
+        message = 1
+    elif ack and mic_set and install:
+        message = 3
+    elif mic_set and not ack and not nonce_zero:
+        message = 2
+    elif mic_set and not ack:
+        message = 4
+    else:
+        message = 0
+    fields.append(_field("EAPOL-Key", f"4-way handshake message {message} of 4", key, end, [
+        _field("key info", f"0x{info:04X}: " + ", ".join(n for flag, n in ((ack, "Ack"), (mic_set, "MIC"), (install, "Install"),
+                                                                          (secure, "Secure")) if flag), key + 1, key + 3),
+        _field("replay counter", replay, key + 5, key + 13), _field("nonce", data[key + 13:key + 45].hex()[:16] + "…", key + 13, key + 45),
+        _field("MIC", data[key + 77:key + 93].hex(), key + 77, key + 93)]))
+    return fields, f" EAPOL-Key message {message}/4 (replay {replay})"

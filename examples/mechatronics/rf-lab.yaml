@@ -1,0 +1,197 @@
+name: rf-lab
+step_seconds: 2.5e-4
+duration_seconds: 2.0
+metadata:
+  description: >
+    Short-range and long-range radios side by side, for the Lab's analyzer: an NFC
+    reader reads an NTAG213 (ISO 14443-A anticollision, NDEF URI); a 125 kHz EM4100
+    card and a UHF EPC Gen2 inventory with three tags (slotted ALOHA, collisions);
+    a LoRaWAN node sends encrypted sensor uplinks and the gateway answers (ACK,
+    LinkADRReq); BLE beacons (iBeacon, Eddystone), a sensor that a phone scans
+    actively and connects to; and a WPA2 network (RSN beacons, 4-way EAPOL
+    handshake, encrypted data) hit by a spoofed deauthentication at 1.2 s.
+  analyzer:
+    topics: [nfc, rfid, lora, ble, wifi]
+    inject: {nfc: nfc, rfid: rfid, lora: lora, ble: ble, wifi: wifi}
+    lorawan:
+      devices:
+        "26011BDA": {nwkskey: 2B7E151628AED2A6ABF7158809CF4F3C, appskey: 000102030405060708090A0B0C0D0E0F}
+      ports:
+        "2":
+          name: environment record
+          fields:
+            - {name: temperature, format: i16, scale: 0.01, unit: degC}
+            - {name: humidity, format: u8, scale: 0.5, unit: "%"}
+            - {name: battery, format: u16, unit: mV}
+    ble:
+      devices: {"D4:CA:6E:00:00:B1": beacon, "C0:98:E5:00:00:5E": sensor, "5A:3B:00:00:00:F0": phone}
+    wifi:
+      stations: {"02:11:22:33:44:01": ap, "3C:71:BF:00:00:77": station}
+
+# Where everything is: RSSI and bit errors follow from these distances (comms/physical.py).
+# Move a device away in the analyzer's Medium panel to watch the link degrade.
+media:
+  nfc: {link: {distance_m: 0.02}}                         # tag 2 cm from the reader antenna (reach ~5 cm)
+  rfid:
+    link:
+      distance_m: 0.03                                    # EM4100 card on the 125 kHz reader
+      sources: {uhf reader: {distance_m: 4.0}, tag1: {distance_m: 3.0}, tag2: {distance_m: 4.5}, tag3: {distance_m: 6.0}}
+  lora: {link: {distance_m: 1500, exponent: 2.9}}          # sensor 1.5 km from the gateway, suburban
+  ble: {link: {distance_m: 3.0, exponent: 2.7, sources: {beacon: {distance_m: 12.0}}}}   # phone near the sensor
+  wifi: {link: {distance_m: 8.0, exponent: 3.0, walls_db: 5}}                           # one wall to the AP
+
+instances:
+  tag_presence:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: pulse, amplitude: 1.0, offset: 0.0, frequency: 1.0, duty: 0.6, delay: 0.05}
+      outputs: {value: nfc.tag_present}
+  card_presence:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: pulse, amplitude: 1.0, offset: 0.0, frequency: 1.0, duty: 0.25, delay: 0.3}
+      outputs: {value: rfid.card_present}
+  climate:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: sine, amplitude: 3.0, offset: 22.0, frequency: 0.5}
+      outputs: {value: env.temperature}
+  nfc_reader:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.rf_boards:NfcReader
+    options:
+      backend: python
+      parameters: {poll_ms: 150.0}
+      outputs: {tags_read: nfc.tags_read}
+      events: {tx: nfc}
+      subscribe: {rx: nfc}
+  ntag:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:Type2Tag
+    options:
+      backend: python
+      parameters: {uri: "https://embeddyn.dev/rf-lab"}
+      inputs: {present: nfc.tag_present}
+      outputs: {in_field: nfc.tag_in_field}
+      events: {tx: nfc}
+      subscribe: {rx: nfc}
+  em4100:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:Em4100Card
+    options:
+      backend: python
+      inputs: {present: rfid.card_present}
+      outputs: {frames: rfid.em4100_frames}
+      events: {tx: rfid}
+  uhf_reader:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.rf_boards:Gen2Reader
+    options:
+      backend: python
+      parameters: {q: 2, pause_ms: 150.0}
+      outputs: {tags_seen: rfid.uhf_tags_seen, rounds: rfid.uhf_rounds}
+      events: {tx: rfid}
+      subscribe: {rx: rfid}
+  uhf_tags:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:Gen2Tags
+    options:
+      backend: python
+      outputs: {inventoried: rfid.uhf_inventoried}
+      events: {tx: rfid}
+      subscribe: {rx: rfid}
+  lora_node:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.rf_boards:LoraNode
+    options:
+      backend: python
+      parameters: {interval_ms: 300.0, sf: 9}
+      inputs: {temperature: env.temperature}
+      outputs: {fcnt: lora.fcnt, acks: lora.acks}
+      events: {tx: lora}
+      subscribe: {rx: lora}
+  lora_gateway:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:LoraGateway
+    options:
+      backend: python
+      outputs: {uplinks: lora.uplinks}
+      events: {tx: lora}
+      subscribe: {rx: lora}
+  beacon:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.rf_boards:BleBeacon
+    options:
+      backend: python
+      outputs: {adverts: ble.beacon_adverts}
+      events: {ble: ble}
+  ble_sensor:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.rf_boards:BleSensor
+    options:
+      backend: python
+      inputs: {temperature: env.temperature}
+      outputs: {connected: ble.sensor_connected}
+      events: {ble: ble}
+      subscribe: {ble_rx: ble}
+  phone:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:BlePhone
+    options:
+      backend: python
+      outputs: {scan_responses: ble.scan_responses}
+      events: {ble: ble}
+      subscribe: {ble_rx: ble}
+  wifi_ap:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:WpaAccessPoint
+    options:
+      backend: python
+      outputs: {stations: wifi.stations, handshakes: wifi.handshakes}
+      events: {wifi_tx: wifi}
+      subscribe: {wifi_rx: wifi}
+  wifi_station:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.rf_boards:WpaStation
+    options:
+      backend: python
+      outputs: {state: wifi.station_state, frames_sent: wifi.frames_sent, joins: wifi.joins}
+      events: {wifi_tx: wifi}
+      subscribe: {wifi_rx: wifi}
+  attacker:
+    domain: environment
+    model: embeddyn.mechatronics.comms.rf_boards:Deauther
+    options:
+      backend: python
+      parameters: {at: 1.2}
+      outputs: {sent: wifi.deauth_sent}
+      events: {wifi_tx: wifi}
+
+signals:
+  nfc.tag_present: {domain: environment, initial: 0.0}
+  rfid.card_present: {domain: environment, initial: 0.0}
+  env.temperature: {domain: environment, unit: degC, initial: 22.0}
+  nfc.tags_read: {domain: firmware, initial: 0.0}
+  nfc.tag_in_field: {domain: environment, initial: 0.0}
+  rfid.em4100_frames: {domain: environment, initial: 0.0}
+  rfid.uhf_tags_seen: {domain: firmware, initial: 0.0}
+  rfid.uhf_rounds: {domain: firmware, initial: 0.0}
+  rfid.uhf_inventoried: {domain: environment, initial: 0.0}
+  lora.fcnt: {domain: firmware, initial: 0.0}
+  lora.acks: {domain: firmware, initial: 0.0}
+  lora.uplinks: {domain: environment, initial: 0.0}
+  ble.beacon_adverts: {domain: firmware, initial: 0.0}
+  ble.sensor_connected: {domain: firmware, initial: 0.0}
+  ble.scan_responses: {domain: environment, initial: 0.0}
+  wifi.stations: {domain: environment, initial: 0.0}
+  wifi.handshakes: {domain: environment, initial: 0.0}
+  wifi.station_state: {domain: firmware, initial: 0.0}
+  wifi.frames_sent: {domain: firmware, initial: 0.0}
+  wifi.joins: {domain: firmware, initial: 0.0}
+  wifi.deauth_sent: {domain: environment, initial: 0.0}

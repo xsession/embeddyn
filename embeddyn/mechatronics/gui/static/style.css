@@ -300,3 +300,12 @@ label { user-select: none; }
 .named { margin: 4px 0; } .named div { font-family: monospace; } .named b { cursor: pointer; color: var(--err); margin-left: 6px; }
 .an-capture { color: var(--warn); }
 .an-title .mini { margin-left: 8px; padding: 0 6px; font-size: 11px; }
+
+#an-medium { padding: 4px 6px; border-bottom: 1px solid var(--line); background: #2a2230; }
+#an-medium.hidden { display: none; }
+.am-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 2px 0; font-size: 12px; color: var(--muted); }
+.am-row input[type=number] { width: 70px; } #am-topic, #am-xt { width: 80px; }
+.an-row.imp { background: #3a1f3a; } .an-row.imp.selected { background: #4b2f5f; }
+.an-hexline .flip { background: #ff3b30; color: #fff; }
+#am-srcs { width: 150px; } #am-derived { margin: 2px 0 4px; line-height: 1.5; } #am-derived .bad { color: var(--err); } #am-derived .good { color: var(--ok); }
+.am-row b { color: #c8d3e0; font-size: 11px; text-transform: uppercase; }

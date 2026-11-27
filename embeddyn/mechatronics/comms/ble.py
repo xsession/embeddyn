@@ -19,7 +19,13 @@ AD_TYPES = {0x01: "Flags", 0x02: "Incomplete 16-bit UUIDs", 0x03: "Complete 16-b
             0x09: "Complete local name", 0x0A: "Tx power level", 0x16: "Service data (16-bit UUID)",
             0x19: "Appearance", 0xFF: "Manufacturer specific data"}
 COMPANIES = {0x004C: "Apple", 0x0006: "Microsoft", 0x0059: "Nordic Semiconductor", 0x02E5: "Espressif",
-             0xFFFF: "test / unassigned"}
+             0x0075: "Samsung", 0x00E0: "Google", 0x0157: "Huami", 0x038F: "Xiaomi", 0xFFFF: "test / unassigned"}
+UUIDS16 = {0x1800: "Generic Access", 0x1801: "Generic Attribute", 0x180A: "Device Information", 0x180D: "Heart Rate",
+           0x180F: "Battery", 0x1809: "Health Thermometer", 0x181A: "Environmental Sensing", 0x1812: "HID",
+           0x181C: "User Data", 0xFEAA: "Eddystone", 0xFE9F: "Google", 0xFD6F: "Exposure Notification", 0xFE2C: "Google Fast Pair"}
+EDDYSTONE_SCHEMES = ["http://www.", "https://www.", "http://", "https://"]
+EDDYSTONE_SUFFIXES = [".com/", ".org/", ".edu/", ".net/", ".info/", ".biz/", ".gov/", ".com", ".org", ".edu", ".net", ".info",
+                      ".biz", ".gov"]
 CHANNEL_MHZ = {37: 2402, 38: 2426, 39: 2480}
 
 
@@ -100,6 +106,22 @@ def decode(data: bytes, config: Mapping[str, Any] | None = None) -> dict[str, An
         source, target = mac_text(data[6:12]), mac_text(data[12:18])
         fields += [_field("ScanA", source, 6, 12), _field("AdvA", target, 12, 18)]
         summary = f"SCAN_REQ → {target}"
+    elif (header & 0x0F) == 5 and length >= 34:
+        source, target = mac_text(data[6:12]), mac_text(data[12:18])
+        ll = data[18:40]
+        access, = struct.unpack_from("<I", ll)
+        win_size, win_offset, interval, latency, timeout = ll[7], *struct.unpack_from("<HHHH", ll, 8)
+        channels = int.from_bytes(ll[16:21], "little")
+        used = [c for c in range(37) if channels >> c & 1]
+        hop, sca = ll[21] & 0x1F, ll[21] >> 5
+        fields += [_field("InitA", source, 6, 12), _field("AdvA", target, 12, 18),
+                   _field("LLData", f"interval {interval * 1.25:g} ms", 18, 40, [
+                       _field("access address", f"0x{access:08X}", 18, 22), _field("CRCInit", ll[4:7].hex(), 22, 25),
+                       _field("WinSize / WinOffset", f"{win_size * 1.25:g} ms / {win_offset * 1.25:g} ms", 25, 28),
+                       _field("interval", f"{interval * 1.25:g} ms", 28, 30), _field("latency", latency, 30, 32),
+                       _field("supervision timeout", f"{timeout * 10} ms", 32, 34),
+                       _field("channel map", f"{len(used)} of 37 data channels", 34, 39), _field("hop / SCA", f"{hop} / {sca}", 39, 40)])]
+        summary = f"CONNECT_IND → {target}: AA 0x{access:08X}, interval {interval * 1.25:g} ms, {len(used)} channels"
     elif (header & 0x0F) == 1 and length >= 12:
         source, target = mac_text(data[6:12]), mac_text(data[12:18])
         fields += [_field("AdvA", source, 6, 12), _field("TargetA", target, 12, 18)]
@@ -128,6 +150,26 @@ def _decode_ads(data: bytes, start: int, end: int, config: Mapping[str, Any]) ->
             shown = repr(name)
         elif kind == 0x0A and value:
             shown = f"{struct.unpack('<b', value[:1])[0]} dBm"
+        elif kind in (0x02, 0x03) and len(value) >= 2:
+            uuids = [struct.unpack_from("<H", value, i)[0] for i in range(0, len(value) - 1, 2)]
+            shown = ", ".join(f"0x{u:04X} {UUIDS16.get(u, '')}".strip() for u in uuids)
+        elif kind == 0x16 and len(value) >= 2:
+            (uuid,) = struct.unpack_from("<H", value)
+            data_part = value[2:]
+            shown, children = _service_data(uuid, data_part, pos + 4)
+            if uuid == 0xFEAA and children:
+                info = (info + " " if info else "") + shown
+        elif kind == 0x19 and len(value) == 2:
+            shown = f"0x{struct.unpack('<H', value)[0]:04X}"
+        elif kind == 0xFF and len(value) >= 25 and value[:4] == b"\x4c\x00\x02\x15":
+            uuid = value[4:20].hex()
+            major, minor = struct.unpack_from(">HH", value, 20)
+            power = struct.unpack_from("<b", value, 24)[0]
+            shown = f"iBeacon {uuid[:8]}-{uuid[8:12]}-{uuid[12:16]}-{uuid[16:20]}-{uuid[20:]} major {major} minor {minor}"
+            children = [_field("company", "0x004C Apple", pos + 2, pos + 4), _field("type", "iBeacon (0x02, 0x15)", pos + 4, pos + 6),
+                        _field("proximity UUID", uuid.upper(), pos + 6, pos + 22), _field("major", major, pos + 22, pos + 24),
+                        _field("minor", minor, pos + 24, pos + 26), _field("measured power", f"{power} dBm at 1 m", pos + 26)]
+            info = f"iBeacon major {major} minor {minor}"
         elif kind == 0xFF and len(value) >= 2:
             (company,) = struct.unpack_from("<H", value)
             spec = formats.get(company)
@@ -159,3 +201,34 @@ def _decode_ads(data: bytes, start: int, end: int, config: Mapping[str, Any]) ->
         items.append(_field(label, shown, pos, pos + 1 + length, children))
         pos += 1 + length
     return items, name, info
+
+
+def _service_data(uuid: int, data: bytes, start: int) -> tuple[str, list | None]:
+    """Service data: Eddystone frames, Environmental Sensing temperature, else bytes."""
+    name = UUIDS16.get(uuid, f"0x{uuid:04X}")
+    if uuid == 0xFEAA and data:
+        frame = data[0]
+        if frame == 0x00 and len(data) >= 18:
+            power = struct.unpack_from("<b", data, 1)[0]
+            return (f"Eddystone-UID {data[2:12].hex().upper()}/{data[12:18].hex().upper()}",
+                    [_field("frame", "UID", start), _field("Tx power", f"{power} dBm at 0 m", start + 1),
+                     _field("namespace", data[2:12].hex().upper(), start + 2, start + 12),
+                     _field("instance", data[12:18].hex().upper(), start + 12, start + 18)])
+        if frame == 0x10 and len(data) >= 3:
+            url = EDDYSTONE_SCHEMES[data[2]] if data[2] < 4 else "?"
+            for byte in data[3:]:
+                url += EDDYSTONE_SUFFIXES[byte] if byte < len(EDDYSTONE_SUFFIXES) else chr(byte)
+            return f"Eddystone-URL {url}", [_field("frame", "URL", start), _field("URL", url, start + 2, start + len(data))]
+        if frame == 0x20 and len(data) >= 14:
+            battery, temp_raw, count, uptime = struct.unpack_from(">HhII", data, 2)
+            return (f"Eddystone-TLM battery {battery} mV, {temp_raw / 256:.1f} degC, {count} adverts",
+                    [_field("frame", "TLM", start), _field("battery", f"{battery} mV", start + 2, start + 4),
+                     _field("temperature", f"{temp_raw / 256:.2f} degC", start + 4, start + 6),
+                     _field("advert count", count, start + 6, start + 10),
+                     _field("uptime", f"{uptime / 10:.1f} s", start + 10, start + 14)])
+    if uuid == 0x181A and len(data) >= 2:
+        (raw,) = struct.unpack_from("<h", data)
+        return f"{name}: {raw / 100:.2f} degC", [_field("temperature (0x2A6E)", f"{raw / 100:.2f} degC", start, start + 2)]
+    if uuid == 0x180F and data:
+        return f"{name}: {data[0]} %", [_field("battery level", f"{data[0]} %", start)]
+    return f"{name}: {data.hex(' ')}", None

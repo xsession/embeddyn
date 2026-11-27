@@ -35,6 +35,9 @@ class CoSimulationOrchestrator:
         self._event_cursor: dict[str, int] = {}
         # Events injected from outside (the Lab's frame sender), published at the next macro step.
         self._injections: deque[tuple[str, Any]] = deque()
+        # Impaired media (project `media:`): noise, loss, crosstalk on event topics.
+        from .comms.medium import Media
+        self.media = Media(project.media, lambda name: float(self.values.get(name, 0.0) or 0.0))
         self.values: dict[str, Any] = {name: signal.initial for name, signal in project.signals.items()}
         self.history: dict[str, deque[float]] = {
             name: deque([float(signal.initial)], maxlen=self._max_delay_for(name) + 2)
@@ -206,29 +209,29 @@ class CoSimulationOrchestrator:
                 self.values[name] = value
             elif signal.kind is SignalKind.EVENT:
                 if value is not None:
-                    event = self.events.publish(now, name, value, adapter.name)
-                    self._event_log.append((instance, event))
-                    writer = getattr(self, "_event_writer", None)
-                    if writer is not None:
-                        writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload, "source": event.source})
+                    self._publish(now, name, value, adapter.name, instance)
             elif signal.kind is SignalKind.BUS:
                 self.values[name] = value
-                event = self.events.publish(now, name, value, adapter.name)
-                self._event_log.append((instance, event))
-                writer = getattr(self, "_bus_writer", None)
-                if writer is not None:
-                    writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload, "source": event.source})
+                self._publish(now, name, value, adapter.name, instance, "_bus_writer")
             else:
                 self._store(name, signal.clamp(float(value)))
         if self.forced:
             self._apply_forced()
         diagnostics = result.diagnostics or {}
         for event in diagnostics.get("events", []):
-            published = self.events.publish(float(event.get("time_seconds", now)), str(event["topic"]), event.get("payload"), adapter.name)
-            self._event_log.append((instance, published))
-            writer = getattr(self, "_event_writer", None)
+            self._publish(float(event.get("time_seconds", now)), str(event["topic"]), event.get("payload"), adapter.name, instance)
+
+    def _publish(self, t: float, topic: str, payload: Any, source: str, instance: str,
+                 writer_name: str = "_event_writer") -> None:
+        """Publish an event through the topic's medium (noise, loss, crosstalk; see comms.medium)."""
+        outputs = self.media.apply(t, topic, payload) if self.media else [(t, payload)]
+        writer = getattr(self, writer_name, None)
+        for when, item in outputs:
+            event = self.events.publish(when, topic, item, source)
+            self._event_log.append((instance, event))
             if writer is not None:
-                writer.append({"time_seconds": published.time_seconds, "topic": published.topic, "payload": published.payload, "source": published.source})
+                writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload,
+                               "source": event.source})
 
     def inject(self, topic: str, payload: Any) -> None:
         """Publish an event from outside the run (thread-safe); it goes out at the start of the next
@@ -238,12 +241,7 @@ class CoSimulationOrchestrator:
     def _drain_injections(self, now: float) -> None:
         while self._injections:
             topic, payload = self._injections.popleft()
-            event = self.events.publish(now, topic, payload, "lab")
-            self._event_log.append(("lab", event))
-            writer = getattr(self, "_event_writer", None)
-            if writer is not None:
-                writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload,
-                               "source": event.source})
+            self._publish(now, topic, payload, "lab", "lab")
 
     def _deliver_events(self, instance: str, adapter: Any) -> None:
         """Hand an adapter the events other instances published since its last activation."""
@@ -253,7 +251,8 @@ class CoSimulationOrchestrator:
         topics = getattr(adapter, "subscribed_topics", None)
         start = self._event_cursor.get(instance, 0)
         fresh = [event for source, event in self._event_log[start:]
-                 if source != instance and (topics is None or event.topic in topics)]
+                 if source != instance and (topics is None or event.topic in topics)
+                 and not _undelivered(event.payload)]
         self._event_cursor[instance] = len(self._event_log)
         if fresh:
             deliver(fresh)
@@ -387,3 +386,11 @@ class CoSimulationOrchestrator:
             writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(rows)
+
+
+def _undelivered(payload: Any) -> bool:
+    """Frames the medium lost, and CAN error frames, are in the capture but reach no receiver."""
+    if not isinstance(payload, dict):
+        return False
+    medium = payload.get("medium")
+    return bool(payload.get("error")) or bool(isinstance(medium, dict) and medium.get("lost"))

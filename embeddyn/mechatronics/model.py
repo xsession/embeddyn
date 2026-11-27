@@ -180,6 +180,7 @@ class MechatronicProject:
     declares_instances: bool = False
     verification: dict[str, Any] = field(default_factory=dict)
     faults: list[Fault] = field(default_factory=list)
+    media: dict[str, Any] = field(default_factory=dict)        # impaired event topics, see comms.medium
 
     def declared_instances(self) -> dict[str, SimulatorConfig]:
         """Instances written in the project file (legacy domains included), no defaults."""
@@ -302,6 +303,7 @@ class MechatronicProject:
             declares_instances=bool(raw.get("instances")),
             verification=dict(raw.get("verification") or {}),
             faults=parse_faults(raw.get("faults"), signals),
+            media={str(k): dict(v or {}) for k, v in (raw.get("media") or {}).items()},
         )
         project.validate()
         return project

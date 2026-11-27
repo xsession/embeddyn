@@ -19,6 +19,8 @@ All examples live in `examples/mechatronics/`. Run any of them with `embeddyn me
 | `mujoco-arm-firmware.yaml` | **Renode** STM32L476 · H-bridge · DCMotorRL · ThermalRC · **MuJoCo**; encoder, **SPI** AS5047P, **I²C** AS6221 | Renode ≥ 1.17, `mujoco` | [Tutorial 5](../tutorials/arm-joint-sensors.md) |
 | `ir-curtain-channel.yaml` | strobe (firmware) · obstacle · `IrBeamPath` · **ngspice** IR LED driver, phototransistor and comparator | libngspice | [Lab breadboard view](lab.md#breadboard-view) |
 | `multiboard-canopen-ble.yaml` | 4 CANopen boards on a **CAN bus** model · BLE gateway · Wi-Fi bridge and access point | — | [Multi-board buses and analyzer](multiboard-comms.md) |
+| `rf-lab.yaml` | NFC reader + NTAG213 · EM4100 · UHF Gen2 inventory · LoRaWAN node + gateway · BLE beacon, sensor, phone · WPA2 AP, station, deauther | `cryptography` for LoRaWAN decryption | [RF lab](multiboard-comms.md#the-rf-lab-nfc-rfid-lora-ble-and-wi-fi) |
+| `cable-lab.yaml` | CANopen on 130 m of twisted pair (past the 500 kbit/s limit) · I2C TMP102 over 2 m of shielded cable | — | [Distance, cables and I2C](multiboard-comms.md#distance-cables-and-i2c-commsphysical) |
 | `two-wheel-drive.yaml` | 2 × PI · 2 × DCMotorRL · **FMU** wheel · GearedDrivetrain wheel; multi-rate | built FMU | [Tutorial 6](../tutorials/instances-and-fmus.md) |
 
 ## Light-curtain bench

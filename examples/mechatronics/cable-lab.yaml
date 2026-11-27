@@ -1,0 +1,142 @@
+name: cable-lab
+step_seconds: 5.0e-4
+duration_seconds: 1.0
+metadata:
+  description: >
+    Wiring stress test. Three CANopen boards on a 500 kbit/s bus whose cable is
+    longer than the bit timing allows (130 m of twisted pair: 100 m is the limit),
+    with EMI from the axis motor current; and an MCU reading a TMP102 sensor over
+    a 2 m shielded I2C cable in fast mode (400 kHz) with 4.7 kOhm pull-ups: the
+    shield adds so much capacitance that the edges no longer reach V_IH in time. Open the analyzer's Medium panel to
+    see the cable and I2C checks, then try a shorter cable, twisted pair, shielding
+    or smaller pull-ups.
+  analyzer:
+    topics: [can, i2c]
+    inject: {can: can.tx, i2c: i2c}
+    can: {bitrate: 500000}
+    canopen:
+      master: 1
+      nodes: {1: master, 2: axis, 3: sensor}
+      pdos:
+        "0x182":
+          name: axis TPDO1
+          fields:
+            - {name: status, format: u16}
+            - {name: position, format: i32, scale: 0.001, unit: mm}
+        "0x183":
+          name: sensor TPDO1
+          fields:
+            - {name: distance, format: u16, unit: mm}
+            - {name: temperature, format: i16, scale: 0.1, unit: degC}
+    i2c:
+      devices:
+        "0x48":
+          name: TMP102
+          registers: {"0": {name: temperature, shift: 4, scale: 0.0625, unit: degC}}
+
+media:
+  can:
+    kind: wired
+    bitrate: 500000
+    cable: {length_m: 130, type: twisted, shielded: false, emi_ber_per_m: 2.0e-7}
+    crosstalk: [{signal: axis.current_a, ber_per_unit: 2.0e-4}]   # motor leads next to the bus; twist reduces it
+    seed: 1
+  i2c:
+    kind: wired
+    cable:
+      length_m: 2.0
+      type: untwisted
+      shielded: true                        # ~100 pF/m: the shield is the capacitance
+      i2c: {mode: fast, pullup_ohm: 4700, vdd: 3.3, devices: 2}
+    seed: 2
+
+instances:
+  setpoint:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: square, amplitude: 40.0, offset: 60.0, frequency: 2.0}
+      outputs: {value: master.target_mm}
+  climate:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: ramp, amplitude: 10.0, offset: 22.0, frequency: 1.0}
+      outputs: {value: env.temperature}
+  can:
+    domain: electrical
+    model: embeddyn.mechatronics.comms.can:CanBus
+    options:
+      backend: python
+      parameters: {bitrate: 500000}
+      outputs: {load_avg: can.load_avg, frames: can.frames}
+      subscribe: {tx: can.tx}
+      events: {wire: can}
+  master:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:CanopenMaster
+    options:
+      backend: python
+      parameters: {node_id: 1, nodes: [2, 3], sync_ms: 10.0}
+      inputs: {target_mm: master.target_mm}
+      outputs: {nmt_state: master.nmt_state, nodes_operational: master.nodes_operational,
+                axis_position_mm: master.axis_position_mm}
+      events: {can_tx: can.tx}
+      subscribe: {can_rx: can}
+  axis:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:AxisNode
+    options:
+      backend: python
+      parameters: {node_id: 2}
+      outputs: {position_mm: axis.position_mm, current_a: axis.current_a}
+      events: {can_tx: can.tx}
+      subscribe: {can_rx: can}
+  sensor:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:SensorNode
+    options:
+      backend: python
+      parameters: {node_id: 3}
+      outputs: {temperature_c: sensor.temperature_c}
+      events: {can_tx: can.tx}
+      subscribe: {can_rx: can}
+  mcu:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.i2c:I2cMaster
+    options:
+      backend: python
+      parameters: {address: 0x48, period_ms: 5.0, scl_hz: 400000.0}
+      outputs: {temperature: mcu.temperature, nacks: mcu.i2c_nacks, reads: mcu.i2c_reads}
+      events: {tx: i2c}
+      subscribe: {rx: i2c}
+  tmp102:
+    domain: environment
+    model: embeddyn.mechatronics.comms.i2c:Tmp102
+    options:
+      backend: python
+      inputs: {temperature: env.temperature}
+      outputs: {transfers: tmp102.transfers}
+      events: {tx: i2c}
+      subscribe: {rx: i2c}
+
+signals:
+  master.target_mm: {domain: environment, unit: mm, initial: 0.0}
+  env.temperature: {domain: environment, unit: degC, initial: 22.0}
+  can.load_avg: {domain: electrical, initial: 0.0}
+  can.frames: {domain: electrical, initial: 0.0}
+  master.nmt_state: {domain: firmware, initial: -1.0}
+  master.nodes_operational: {domain: firmware, initial: 0.0}
+  master.axis_position_mm: {domain: firmware, unit: mm, initial: 0.0}
+  axis.position_mm: {domain: firmware, unit: mm, initial: 0.0}
+  axis.current_a: {domain: firmware, unit: A, initial: 0.0}
+  sensor.temperature_c: {domain: firmware, unit: degC, initial: 25.0}
+  mcu.temperature: {domain: firmware, unit: degC, initial: 0.0}
+  mcu.i2c_nacks: {domain: firmware, initial: 0.0}
+  mcu.i2c_reads: {domain: firmware, initial: 0.0}
+  tmp102.transfers: {domain: environment, initial: 0.0}
+
+metrics:
+  i2c_temperature: {type: stats, signal: mcu.temperature}

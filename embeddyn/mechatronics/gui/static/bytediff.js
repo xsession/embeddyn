@@ -11,6 +11,7 @@
 export function messageKey(p) {
   if (p.proto === 'CANopen' || p.proto === 'CAN') return `CAN 0x${Number(p.id).toString(16).toUpperCase().padStart(3, '0')}`;
   if (p.proto === 'BLE') return `BLE ${p.source || '?'} ${p.type}`;
+  if (['NFC', 'RFID', 'LoRa', 'I2C'].includes(p.proto)) return `${p.proto} ${p.source || p.target || '?'} ${p.type}`;
   return `Wi-Fi ${p.source || '?'} → ${p.target || '?'} ${p.type}`;
 }
 

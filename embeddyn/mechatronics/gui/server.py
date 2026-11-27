@@ -328,6 +328,42 @@ def make_handler(state: LabState):
                 return {"injections": []}
             return session.stop_injection(body.get("id"))
 
+        def _post_analyzer_medium(self, body: dict[str, Any]) -> dict[str, Any]:
+            """Change a topic's impairments in the running simulation."""
+            session = state.session(str(body["session"]))
+            orchestrator = getattr(session, "_orchestrator", None)
+            if orchestrator is None or session.finished:
+                raise LookupError("the run is not active")
+            spec = body.get("spec")
+            if spec is not None and not isinstance(spec, dict):
+                raise ValueError("spec must be an object or null")
+            orchestrator.media.update(str(body.get("topic") or ""), spec)
+            return {"media": orchestrator.media.specs()}
+
+        def _post_analyzer_medium_check(self, body: dict[str, Any]) -> dict[str, Any]:
+            """Link budget, cable and I2C checks for medium settings, without a run."""
+            from ..comms.medium import Medium
+            from ..comms.physical import RADIO, radio_link
+            topic = str(body.get("topic") or "")
+            spec = dict(body.get("spec") or {})
+            medium = Medium(topic, spec)
+            derived = medium.derived()
+            link = spec.get("link")
+            if link:
+                proto = topic.split(".")[0]
+                kinds = {"rfid": [("em4100", {"proto": "rfid", "air": "em4100"}), ("gen2 tag", {"proto": "rfid", "air": "gen2", "dir": "tag"})],
+                         "lora": [(f"SF{sf}", {"proto": "lora", "sf": sf, "freq": 868.1}) for sf in (7, 9, 12)]}.get(
+                    proto, [(proto, {"proto": proto if proto in RADIO else "ble", "channel": 6})])
+                links = {}
+                for name, sample in kinds:
+                    for source, extra in [("", {}), *[(s, v) for s, v in (link.get("sources") or {}).items()]]:
+                        budget = radio_link({**sample, "src": source}, link)
+                        label = f"{source} {name}".strip() if source else name
+                        links[label] = {k: budget[k] for k in ("distance_m", "rssi", "margin_db", "tag_power_dbm", "ber", "lost", "why")
+                                        if k in budget}
+                derived["links"] = links
+            return {"derived": derived}
+
         def _post_analyzer_import(self, body: dict[str, Any]) -> dict[str, Any]:
             from ..comms.captures import read_capture
             path = Path(str(body.get("path") or "")).expanduser()
@@ -484,7 +520,7 @@ def _decode_new(session: RunSession, cache: dict[str, Any], config: dict[str, An
     for event in events:
         if topics and event.get("topic") not in topics:
             continue
-        row = decode_event(event, config)
+        row = decode_event(event, config, cache.setdefault("context", {}))
         if row is not None:
             row["no"] = len(cache["rows"]) + 1
             row["source_instance"] = event.get("source")
@@ -492,6 +528,7 @@ def _decode_new(session: RunSession, cache: dict[str, Any], config: dict[str, An
     cache["cursor"] = cursor
     return {"packets": cache["rows"][start:], "total": len(cache["rows"]), "status": status,
             "pending": len(cache.get("held", [])), "injections": session.injection_list(),
+            "media": (session._orchestrator.media.specs() if getattr(session, "_orchestrator", None) is not None else None),
             "capture": getattr(session, "path", None)}
 
 

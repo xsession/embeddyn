@@ -144,6 +144,31 @@ Types `stuck` (`value`), `offset`, `gain`, `noise` (`std`, `seed`), `drift`
 signals; `dropout` and `corrupt` (`bits`) on the event signal of a Renode UART
 or CAN bus, with `direction` and `id`; see [Fault injection](faults.md).
 
+## `media`
+
+Impaired communication media for stress tests: per event topic (a CAN wire, a radio
+channel), the medium adds:
+
+* bit errors and losses;
+* bursts and time modulation;
+* radio fading below a sensitivity;
+* a periodic interferer;
+* crosstalk from another topic or from an analog signal;
+* CAN error frames with retransmission.
+
+```yaml
+media:
+  can: {bit_error_rate: 1.0e-4, crosstalk: [{signal: axis.current_a, ber_per_unit: 2.0e-4}]}
+  ble: {rssi_offset: -20, fading_std: 6, sensitivity: -90}
+```
+
+Instead of fixed numbers, `link:` (radio distance, transmit power, walls) and `cable:`
+(length, twisted or not, shield, I2C pull-ups) let the physical models derive RSSI,
+errors, the CAN length limit and the I2C rise time. See
+[impaired media](multiboard-comms.md#impaired-media-noise-fading-interference-crosstalk) and
+[distance, cables and I2C](multiboard-comms.md#distance-cables-and-i2c-commsphysical).
+Signal-level faults (stuck, noise, dropout...) stay in `faults`.
+
 ## `components`
 
 Reusable component definitions and their instances. Instance parameters become project parameters named `<instance>.<param>` with provenance `component-instance`. See [Architecture and parameter storage](../project/architecture-and-parameter-storage.md) for the design.
