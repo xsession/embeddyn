@@ -28,7 +28,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | 11 | LP-MSPM0G3507 | MSPM0G3507 | done (`mspm0g3507` profile) |
 | 12 | EK-LM3S2965 CAN evaluation board | LM3S2965 (seen), Cortex-M3 50 MHz | near (`ti/tm4c123gh6pm.repl`, the Stellaris successor) |
 | 13 | CH32V003F4P6 board (QSZNTEC) | CH32V003F4P6 (seen), 24 MHz xtal | new — the existing `wch/ch32v003.repl` is a placeholder (SiFive UART/GPIO, PLIC instead of PFIC) |
-| 14 | STM32L496G-DISCO (MB1261 B-01) | STM32L496AGI6 (seen) | near (`stm32l476.repl`) |
+| 14 | STM32L496G-DISCO (MB1261 B-01) | STM32L496AGI6 (seen) | done (`stm32l496` profile, board `st/stm32l496g_disco.repl`; STM32CubeL4 examples 13 pass / 3 known gaps / 19 skipped: LCD, camera, audio, USB OTG still to model) |
 | 15 | Arduino UNO Q (ABX00162) | Qualcomm QRB2210 (4× Cortex-A53, Linux) + STM32U585AII6 (seen) | U585: near (`stm32u575.repl`); QRB2210: new, Linux-class SoC |
 | 16 | STM32L0538-DISCO (MB1143 B-01) | STM32L053C8T6 (seen) | done (`stm32l053` profile, board `st/stm32l0538_disco.repl`; STM32CubeL0 examples 138 pass / 7 known gaps over this and NUCLEO-L053R8; e-paper still to model) |
 | 17 | LPCXpresso LPC812 rev A (with LPC-Link) | LPC812M101JDH20 (doc; marking under glare) | near (`nxp/lpc845.repl`) |

@@ -1,0 +1,58 @@
+{
+  "name": "stm32l496",
+  "description": "ST STM32L496xG (Cortex-M4F 80 MHz, 1 MB dual-bank flash, 320 KB SRAM, FMC, QUADSPI, DMA2D, SDMMC): GNU Arm toolchain with the STM32CubeL4 HAL/LL, Renode stm32l496 platform (board 32L496GDISCOVERY)",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeL4",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m4",
+      "-mthumb",
+      "-mfpu=fpv4-sp-d16",
+      "-mfloat-abi=hard",
+      "-Os",
+      "-g",
+      "-DSTM32L496xx",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32L4xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32L4xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with STM32L496AGIx_FLASH.ld and startup_stm32l496xx.s from a Cube example (Projects/32L496GDISCOVERY/Templates/STM32CubeIDE). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32L4xx/Include/stm32l496xx.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": ["0x08000000", "0x080FFFFF"],
+    "sram1": ["0x20000000", "0x2003FFFF"],
+    "sram2": ["0x10000000", "0x1000FFFF"],
+    "peripherals": ["0x40000000", "0x5FFFFFFF"],
+    "qspi_flash": ["0x90000000", "0x907FFFFF"],
+    "psram": ["0x64000000", "0x640FFFFF"]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32l496.repl",
+    "pc_command": "cpu PC",
+    "notes": "Board platforms/boards/st/stm32l496g_disco.repl: LD2 green PB13 (active low) = led2, LD1 orange on the MFX expander I/O 4 (active low; 'sysbus.i2c2.mfx Level 4'), joystick buttons sysbus.gpioPortC.joySel (PC13), gpioPortI.joyUp/joyDown/joyLeft (PI8/PI10/PI9), gpioPortF.joyRight (PF11), MX25R6435F QSPI flash (qspiFlash, memory-mapped at 0x90000000), 1 MB PSRAM at 0x64000000, MFX at I2C2 0x42 (IDD measurement: 'sysbus.i2c2.mfx CurrentNanoAmps 1500000'). L4 core models: STM32L4_RCC (clock tree drives systick, timers, LPTIMs), STM32L4_PWR, STM32L4_FlashController (page/mass erase, option bytes). EXTI line n takes pin n of the port SYSCFG_EXTICR selects (extiMux). Not modelled yet: USB OTG FS, DCMI/camera, SAI/DFSDM audio, the ST7789H2 LCD (device models step). Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeL4 examples (tools/stm32cube/run_examples.py with examples_l496.txt in the Renode tree)"
+  }
+}
