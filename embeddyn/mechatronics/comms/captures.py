@@ -4,7 +4,8 @@
   ``can0  123   [4]  DE AD BE EF`` as printed by ``candump can0``, ``R`` remote frames and
   29-bit ids);
 * pcap and pcapng files with SocketCAN (227), Bluetooth LE LL (251), Bluetooth LE LL with
-  PHDR (256) or IEEE 802.11 (105) packets.
+  PHDR (256), IEEE 802.11 (105) or 802.11 with radiotap (127), LoRaTap (270), ISO 14443 (264)
+  or Linux I2C (209) packets.
 
 Events look like the co-simulation's: ``{"time_seconds", "topic", "payload", "source"}``
 with payloads ``{"proto": "can"|"ble"|"wifi", ...}``, times relative to the first packet.
@@ -63,7 +64,7 @@ def _relative(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return events
 
 
-def _packet_event(link: int, stamp: float, data: bytes) -> dict[str, Any] | None:
+def _packet_event(link: int, stamp: float, data: bytes) -> dict[str, Any] | list[dict[str, Any]] | None:
     if link == 227 and len(data) >= 8:                     # SocketCAN can_frame, id in network order
         (can_id,) = struct.unpack_from(">I", data)
         if can_id & 0x20000000:                            # error frame
@@ -88,6 +89,60 @@ def _packet_event(link: int, stamp: float, data: bytes) -> dict[str, Any] | None
     if link == 105:
         return {"time_seconds": stamp, "topic": "wifi", "source": "capture",
                 "payload": {"proto": "wifi", "channel": None, "rssi": None, "data": data.hex(), "src": "capture"}}
+    if link == 127 and len(data) >= 8:                     # radiotap: keep channel and signal, drop the header
+        length, present = struct.unpack_from("<HI", data, 2)
+        channel, rssi, fcs = None, None, True
+        pos = 8
+        while present & 0x80000000 and pos + 4 <= length:   # extended presence bitmaps
+            present2 = struct.unpack_from("<I", data, pos)[0]
+            pos += 4
+            if not present2 & 0x80000000:
+                break
+        fields = [(0, 8, 8), (1, 1, 1), (2, 1, 1), (3, 4, 2), (4, 2, 2), (5, 1, 1)]   # (bit, size, alignment)
+        for bit, size, align in fields:
+            if not present >> bit & 1:
+                continue
+            pos += -pos % align
+            if bit == 1:
+                fcs = bool(data[pos] & 0x10)
+            elif bit == 3:
+                freq = struct.unpack_from("<H", data, pos)[0]
+                channel = (freq - 2407) // 5 if 2412 <= freq <= 2472 else 14 if freq == 2484 else (freq - 5000) // 5
+            elif bit == 5:
+                rssi = struct.unpack_from("<b", data, pos)[0]
+            pos += size
+        frame = data[length:]
+        if not fcs:                                        # our decoder expects the FCS: add it
+            from .wifi import fcs as wifi_fcs
+            frame += wifi_fcs(frame)
+        return {"time_seconds": stamp, "topic": "wifi", "source": "capture",
+                "payload": {"proto": "wifi", "channel": channel, "rssi": rssi, "data": frame.hex(), "src": "capture"}}
+    if link == 270 and len(data) >= 4:                     # LoRaTap v0 (15-byte header)
+        length = struct.unpack_from(">H", data, 2)[0]
+        payload: dict[str, Any] = {"proto": "lora", "data": data[length:].hex(), "src": "capture"}
+        if data[0] == 0 and length >= 15:
+            freq, bandwidth, sf, packet_rssi, _, _, snr = struct.unpack_from(">IBBBBBb", data, 4)
+            payload.update(freq=freq / 1e6, bw=125 * bandwidth, sf=sf, rssi=packet_rssi - 139, snr=snr / 4)
+        return {"time_seconds": stamp, "topic": "lora", "source": "capture", "payload": payload}
+    if link == 264 and len(data) >= 4:                     # ISO 14443: version, event, length
+        event, length = data[1], struct.unpack_from(">H", data, 2)[0]
+        if event not in (0xFE, 0xFF):
+            return None                                    # field on/off and other events
+        frame = data[4:4 + length]
+        payload = {"proto": "nfc", "dir": "pcd" if event == 0xFE else "picc", "data": frame.hex(), "src": "capture"}
+        if event == 0xFE and len(frame) == 1 and frame[0] in (0x26, 0x52):
+            payload["bits"] = 7
+        return {"time_seconds": stamp, "topic": "nfc", "source": "capture", "payload": payload}
+    if link == 209 and len(data) >= 6:                     # Linux I2C: bus, flags, address byte, data
+        flags = struct.unpack_from(">I", data, 1)[0]
+        message = data[5:]
+        if flags & 1 and len(message) > 1:                 # a read: the request, then the data the slave drove
+            return [{"time_seconds": stamp, "topic": "i2c", "source": "capture",
+                     "payload": {"proto": "i2c", "dir": "m2s", "data": message[:1].hex(), "src": "capture"}},
+                    {"time_seconds": stamp, "topic": "i2c", "source": "capture",
+                     "payload": {"proto": "i2c", "dir": "s2m", "data": message[1:].hex(), "src": "capture"}}]
+        return {"time_seconds": stamp, "topic": "i2c", "source": "capture",
+                "payload": {"proto": "i2c", "dir": "m2s", "data": message.hex(), "src": "capture"}}
     return None
 
 
@@ -111,7 +166,7 @@ def read_pcap(raw: bytes) -> list[dict[str, Any]]:
         pos += 16 + captured
         event = _packet_event(link, seconds + fraction * unit, data)
         if event is not None:
-            events.append(event)
+            events.extend(event if isinstance(event, list) else [event])
     return _relative(events)
 
 
@@ -148,7 +203,7 @@ def _read_pcapng(raw: bytes) -> list[dict[str, Any]]:
                 link, resolution = interfaces[interface]
                 event = _packet_event(link, ((high << 32) | low) * resolution, body[20:20 + captured])
                 if event is not None:
-                    events.append(event)
+                    events.extend(event if isinstance(event, list) else [event])
         pos += length
     return events
 

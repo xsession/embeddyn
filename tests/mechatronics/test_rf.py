@@ -238,3 +238,64 @@ def test_http_live_medium(lab):
     packets = json.loads(urllib.request.urlopen(f"{lab}/api/analyzer?session={info['session']}&from=0", timeout=10).read())
     assert packets["media"]["rfid"]["stats"]["lost"] > 0
     assert any(p.get("impaired") and p["proto"] == "RFID" for p in packets["packets"])
+
+
+# -- pcap export: every link type round-trips, and Wireshark agrees (opt-in) --------------------------------------
+import os
+import shutil
+import subprocess
+
+from embeddyn.mechatronics.comms.analyzer import write_pcap
+from embeddyn.mechatronics.comms.captures import read_capture
+
+CABLE_LAB = ROOT / "examples/mechatronics/cable-lab.yaml"
+TSHARK = os.environ.get("TSHARK") or shutil.which("tshark")
+
+
+@pytest.fixture(scope="module")
+def captures(tmp_path_factory, rf_run):
+    out = tmp_path_factory.mktemp("pcap")
+    rows, _, _ = rf_run
+    raw = yaml.safe_load(RF_LAB.read_text())
+    events = [e for r in rows for e in r.get("__events__", []) if e["topic"] in raw["metadata"]["analyzer"]["topics"]]
+    cable_rows, _, _ = _run(CABLE_LAB, {"i2c": {"kind": "wired"}, "can": {"kind": "wired"}})
+    events += [e for r in cable_rows for e in r.get("__events__", []) if e["topic"] in ("i2c", "can")]
+    files = {proto: out / f"{proto}.pcap" for proto in ("can", "ble", "wifi", "lora", "nfc", "i2c")}
+    counts = {proto: write_pcap(events, path, proto) for proto, path in files.items()}
+    return events, files, counts
+
+
+def test_pcap_round_trip_every_link_type(captures):
+    events, files, counts = captures
+    assert all(counts[p] > 5 for p in counts), counts
+    for proto, path in files.items():
+        back = read_capture(path)
+        original = sorted((e for e in events if e["payload"].get("proto") == proto), key=lambda e: e["time_seconds"])
+        if proto == "i2c":                                   # a read is one record: request and data
+            assert [e["payload"]["data"] for e in back] == [e["payload"]["data"] for e in original]
+            continue
+        assert [e["payload"]["data"] for e in back] == [e["payload"]["data"] for e in original], proto
+        if proto == "ble":
+            assert {e["payload"]["channel"] for e in back} == {37, 38, 39}
+        if proto in ("wifi", "lora"):
+            assert all(e["payload"]["rssi"] is not None for e in back)
+        if proto == "nfc":
+            assert [e["payload"]["dir"] for e in back] == [e["payload"]["dir"] for e in original]
+
+
+@pytest.mark.skipif(not TSHARK, reason="set TSHARK (or put tshark on PATH) to check the captures with Wireshark")
+def test_wireshark_reads_every_capture(captures):
+    _, files, counts = captures
+    for proto, path in files.items():
+        listing = subprocess.run([TSHARK, "-r", str(path)], capture_output=True, text=True, timeout=120)
+        assert listing.returncode == 0 and len(listing.stdout.splitlines()) >= counts[proto] * (0.5 if proto == "i2c" else 1)
+        malformed = subprocess.run([TSHARK, "-r", str(path), "-Y", "_ws.malformed"], capture_output=True, text=True, timeout=120)
+        assert malformed.stdout.strip() == "", f"{proto}: {malformed.stdout[:300]}"
+    fcs = subprocess.run([TSHARK, "-r", str(files["wifi"]), "-o", "wlan.check_checksum:TRUE", "-T", "fields", "-e", "wlan.fcs.status"],
+                         capture_output=True, text=True, timeout=120).stdout.split()
+    assert fcs and set(fcs) == {"1"}                         # every FCS good
+    nfc = subprocess.run([TSHARK, "-r", str(files["nfc"]), "-V"], capture_output=True, text=True, timeout=120).stdout
+    assert "[CRC Status: Good]" in nfc and "[CRC Status: Bad]" not in nfc
+    lora = subprocess.run([TSHARK, "-r", str(files["lora"]), "-T", "fields", "-e", "lorawan.fhdr.devaddr"],
+                          capture_output=True, text=True, timeout=120).stdout.split()
+    assert lora and set(lora) == {"0x26011bda"}

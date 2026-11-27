@@ -440,7 +440,7 @@ async function poll() {
     if (result.packets.length) { an.packets.push(...result.packets); render(); }
     renderInjections(result.injections || []);
     renderMediaStats(result.media);
-    for (const proto of ['can', 'ble', 'wifi']) $(`an-pcap-${proto}`).href = `/api/pcap?session=${session}&proto=${proto}`;
+    for (const proto of ['can', 'ble', 'wifi', 'lora', 'nfc', 'i2c']) $(`an-pcap-${proto}`).href = `/api/pcap?session=${session}&proto=${proto}`;
     if (['done', 'stopped', 'error'].includes(result.status) && result.total === an.packets.length) stopPolling();
   } catch { /* the server restarted or the run is gone */ }
 }

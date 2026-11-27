@@ -206,7 +206,7 @@ def test_pcap_files(run, tmp_path):
     assert caplen == length == 16                          # SocketCAN can_frame
     buffer = io.BytesIO()
     assert write_pcap(events, buffer, "ble") == counts["ble"]
-    assert struct.unpack_from("<I", buffer.getvalue(), 20)[0] == 251
+    assert struct.unpack_from("<I", buffer.getvalue(), 20)[0] == 256              # BLE LL with PHDR (channel, RSSI)
     with pytest.raises(ValueError):
         write_pcap(events, buffer, "usb")
 
@@ -260,7 +260,7 @@ def test_http_analyzer_and_pcap(lab):
     more = json.loads(urllib.request.urlopen(f"{lab}/api/analyzer?session={info['session']}&from=50", timeout=10).read())
     assert more["packets"][0]["no"] == 51
     pcap = urllib.request.urlopen(f"{lab}/api/pcap?session={info['session']}&proto=wifi", timeout=10).read()
-    assert struct.unpack_from("<I", pcap, 20)[0] == 105 and len(pcap) > 24
+    assert struct.unpack_from("<I", pcap, 20)[0] == 127 and len(pcap) > 24             # 802.11 with radiotap
 
 
 # -- reverse-engineering tools ---------------------------------------------------------------------------

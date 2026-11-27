@@ -27,7 +27,9 @@ from typing import Any, Iterable, Mapping
 
 from . import ble, canopen, i2c, lora, nfc, rfid, wifi
 
-LINKTYPES = {"can": 227, "ble": 251, "wifi": 105}
+# Link types (www.tcpdump.org/linktypes.html): SocketCAN, BLE LL with PHDR, 802.11 with radiotap,
+# LoRaTap, ISO 14443, Linux I2C.
+LINKTYPES = {"can": 227, "ble": 256, "wifi": 127, "lora": 270, "nfc": 264, "i2c": 209}
 
 
 def protocol_of(payload: Any) -> str | None:
@@ -280,15 +282,21 @@ def _write_pcap(events: Iterable[Mapping[str, Any]], handle: Any, proto: str) ->
     count = 0
     events = sorted(events, key=lambda event: float(event.get("time_seconds", 0.0)))
     handle.write(struct.pack("<IHHiIII", 0xA1B23C4D, 2, 4, 0, 0, 65535, LINKTYPES[proto]))   # ns resolution
+    last_address = 0
     for event in events:
         payload = event.get("payload")
         if protocol_of(payload) != proto:
             continue
         data = bytes.fromhex(str(payload.get("data", "")))
-        if proto == "can":                         # struct can_frame, network byte order id
-            can_id = int(payload["id"]) | (0x80000000 if payload.get("ext") else 0) | \
-                (0x40000000 if payload.get("rtr") else 0)
-            data = struct.pack(">IB3x", can_id, len(data)) + data.ljust(8, b"\0")[:8]
+        if proto == "i2c":                             # slave data belongs to the last addressed device
+            if payload.get("dir") == "m2s" and data:
+                last_address = data[0] >> 1
+                if data[0] & 1:
+                    continue                           # the read is written with its data, below
+            payload = {**payload, "_address": last_address}
+        data = _frame(proto, payload, data)
+        if data is None:
+            continue
         t = max(0.0, float(event.get("time_seconds", 0.0)))
         seconds = int(t)
         nanos = int(round((t - seconds) * 1e9))
@@ -297,6 +305,45 @@ def _write_pcap(events: Iterable[Mapping[str, Any]], handle: Any, proto: str) ->
         handle.write(struct.pack("<IIII", seconds, nanos, len(data), len(data)) + data)
         count += 1
     return count
+
+
+def _frame(proto: str, payload: Mapping[str, Any], data: bytes) -> bytes | None:
+    """One packet in its link type's framing (pseudo-headers carry channel, RSSI, direction)."""
+    if proto == "can":                                 # struct can_frame: id in network order, DLC, data
+        if payload.get("error"):                       # CAN_ERR_FLAG | CAN_ERR_PROT, data[2] = CAN_ERR_PROT_BIT
+            return struct.pack(">IB3x", 0x20000000 | 0x08, 8) + bytes([0, 0, 0x01, 0, 0, 0, 0, 0])
+        can_id = int(payload["id"]) | (0x80000000 if payload.get("ext") else 0) | (0x40000000 if payload.get("rtr") else 0)
+        return struct.pack(">IB3x", can_id, len(data)) + data.ljust(8, b"\0")[:8]
+    if proto == "ble":                                 # LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR
+        rf = {37: 0, 38: 12, 39: 39}.get(payload.get("channel"), 0)
+        rssi = payload.get("rssi")
+        flags = 0x0001 | 0x0010 | (0x0002 if rssi is not None else 0)   # dewhitened, reference AA valid, signal valid
+        signal = max(-128, min(127, int(round(float(rssi))))) if rssi is not None else 0
+        return struct.pack("<BbbBIH", rf, signal, -100, 0, 0x8E89BED6, flags) + data
+    if proto == "wifi":                                # radiotap: flags (FCS at end), channel, antenna signal
+        freq = int({**{c: 2407 + 5 * c for c in range(1, 14)}, 14: 2484}.get(payload.get("channel") or 0, 2437))
+        rssi = payload.get("rssi")
+        signal = max(-128, min(127, int(round(float(rssi))))) if rssi is not None else -50
+        header = struct.pack("<BBHI", 0, 0, 16, (1 << 1) | (1 << 3) | (1 << 5)) + bytes([0x10, 0]) + \
+            struct.pack("<HHb", freq, 0x00C0 if freq < 3000 else 0x0140, signal) + b"\0"
+        return header + data
+    if proto == "lora":                                # LoRaTap v1: frequency, bandwidth, SF, RSSI, SNR, sync word
+        bandwidth = {125: 1, 250: 2, 500: 4}.get(int(payload.get("bw") or 125), 1)
+        rssi = payload.get("rssi")
+        packet_rssi = max(0, min(255, int(round(float(rssi) + 139)))) if rssi is not None else 0
+        snr = max(-128, min(127, int(round(float(payload.get("snr") or 0) * 4))))
+        return struct.pack(">BBHIBBBBBbB", 0, 0, 15, int(round(float(payload.get("freq") or 868.1) * 1e6)), bandwidth,
+                           int(payload.get("sf") or 7), packet_rssi, packet_rssi, packet_rssi, snr, 0x34) + data
+    if proto == "nfc":                                 # ISO 14443 pseudo-header: version, event (0xFE PCD→PICC, 0xFF PICC→PCD), length
+        event = 0xFE if payload.get("dir", "pcd") == "pcd" else 0xFF
+        return struct.pack(">BBH", 0, event, len(data)) + data
+    if proto == "i2c":                                 # Linux I2C: bus, flags (bit 0: read), address byte, data
+        if payload.get("dir") == "s2m":                # the data of a read: after the read address
+            address = int(payload.get("_address", 0))
+            return struct.pack(">BI", 0, 1) + bytes([address << 1 | 1]) + data
+        read = bool(data and data[0] & 1)
+        return struct.pack(">BI", 0, 1 if read else 0) + data
+    return None
 
 
 def _dbc_name(text: str) -> str:

@@ -413,8 +413,17 @@ run streams.
 * **Time cursor:** clicking a packet moves the run's time cursor there, so the scope and
   meters show that instant. With **follow cursor**, scrubbing or **replay** selects the
   packet at the cursor.
-* **pcap:** CAN (LINKTYPE_CAN_SOCKETCAN, 227), BLE (LINKTYPE_BLUETOOTH_LE_LL, 251) and
-  Wi-Fi (LINKTYPE_IEEE802_11, 105), nanosecond timestamps.
+* **pcap:** one file per protocol, nanosecond timestamps. Pseudo-headers carry what the
+  medium knows:
+
+  | Protocol | Link type | Carries |
+  |---|---|---|
+  | CAN | SocketCAN (227) | error frames as `CAN_ERR_FLAG` protocol errors |
+  | BLE | BLE LL with PHDR (256) | RF channel and RSSI |
+  | Wi-Fi | 802.11 with radiotap (127) | FCS-present flag, channel frequency, antenna signal |
+  | LoRa | LoRaTap v0 (270) | frequency, bandwidth, SF, RSSI, SNR, LoRaWAN sync word |
+  | NFC | ISO 14443 (264) | direction (PCD → PICC, PICC → PCD) |
+  | I2C | Linux I2C (209) | read/write flag; a read carries its address and the data |
 
 ### Changes view (reverse engineering)
 
@@ -476,7 +485,8 @@ same message (hover for the old value).
   (Intel/Motorola byte order, signedness, scale, offset, range, unit), for SavvyCAN,
   cantools or a CAN tool chain.
 * **Open capture…** loads traffic recorded from real hardware without running anything:
-  * pcap or pcapng with SocketCAN (227), BLE LL (251, or 256 with PHDR) or 802.11 (105);
+  * pcap or pcapng with SocketCAN (227), BLE LL (251, or 256 with PHDR), 802.11 (105, or
+    127 with radiotap), LoRaTap (270), ISO 14443 (264) or Linux I2C (209);
   * `candump -l` logs and `candump` console output (29-bit ids, remote frames).
 
   Times start at the first packet. CAN can be decoded as CANopen with the project's
@@ -497,7 +507,7 @@ same message (hover for the old value).
   `CoSimulationOrchestrator.inject(topic, payload)` does the same from scripts.
 
 The API is `GET /api/analyzer?session=…&from=N` (decoded packets from packet N, in time
-order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`, plus POST
+order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi|lora|nfc|i2c`, plus POST
 `analyzer/inject`, `analyzer/inject_stop`, `analyzer/import`, `analyzer/config` and
 `analyzer/dbc`.
 
@@ -530,10 +540,32 @@ order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`, plus 
   * medium strength, bit-error statistics, radio loss, signal and topic crosstalk, CAN
     retransmission and abandonment, a noisy CAN bus that keeps the network up, lost
     frames that reach no receiver, and the live medium API;
+* every pcap link type round-tripping through `read_capture`, and the opt-in tshark
+  check;
 * candump, pcap and pcapng reading, named fields and DBC output, injection through the
   orchestrator (a node obeys an injected NMT stop), and the send, import and config
   endpoints.
 
-The pcap layouts follow the link-type specifications. They have not been opened in
-Wireshark here, and the BLE CRC-24 follows the Ubertooth convention without an outside
-check.
+**Checked with Wireshark 4.2 (tshark).** Every capture type opens without a malformed
+packet:
+
+* the CANopen boot and SDOs, error frames as "Protocol violation";
+* BLE adverts, SCAN_REQ/SCAN_RSP and CONNECT_IND;
+* the 802.11 join, the EAPOL 4-way handshake and UDP/JSON;
+* LoRaWAN headers, matching DevAddr, FCtrl, FCnt and port;
+* the ISO 14443 anticollision, select and READ;
+* I2C reads and writes to 0x48.
+
+Wireshark's own validators agree on:
+
+* every 802.11 FCS (`wlan.check_checksum`), and a deliberately corrupted frame shows as
+  "Bad";
+* the IPv4 header checksums;
+* every NFC CRC_A ("CRC Status: Good").
+
+Wireshark 4.2 shows the BLE CRC but does not compute it, so the CRC-24 (Ubertooth
+convention) is checked only between the simulated boards. LoRaWAN MICs need keys in
+Wireshark; ours match the published `lora-packet` example instead.
+
+`test_wireshark_reads_every_capture` repeats these checks when `TSHARK` points at a
+tshark binary.

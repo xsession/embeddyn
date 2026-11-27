@@ -668,7 +668,8 @@ class WpaStation(_Plant):
             info = struct.unpack_from(">H", data, key + 1)[0]
             replay = struct.unpack_from(">Q", data, key + 5)[0]
             if not info & 0x0100:                               # message 1: answer with 2 (SNonce)
-                message = wifi.eapol_key(2, replay, self.rng.randbytes(32), self.rng.randbytes(16), self.rng.randbytes(22))
+                message = wifi.eapol_key(2, replay, self.rng.randbytes(32), self.rng.randbytes(16),
+                                         wifi.element(48, RSN_PSK_CCMP))   # message 2 carries the STA's RSN element
             else:                                               # message 3: answer with 4, then encrypted traffic
                 message = wifi.eapol_key(4, replay, bytes(32), self.rng.randbytes(16))
                 self.state, self.joins, self.next = 4, self.joins + 1, t + 0.01
