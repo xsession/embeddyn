@@ -1,0 +1,8 @@
+# Signal bindings for circuits/ir-curtain-channel.cir (backend: ngspice-shared).
+bindings:
+  - {signal: electrical.gpio, direction: input, source: Vgpio, min: 0.0, max: 3.3}
+  - {signal: electrical.photo_current, direction: input, current_source: Iph, min: 0.0}
+
+  - {signal: electrical.led_current, direction: output, vector: "i(Vsled)", mode: mean}
+  - {signal: electrical.rx_voltage, direction: output, vector: "V(rx)", mode: last}
+  - {signal: electrical.rx_out, direction: output, vector: "V(rx_out)", mode: last}

@@ -6,6 +6,7 @@ using the same project files as the CLI. Its parts come from four places:
 | Inspiration | What the Lab takes from it |
 |---|---|
 | Proteus (schematic capture + virtual instruments) | parts with pins, wires, scopes, meters and logic analysers wired onto the schematic |
+| Fritzing (breadboard view) | ngspice circuits drawn as prototypes on a solderless breadboard, with parts, jumpers and supply modules |
 | Webots (robot simulator) | a 3-D view of the mechanism that moves with the simulation |
 | velxio-style emulators | a parts library, run/stop toolbar and live controls next to real firmware emulation |
 | embeddyn | the co-simulation engine underneath (Renode, ngspice, Webots, FMU, python plants, replay) |
@@ -27,7 +28,7 @@ the built-in mocks.
 
 ```text
 ┌ toolbar: New · Open ▾ · Save · Save as · YAML · Check │ ▶ Run ❚❚ ■ · mock hardware · real-time × │ t · status ┐
-├ parts library ┬──── Schematic │ 3-D view │ Split ────────────────────┬ inspector ─────────────┤
+├ parts library ┬─ Schematic │ Breadboard │ 3-D view │ Split ─────────┬ inspector ─────────────┤
 │ Controllers   │                                                       │ project / part / wire  │
 │ Electrical    │   parts with pins, wires, live values on the pins     │ parameters, options,   │
 │ Mechanical    │                                                       │ pins, transforms       │
@@ -94,6 +95,76 @@ and a saved project behaves the same from the CLI.
 * **3-D view:** drag to orbit, shift- or right-drag to pan, wheel to zoom, double-click to
   re-frame. Angles follow the signal unit (deg or rad) unless the body's `unit` is set.
 
+## Breadboard view
+
+The **Breadboard** tab draws every ngspice circuit of the project the way it would sit on a
+solderless breadboard, in the manner of Fritzing:
+
+* resistors carry colour bands, from their value or from the `.param` / `{{signal}}` they
+  refer to;
+* ceramic and electrolytic capacitors, inductors, diodes and LEDs (IR LEDs glow violet) are
+  drawn as such;
+* transistors are TO-92 packages, power MOSFETs TO-220;
+* switches, dependent sources and subcircuits are DIP chips across the trench;
+* behavioural `B` sources are small `ƒ` chips;
+* zero-volt sense sources are yellow ammeters.
+
+Sources sit beside the board as modules: a bench supply, a function generator (`PULSE`,
+`SIN` and the like), an **MCU pin** for an `external` source fed by a firmware-domain
+instance, or a signal input for any other instance. Jumper wires run from the modules to
+the board: red for the supply rail, black for ground, other colours by net.
+
+```text
+┌ toolbar: circuit ▾ · ＋ Part ▾ · ↶ · Auto-layout · Netlist… · Save layout · Export .cir · ✓ matches netlist ┐
+│ [Bench supply 5 V]──red──┐   ┌──────────── breadboard (rails, a–e │ trench │ f–j) ─────────────────┐  │
+│ [MCU pin · gpio ]──────┐ └──▶│  Rled ▭▭▭  D1 ◉ IR   Q2 ◗ PT   Q1 ◗ NPN   Bcmp ƒ   Rout ▭▭▭  Cout ◍  │  │
+│ [Current input  ]────┐ └────▶│  Vsled [A 23.7 mA]        ⚑ V(rx) = 126 mV    ⚑ V(rx_out) = 3.3 V │  │
+└──────────────────────┴───────┴────────────────────────────────────────────────────────────────────┴──┘
+```
+
+**Connectivity follows the real board.** The five holes of a column half (a–e or f–j) form
+one strip, each power rail is one conductor, and a jumper joins its two ends. Hover a hole,
+leg or wire to see its net, with every hole on that net lit up. The status line and the
+inspector compare the board with the netlist:
+
+* **open**: a netlist net is split into unconnected pieces;
+* **short**: one piece joins different nets;
+* **unplaced**: a leg is in no hole.
+
+**Editing:**
+
+* drag a part to move all its legs, or drag a leg end to bend it to another hole;
+* drag from a free hole or a module terminal to draw a jumper;
+* select a part to edit its value or model and see its pins, nets and SPICE card;
+* **Del** removes a part or wire, **R** swaps a part's legs, **Ctrl+Z** undoes, **F** fits.
+* **＋ Part** adds resistors, capacitors, LEDs (red, 940 nm IR), photodiodes, 1N4148,
+  2N3904/2N3906, a phototransistor, MOSFETs, a bench supply, a function generator and an
+  ammeter. Each added part brings its `.model` card.
+
+**Live values:** after or during a run, the bound vectors show on the board:
+
+* `V(node)` as a flag on the net;
+* `i(Vsense)` on its ammeter;
+* input sources on their module's display;
+* an LED lights with the current of the ammeter in series with it.
+
+Flags name the instances that read the signal (`→ beam`). They follow the time cursor and
+replay like the instruments.
+
+**Files:**
+
+* **Save layout** (and the project's Save) writes `<netlist>.breadboard.yaml` next to the
+  netlist. Without one, the board is laid out automatically in signal-flow order, starting
+  from the nets the modules drive.
+* **Netlist…** shows the netlist the board makes.
+* **Export .cir** writes it out. Element cards get the board's nets and values. Removed
+  parts stay as comments, and added parts and their model cards go before `.end`. Every
+  other line (`.param`, `.model`, comments, `{{placeholders}}`) is kept.
+
+**Overview:** the modules show where each circuit input comes from (for example
+`strobe firmware → electrical.gpio` on an MCU pin). The probe flags show which instances
+read each output, so one board shows the whole electrical side of the co-simulation.
+
 ## Files
 
 Saving writes an ordinary project file. Simulator instances, signals and couplings
@@ -116,7 +187,8 @@ part exposes gets a net-label terminal.
 | `gui/sources.py` | `FunctionGenerator`, `ServoPulseGenerator` plants |
 | `gui/session.py` | `RunSession`: thread around `CoSimulationOrchestrator.iterate()`; pause, stop, real-time pacing, forced signals, metrics, CSV |
 | `gui/server.py` | `ThreadingHTTPServer`; JSON API under `/api`, Server-Sent Events at `/api/stream` |
-| `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `scene3d.js` (flat-shaded canvas renderer) |
+| `gui/breadboard.py` | SPICE netlist parser, part types and palette, automatic breadboard layout, connectivity check, netlist export, `.breadboard.yaml` sidecars |
+| `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `breadboard.js` (breadboard view), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `scene3d.js` (flat-shaded canvas renderer) |
 
 Two core changes support the Lab:
 
@@ -151,3 +223,12 @@ It opens in the Lab the same way, and running it there gives the same metrics as
 * function-generator waveforms;
 * the HTTP API: open, run, stream, CSV, save-as with path rebasing, cross-origin and
   path-traversal refusal, and pin re-derivation.
+
+`tests/mechatronics/test_breadboard.py` covers the breadboard view:
+
+* netlist parsing: models, continuations, subcircuits, `.control`;
+* an automatic layout of every example netlist that matches it, with one lead per hole;
+* opens, shorts and unplaced legs;
+* export with changed, removed and added parts;
+* sidecar files and the breadboard API;
+* an ngspice run of `ir-curtain-channel.yaml`.

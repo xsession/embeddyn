@@ -17,6 +17,7 @@ All examples live in `examples/mechatronics/`. Run any of them with `embeddyn me
 | `rc-servo-l476.yaml` | **Renode** STM32L476 · RCServo · replayed operator; UART console | Renode | [Tutorial 4](../tutorials/rc-servo-firmware.md) |
 | `rc-servo-l476-can.yaml` | as above with **CAN** status/command frames | Renode ≥ 1.17 | [Renode adapter](renode.md#can-renode-117) |
 | `mujoco-arm-firmware.yaml` | **Renode** STM32L476 · H-bridge · DCMotorRL · ThermalRC · **MuJoCo**; encoder, **SPI** AS5047P, **I²C** AS6221 | Renode ≥ 1.17, `mujoco` | [Tutorial 5](../tutorials/arm-joint-sensors.md) |
+| `ir-curtain-channel.yaml` | strobe (firmware) · obstacle · `IrBeamPath` · **ngspice** IR LED driver, phototransistor and comparator | libngspice | [Lab breadboard view](lab.md#breadboard-view) |
 | `two-wheel-drive.yaml` | 2 × PI · 2 × DCMotorRL · **FMU** wheel · GearedDrivetrain wheel; multi-rate | built FMU | [Tutorial 6](../tutorials/instances-and-fmus.md) |
 
 ## Light-curtain bench

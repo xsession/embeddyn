@@ -19,12 +19,23 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
+from . import breadboard
 from .document import graph_from_raw, instance_ports, load_graph, project_from_graph, raw_from_graph, to_yaml
 from .parts import EXAMPLES, instantiate_part, part_library
 from .session import RunSession
 
 STATIC = Path(__file__).resolve().parent / "static"
 _PATH_KEYS = ("script", "firmware", "bindings", "log")
+_NETLIST_SUFFIXES = {".cir", ".sp", ".spice", ".net", ".ckt"}
+
+
+def _netlist_path(body: dict[str, Any], key: str = "path") -> Path:
+    path = Path(str(body.get(key) or "")).expanduser()
+    if not str(body.get(key) or "") or path.suffix.lower() not in _NETLIST_SUFFIXES:
+        raise ValueError(f"a SPICE netlist ({', '.join(sorted(_NETLIST_SUFFIXES))}) is needed")
+    if not path.is_absolute():
+        path = Path(str(body.get("root") or os.getcwd())) / path
+    return path.resolve()
 
 
 def _examples() -> list[dict[str, Any]]:
@@ -250,6 +261,41 @@ def make_handler(state: LabState):
             path.write_text("# Saved by embeddyn Lab. Layout and instruments live in metadata.gui.\n" + text,
                             encoding="utf-8")
             return {"path": str(path), "graph": load_graph(path)}
+
+        # breadboard view -----------------------------------------------------
+        def _post_breadboard_circuits(self, body: dict[str, Any]) -> dict[str, Any]:
+            return {"circuits": breadboard.circuit_instances(body["graph"]), "palette": breadboard.palette()}
+
+        def _post_breadboard_open(self, body: dict[str, Any]) -> dict[str, Any]:
+            return breadboard.open_board(_netlist_path(body))
+
+        def _post_breadboard_layout(self, body: dict[str, Any]) -> dict[str, Any]:
+            path = _netlist_path(body)
+            result = breadboard.open_board(path)
+            board = breadboard.auto_layout(breadboard.parse_netlist(result["netlist"]), name=path.stem)
+            board["saved"] = False
+            return {**result, "board": board, "check": breadboard.check_board(board)}
+
+        def _post_breadboard_check(self, body: dict[str, Any]) -> dict[str, Any]:
+            return breadboard.check_board(body["board"])
+
+        def _post_breadboard_save(self, body: dict[str, Any]) -> dict[str, Any]:
+            path = _netlist_path(body)
+            if not path.exists():
+                raise FileNotFoundError(str(path))
+            return {"sidecar": str(breadboard.save_board(path, body["board"]))}
+
+        def _post_breadboard_netlist(self, body: dict[str, Any]) -> dict[str, Any]:
+            path = _netlist_path(body)
+            original = path.read_text(encoding="utf-8") if path.exists() else None
+            return {"text": breadboard.export_netlist(body["board"], original)}
+
+        def _post_breadboard_export(self, body: dict[str, Any]) -> dict[str, Any]:
+            path = _netlist_path(body)
+            target = _netlist_path({"path": body.get("target") or str(path), "root": str(path.parent)})
+            original = path.read_text(encoding="utf-8") if path.exists() else None
+            target.write_text(breadboard.export_netlist(body["board"], original), encoding="utf-8")
+            return {"path": str(target)}
 
         def _post_run(self, body: dict[str, Any]) -> dict[str, Any]:
             session = RunSession(body["graph"], mock=bool(body.get("mock")), realtime=bool(body.get("realtime")),

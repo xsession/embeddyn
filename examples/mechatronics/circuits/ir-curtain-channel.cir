@@ -1,0 +1,52 @@
+* One channel of an IR light curtain: emitter driver and receiver front end.
+* Used with backend ngspice-shared; the breadboard view of the Lab lays it
+* out as a prototype (ir-curtain-channel.cir.breadboard.yaml).
+*
+* Emitter: the MCU strobes the IR LED through an NPN low-side switch; Rled
+* sets the LED current from the 5 V rail, Vsled measures it.
+* Receiver: the optics turn LED current into phototransistor base current
+* (Iph, external); the phototransistor pulls the collector node rx down
+* against Rload. A comparator against the Rref1/Rref2 threshold, with an
+* RC filter, gives the MCU a 0/3.3 V "beam seen" input.
+*
+* Inputs (external sources, values set by Embeddyn each step):
+*   Vgpio   MCU strobe output, 0 / 3.3 V
+*   Iph     photo base current in A (optics: transmission * coupling * LED current)
+* Outputs (vectors read by Embeddyn):
+*   i(Vsled)   LED current        V(rx)   phototransistor collector
+*   V(rx_out)  comparator output at the MCU pin
+* {{name}} placeholders take a signal's start value or a parameter's value:
+*   curtain.led_resistor   ohm  emitter current setting resistor
+*   curtain.load_resistor  ohm  phototransistor collector load
+
+.param rled={{curtain.led_resistor}}
+.param rload={{curtain.load_resistor}}
+
+* Supply rail
+Vcc vcc 0 dc 5
+
+* Emitter: MCU pin -> base resistor -> NPN switch -> IR LED from the rail
+Vgpio gpio 0 dc 0 external
+Rbase gpio base 1k
+Rled vcc led_a {rled}
+D1 led_a led_k LED_IR940
+Vsled led_k qc dc 0
+Q1 qc base 0 Q2N3904
+
+* Receiver: phototransistor with load resistor, base current from the optics
+Rload vcc rx {rload}
+Q2 rx pt_b 0 PT_NPN
+Iph 0 pt_b dc 0 external
+Cfilt rx 0 1n
+
+* Threshold divider and comparator (open-collector style, pulled to 3.3 V logic)
+Rref1 vcc ref 10k
+Rref2 ref 0 10k
+Bcmp cmp 0 V = 1.65*(1+tanh(400*(V(ref)-V(rx))))
+Rout cmp rx_out 1k
+Cout rx_out 0 10n
+
+.model LED_IR940 D(Is=5.7e-17 N=1.5 Rs=1.5 Cjo=30p)
+.model Q2N3904 NPN(Is=6.734f Bf=416.4 Vaf=74.03 Ikf=66.78m Rb=10 Rc=1 Cjc=3.638p Cje=4.493p Tf=301.2p)
+.model PT_NPN NPN(Is=1e-14 Bf=500 Vaf=60 Cjc=12p Cje=20p)
+.end

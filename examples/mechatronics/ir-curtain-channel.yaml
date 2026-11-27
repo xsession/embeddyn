@@ -1,0 +1,60 @@
+name: ir-curtain-channel
+step_seconds: 2.0e-5
+duration_seconds: 0.02
+metadata:
+  description: >
+    One IR light-curtain channel in ngspice: the MCU strobes an IR LED through
+    an NPN switch, a phototransistor and comparator report the beam back.
+    An obstacle blocks the beam at 100 Hz. Open it in the Lab's Breadboard
+    view to see the circuit as a prototype with live LED current and
+    receiver voltages.
+
+parameters:
+  curtain.led_resistor: {value: 150.0, unit: ohm}     # {{curtain.led_resistor}}: LED current ~20 mA from 5 V
+  curtain.load_resistor: {value: 10000.0, unit: ohm}  # {{curtain.load_resistor}}: phototransistor load
+
+instances:
+  strobe:
+    domain: firmware
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: square, amplitude: 1.65, offset: 1.65, frequency: 1000.0}
+      outputs: {value: electrical.gpio}
+  obstacle:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: pulse, amplitude: 1.0, offset: 0.0, frequency: 100.0, duty: 0.5}
+      outputs: {value: optics.transmission}
+  beam:
+    domain: environment
+    model: embeddyn.mechatronics.lightcurtain.beam:IrBeamPath
+    options:
+      backend: python
+      parameters: {coupling: 2.0e-4}
+      inputs: {led_current: optics.led_current, transmission: optics.transmission}
+      outputs: {photo_current: optics.photo_current}
+  electrical:
+    domain: electrical
+    model: circuits/ir-curtain-channel.cir
+    options: {backend: ngspice-shared, bindings: bindings/ngspice-ir-curtain.yaml, max_step: 2.0e-6}
+
+signals:
+  electrical.gpio: {domain: firmware, unit: V, initial: 0.0}
+  optics.transmission: {domain: environment, initial: 1.0}
+  optics.led_current: {domain: environment, unit: A, initial: 0.0}
+  optics.photo_current: {domain: environment, unit: A, initial: 0.0}
+  electrical.photo_current: {domain: electrical, unit: A, initial: 0.0}
+  electrical.led_current: {domain: electrical, unit: A, initial: 0.0}
+  electrical.rx_voltage: {domain: electrical, unit: V, initial: 5.0}
+  electrical.rx_out: {domain: electrical, unit: V, initial: 0.0}
+
+couplings:
+  - {source: electrical.led_current, target: optics.led_current, delay_steps: 1}
+  - {source: optics.photo_current, target: electrical.photo_current}
+
+metrics:
+  led_current: {type: stats, signal: electrical.led_current}
+  receiver: {type: stats, signal: electrical.rx_out}

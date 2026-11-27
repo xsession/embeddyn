@@ -63,8 +63,10 @@ label { user-select: none; }
 .tabs { display: flex; gap: 4px; align-items: center; padding: 4px 6px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .tabs .spacer { flex: 1; }
 #views { flex: 1; display: flex; min-height: 0; position: relative; }
-#schematic-wrap, #scene-wrap { flex: 1; position: relative; min-width: 0; }
+#schematic-wrap, #scene-wrap, #breadboard-wrap { flex: 1; position: relative; min-width: 0; }
 .view-schematic #scene-wrap { display: none; } .view-scene #schematic-wrap { display: none; }
+#breadboard-wrap { display: none; flex-direction: column; }
+.view-breadboard #breadboard-wrap { display: flex; } .view-breadboard #schematic-wrap, .view-breadboard #scene-wrap { display: none; }
 .view-split #schematic-wrap { border-right: 2px solid var(--line); }
 #schematic { width: 100%; height: 100%; display: block; background: var(--sheet); outline: none; }
 #scene { width: 100%; height: 100%; display: block; }
@@ -156,3 +158,76 @@ label { user-select: none; }
 .serial { flex: 1; margin: 0; padding: 6px 8px; overflow: auto; background: #0b0f0c; color: #9cf59c;
   font: 12px ui-monospace, monospace; white-space: pre; }
 .serial-input { display: flex; gap: 6px; padding: 4px 6px; border-top: 1px solid var(--line); align-items: center; }
+
+/* Breadboard view ------------------------------------------------------------------------------ */
+#bb-toolbar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 4px 6px; background: var(--panel2); border-bottom: 1px solid var(--line); }
+#bb-toolbar select { max-width: 280px; } #bb-toolbar button { white-space: nowrap; }
+#bb-toolbar .menu { width: 230px; max-height: 60vh; overflow: auto; }
+#bb-status { margin-left: auto; font-size: 12px; } #bb-status.ok { color: var(--ok); } #bb-status.bad { color: var(--warn); }
+#breadboard { flex: 1; width: 100%; min-height: 0; display: block; outline: none; cursor: default;
+  background: radial-gradient(circle at 30% 20%, #3b4250, #262a31 70%); }
+#bb-tip { position: absolute; display: none; pointer-events: none; z-index: 5; background: #111c; color: #fff; border: 1px solid var(--line);
+  border-radius: 4px; padding: 4px 7px; font-size: 12px; max-width: 320px; }
+#bb-tip .v { color: #7dff9a; } #bb-tip div { color: var(--muted); font-size: 11px; }
+.bb-empty { fill: var(--muted); font-size: 14px; }
+.bb-body { fill: #f3f1ea; stroke: #cbc5b4; stroke-width: 1.2; }
+.bb-trench { fill: #dcd8cc; }
+.bb-railline { stroke-width: 1.6; } .bb-railline.pos { stroke: #d33; } .bb-railline.neg { stroke: #2f6fd1; }
+.bb-railsign { font: bold 11px sans-serif; fill: #777; text-anchor: middle; }
+.bb-holes { fill: #4a4a4a; }
+.bb-label { font: 7px sans-serif; fill: #9a968a; text-anchor: middle; user-select: none; }
+.bb-brand { font: italic 10px sans-serif; fill: #b4ae9d; }
+.bb-hl-holes { fill: #2ee66b; } .bb-hl-term { fill: none; stroke: #2ee66b; stroke-width: 2.5; }
+.bb-leg { stroke: #a9adb3; stroke-width: 2.4; stroke-linecap: round; }
+.bb-legend { fill: #6d7177; stroke: #c8ccd2; stroke-width: 1; cursor: grab; }
+.bb-part { cursor: move; } .bb-part.selected .bb-leg { stroke: #4ea1ff; }
+.bb-part.selected rect, .bb-part.selected path, .bb-part.selected ellipse, .bb-module.selected .bb-module-body { stroke: #4ea1ff !important; stroke-width: 2 !important; }
+.bb-resistor { fill: #d8c095; stroke: #a48e64; stroke-width: 0.8; }
+.bb-inductor { fill: #2f6e3c; stroke: #1d4a27; } .bb-coil { stroke: #c98a3c; stroke-width: 1.4; }
+.bb-ecap { fill: #213f80; stroke: #10224a; } .bb-ecap-stripe { fill: #b9c4dc; } .bb-ecap-text { fill: #d8e0f0; font: bold 9px sans-serif; }
+.bb-ccap { fill: #e6a33c; stroke: #a8701e; stroke-width: 1; }
+.bb-diode { fill: #222; } .bb-band { fill: #cfcfcf; }
+.bb-led { stroke: #00000055; stroke-width: 1; }
+.bb-ammeter { fill: #f6c90e; stroke: #4a3c00; stroke-width: 1; } .bb-ammeter-text { font: bold 8px sans-serif; fill: #222; text-anchor: middle; }
+.bb-chip { fill: #26282c; stroke: #111; } .bb-chip-text { fill: #e8e8e8; font: bold 11px sans-serif; text-anchor: middle; user-select: none; }
+.bb-chip-text.small { font-size: 7.5px; font-weight: normal; }
+.bb-notch { fill: none; stroke: #777; } .bb-dippin { fill: #c9ccd1; cursor: grab; }
+.bb-to { fill: #1f1f22; stroke: #000; } .bb-photo { fill: #3b1212; } .bb-lens { fill: #e9f3ff; opacity: 0.55; }
+.bb-tab { fill: #c9ccd1; stroke: #8b8f96; } .bb-tabhole { fill: #555; }
+.bb-generic { fill: #888; }
+.bb-ref { font: 7px sans-serif; fill: #343a40; text-anchor: middle; paint-order: stroke; stroke: #f3f1eacc; stroke-width: 2.5; user-select: none; pointer-events: none; }
+.bb-pinname { font: 6px sans-serif; fill: #6b6f75; text-anchor: middle; pointer-events: none; }
+.bb-wire { cursor: pointer; }
+.bb-wire-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.bb-wire-outline { fill: none; stroke: #00000066; stroke-width: 6.4; stroke-linecap: round; }
+.bb-wire-core { fill: none; stroke-width: 4.4; stroke-linecap: round; }
+.bb-wire.selected .bb-wire-outline { stroke: #4ea1ff; stroke-width: 8; }
+.bb-wire-end { fill: #b9bdc3; stroke: #555; stroke-width: 0.8; cursor: grab; }
+.bb-module-body { stroke: #111; stroke-width: 1; }
+.bb-module.supply .bb-module-body { fill: #2b2f36; } .bb-module.generator .bb-module-body { fill: #1e4d6b; }
+.bb-module.mcu .bb-module-body { fill: #1b5e9e; } .bb-module.signal .bb-module-body { fill: #19695a; }
+.bb-module.isource .bb-module-body { fill: #8a4b12; }
+.bb-module { cursor: move; }
+.bb-module-title { fill: #fff; font: bold 9px sans-serif; user-select: none; }
+.bb-module-sub { fill: #d3dbe6; font: 7.5px sans-serif; user-select: none; }
+.bb-module-pin { fill: #fff; font: bold 9px sans-serif; }
+.bb-lcd { fill: #b9d7a8; stroke: #4d6b3e; } .bb-lcd-text { font: bold 11px monospace; fill: #213018; }
+.bb-jack { stroke: #111; stroke-width: 1.5; cursor: crosshair; } .bb-jack.pos { fill: #d12b2b; } .bb-jack.neg { fill: #222; }
+.bb-probe-lead { stroke: #e8d14a; stroke-width: 1.4; stroke-dasharray: 3 2; }
+.bb-probe-tip { fill: #e8d14a; stroke: #6b5d00; }
+.bb-probe-box { fill: #fff8d0; stroke: #b39b00; }
+.bb-probe-text { font: 8.5px monospace; fill: #3d3400; }
+.bb-ghost-wire { fill: none; stroke: #4ea1ff; stroke-width: 4; stroke-dasharray: 6 3; stroke-linecap: round; }
+.bb-ghost-leg { stroke: #4ea1ff; stroke-width: 2.4; stroke-dasharray: 3 2; }
+.bb-ghost-target { fill: #4ea1ff55; stroke: #4ea1ff; stroke-width: 1.5; }
+.bb-ghost-bad { fill: #ff5c5c55; stroke: #ff5c5c; stroke-width: 1.5; }
+.bb-ghost-text { font: 9px sans-serif; fill: #fff; paint-order: stroke; stroke: #000; stroke-width: 2.5; }
+.bb-pins td.ok { color: var(--ok); } .bb-pins td.bad { color: var(--err); }
+.bb-card { background: #1a1d22; padding: 6px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; font-size: 11px; }
+.bb-actions { display: flex; gap: 6px; margin: 8px 0; }
+.bb-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+.bb-swatch { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid #0006; }
+.bb-swatch.active { border-color: #fff; }
+.bb-issues { padding-left: 16px; margin: 4px 0; font-size: 12px; } .bb-issues li { cursor: default; margin: 2px 0; }
+.bb-issues li.short { color: var(--err); } .bb-issues li.open { color: var(--warn); } .bb-issues li.unplaced { color: var(--muted); }
+.muted { color: var(--muted); font-weight: normal; }

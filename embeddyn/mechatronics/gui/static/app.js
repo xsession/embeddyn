@@ -4,6 +4,7 @@ import { fit, render as renderSchematic, setShowValues, updateValues } from './s
 import { rebuild as rebuildInstruments, redrawAll, reveal } from './instruments.js';
 import { render as renderInspector } from './inspector.js';
 import { draw as drawScene } from './scene3d.js';
+import { fit as fitBreadboard, projectSaved, setActive as setBreadboard, updateLive as updateBreadboard, bb } from './breadboard.js';
 
 const $ = (id) => document.getElementById(id);
 let stream = null;
@@ -90,6 +91,7 @@ async function save(as = false) {
     state.dirty = false;
     $('project-name').textContent = `${result.graph.name} — ${result.path}`;
     emit('graph-changed');
+    projectSaved();
     toast(`Saved ${result.path}`);
     log(`saved ${result.path}`, 'ok');
   } catch (error) { toast(error.message, true); log(error.message, 'err'); }
@@ -236,6 +238,7 @@ function frame() {
     slider.max = Math.max(0, data.length - 1);
     if (document.activeElement !== slider) slider.value = Math.max(0, data.cursor);
     updateValues();
+    if (bb.active) updateBreadboard();
     redrawAll();
   }
   drawScene();
@@ -278,13 +281,14 @@ function bind() {
     data.cursor = Number(e.target.value); frameDirty = true;
   });
   $('btn-replay').onclick = replay;
-  $('btn-fit').onclick = fit;
+  $('btn-fit').onclick = () => (bb.active ? fitBreadboard() : fit());
   $('modal-close').onclick = () => $('modal').classList.add('hidden');
   $('modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') $('modal').classList.add('hidden'); });
   document.querySelectorAll('#view-tabs button[data-view]').forEach((b) => (b.onclick = () => {
     document.querySelectorAll('#view-tabs button[data-view]').forEach((x) => x.classList.toggle('active', x === b));
     $('views').className = 'view-' + b.dataset.view;
-    if (b.dataset.view !== 'scene') requestAnimationFrame(fit);
+    setBreadboard(b.dataset.view === 'breadboard');
+    if (!['scene', 'breadboard'].includes(b.dataset.view)) requestAnimationFrame(fit);
   }));
   document.querySelectorAll('#dock-tabs button').forEach((b) => (b.onclick = () => showDock(b.dataset.dock)));
   document.addEventListener('keydown', (e) => {

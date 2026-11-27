@@ -1,5 +1,6 @@
 // Property inspector: project, part, wire.
 import { deleteNode, deleteWire, refreshPorts } from './ops.js';
+import { inspectorPanel } from './breadboard.js';
 import { api, data, emit, findNode, formatValue, markDirty, nodeColor, on, signalUnit, state, toast } from './store.js';
 
 const body = document.getElementById('inspector-body');
@@ -35,6 +36,7 @@ export function render() {
   body.innerHTML = '';
   const graph = state.graph;
   if (!graph) return;
+  if (inspectorPanel(body)) return;           // breadboard view: its own parts and wires
   const sel = state.selection;
   if (sel?.type === 'node') {
     const node = findNode(sel.id);

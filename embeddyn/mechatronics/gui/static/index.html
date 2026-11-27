@@ -53,6 +53,7 @@
   <section id="center">
     <nav class="tabs" id="view-tabs">
       <button data-view="schematic" class="active">Schematic</button>
+      <button data-view="breadboard" title="Circuits as breadboard prototypes">Breadboard</button>
       <button data-view="scene">3-D view</button>
       <button data-view="split">Split</button>
       <span class="spacer"></span>
@@ -61,6 +62,19 @@
     </nav>
     <div id="views" class="view-schematic">
       <div id="schematic-wrap"><svg id="schematic" tabindex="0"></svg></div>
+      <div id="breadboard-wrap">
+        <div id="bb-toolbar">
+          <select id="bb-circuit" title="Circuit (ngspice instance) to show"></select>
+          <div class="dropdown"><button id="bb-add" title="Add a part to the board">＋ Part ▾</button><div class="menu" id="bb-palette"></div></div>
+          <button id="bb-undo" title="Undo (Ctrl+Z)">↶</button>
+          <button id="bb-auto" title="Lay the circuit out again automatically">Auto-layout</button>
+          <button id="bb-netlist" title="Show the netlist the board makes">Netlist…</button>
+          <button id="bb-save" title="Save the layout next to the netlist">Save layout</button>
+          <button id="bb-export" title="Write the board back as a SPICE netlist">Export .cir</button>
+          <span id="bb-status"></span>
+        </div>
+        <svg id="breadboard" tabindex="0"></svg><div id="bb-tip"></div>
+      </div>
       <div id="scene-wrap"><canvas id="scene"></canvas>
         <div class="scene-help">drag: orbit · shift/right-drag: pan · wheel: zoom · double-click: reset</div></div>
     </div>

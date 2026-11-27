@@ -256,6 +256,33 @@ webots --batch --minimize --no-rendering --mode=fast --stdout --stderr examples/
 
 `tests/mechatronics/test_light_curtain_bench.py` runs the world for 1.5 s when `WEBOTS_HOME` points at the installation or `webots` is on the `PATH`.
 
+## One channel in ngspice
+
+The bench models optics and the receiver chain as signals. To look at the electronics of
+one beam, `examples/mechatronics/ir-curtain-channel.yaml` co-simulates a single channel in
+ngspice (`circuits/ir-curtain-channel.cir`):
+
+* **Emitter:** an MCU strobe (1 kHz, 0/3.3 V) switches the 940 nm IR LED through a 2N3904.
+  `Rled` (`curtain.led_resistor`) sets about 20 mA from 5 V, and `Vsled` measures it.
+* **Optics:** `IrBeamPath` (`lightcurtain/beam.py`) turns LED current into phototransistor
+  base current: `coupling × transmission × I_LED`. An obstacle blocks the beam at 100 Hz.
+* **Receiver:**
+  * a phototransistor with load `Rload` (`curtain.load_resistor`);
+  * a comparator against a 2.5 V divider;
+  * an RC filter to the MCU input.
+
+  The input reads 3.3 V when the beam is clear and lit, and 0 V when it is blocked. The
+  slow recovery of the unbiased phototransistor base shows up when the LED switches off.
+
+Open the project in the Lab and switch to **Breadboard** to see the channel as a prototype:
+
+* an MCU-pin module drives the base resistor;
+* the IR LED glows with the measured current;
+* flags show `V(rx)` and `V(rx_out)` while the run replays.
+
+Try other LED resistors, load resistors or parts there and export the netlist. See
+[the Lab's breadboard view](lab.md#breadboard-view).
+
 ## Limits
 
 * **Reflections are diffuse and single-bounce.** There are no specular surfaces (polished metal, wet skin) and no multipath.
