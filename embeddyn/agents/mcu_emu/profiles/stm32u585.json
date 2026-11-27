@@ -1,0 +1,58 @@
+{
+  "name": "stm32u585",
+  "description": "ST STM32U585xI / U575xI (Cortex-M33 160 MHz, 2 MB dual-bank flash, 786 KB SRAM; the MCU of the Arduino UNO Q): GNU Arm toolchain with the STM32CubeU5 HAL/LL, Renode stm32u585 platform (boards NUCLEO-U575ZI-Q and B-U585I-IOT02A)",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeU5",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m33",
+      "-mthumb",
+      "-mfpu=fpv5-sp-d16",
+      "-mfloat-abi=hard",
+      "-Os",
+      "-g",
+      "-DSTM32U585xx",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32U5xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32U5xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "TrustZone off (TZEN = 0): build non-secure images like the Cube examples (Projects/NUCLEO-U575ZI-Q/Templates/STM32CubeIDE: STM32U575ZITXQ_FLASH.ld, startup_stm32u575zitxq.s). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32U5xx/Include/stm32u585xx.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": ["0x08000000", "0x081FFFFF"],
+    "sram1": ["0x20000000", "0x2002FFFF"],
+    "sram2": ["0x20030000", "0x2003FFFF"],
+    "sram3": ["0x20040000", "0x200BFFFF"],
+    "sram4": ["0x28000000", "0x28003FFF"],
+    "peripherals": ["0x40000000", "0x4FFFFFFF"]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32u585.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/st/nucleo_u575zi_q.repl (LD1 green PC7, LD2 blue PB7, LD3 red PG2, button sysbus.gpioPortC.userButton PC13) and platforms/boards/st/b_u585i_iot02a.repl (LED6 red PH6, LED7 green PH7, active low). U5 models: STM32U5_RCC (MSIS/HSI/HSE/PLL1 clock tree drives systick and timer clocks), STM32U5_PWR (VOS/boost, SMPS), STM32U5_FlashController (8 KB pages, two banks), STM32_Cache (ICACHE/DCACHE), STM32_RTCv3 (the RTC of U5/L5/G4/WB/WL: calendar at ck_spre, alarms, wake-up timer); EXTI, GPDMA, SPI and ADC4 are the STM32WBA models, ADC1 the STM32L5 one. Not modelled yet: OCTOSPI and the octal memories, AES/SAES/HASH/PKA/OTFDEC, CORDIC, FMAC, MDF/ADF, USB OTG, LPDMA/LPBAM, GPDMA linked lists, Standby wake-up. The IWDG examples' LSI measurement needs tools/stm32cube/fixtures/lsi_tim17_u5.repl. Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeU5 examples (tools/stm32cube/run_examples.py with examples_u575.txt and examples_b_u585.txt in the Renode tree)"
+  }
+}
