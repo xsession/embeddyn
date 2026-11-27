@@ -32,7 +32,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | 15 | Arduino UNO Q (ABX00162) | Qualcomm QRB2210 (4× Cortex-A53, Linux) + STM32U585AII6 (seen) | U585: done (`stm32u585` profile; STM32CubeU5 examples on NUCLEO-U575ZI-Q 88 pass / 59 skipped, no known gaps, B-U585I-IOT02A 4 pass; UNO Q pin map still to add); QRB2210: new, Linux-class SoC |
 | 16 | STM32L0538-DISCO (MB1143 B-01) | STM32L053C8T6 (seen) | done (`stm32l053` profile, board `st/stm32l0538_disco.repl`; STM32CubeL0 examples 145 pass / 19 skipped, no known gaps, over this and NUCLEO-L053R8; e-paper still to model) |
 | 17 | LPCXpresso LPC812 rev A (with LPC-Link) | LPC812M101JDH20 (doc; marking under glare) | near (`nxp/lpc845.repl`) |
-| 18 | FRDM-KL05Z | MKL05Z32VFM4 (seen "M05…") | near (`nxp/mkl25z128.repl`) |
+| 18 | FRDM-KL05Z | MKL05Z32VFM4 (seen "M05…") | done (`mkl05z32` profile, board `nxp/frdm_kl05z.repl`; Mbed OS 5.15 KL05Z HAL test programs 11 pass; TSI slider still to model) |
 
 ## Secondary MCUs on the boards
 
@@ -58,7 +58,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | LSM303AGR accel + mag (U1) | X-NUCLEO-IKS01A2 | I²C acc 0x32, mag 0x3C | base (`LSM303AGR_Accelerometer.cs`, `_Magnetic.cs`) |
 | HTS221 humidity + temperature (U3) | X-NUCLEO-IKS01A2 | I²C 0xBE | new |
 | LPS22HB pressure (U4) | X-NUCLEO-IKS01A2 | I²C 0xBA / 0xB8 | base (`LPS22HB.cs`) |
-| MMA8451Q 3-axis accelerometer (U7, seen "MMA 451") | FRDM-KL05Z | I²C 0x1D | base (`MMA8451.cs`) |
+| MMA8451Q 3-axis accelerometer (U7, seen "MMA 451") | FRDM-KL05Z | I²C 0x1D | done (`Sensors.MMA8451Q`: real register map, 2/4/8 g, fast read) |
 | MP34DT01 PDM MEMS microphones ×2 (seen) | STM32L496G-DISCO | DFSDM / SAI PDM | new |
 | Capacitive touch slider (TSI electrodes) | FRDM-KL05Z | TSI peripheral | new (part of the KL05 TSI model) |
 | Touch-sensing linear slider (TSC electrodes) | STM32L0538-DISCO | TSC peripheral | done (STM32_TSC; TouchSensing_Linear passes) |
