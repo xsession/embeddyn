@@ -1,27 +1,71 @@
 {
   "name": "stm32l476",
-  "description": "Example profile for an Arm Cortex-M part (STM32L476): GNU Arm toolchain, CMSIS-SVD register map, Renode stm32l476 platform. Copy and adapt for other SVD-described MCUs.",
+  "description": "ST STM32L476xG (Cortex-M4F 80 MHz, 1 MB dual-bank flash, 96 KB SRAM1 + 32 KB SRAM2, segment LCD, 3 ADCs, 2 DACs, COMP, OPAMP, SWPMI, RNG): GNU Arm toolchain with the STM32CubeL4 HAL/LL, Renode stm32l476 platform (board NUCLEO-L476RG)",
   "env_defaults": {
     "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeL4",
     "SVD_DIR": "/opt/svd",
     "RENODE_ROOT": "/opt/renode"
   },
   "toolchain": {
     "cc": "${ARM_BIN}/arm-none-eabi-gcc",
-    "cflags": ["-mcpu=cortex-m4", "-mthumb", "-O1", "-nostartfiles"],
-    "cflags_post": [],
+    "cflags": [
+      "-mcpu=cortex-m4",
+      "-mthumb",
+      "-mfpu=fpv4-sp-d16",
+      "-mfloat-abi=hard",
+      "-Os",
+      "-g",
+      "-DSTM32L476xx",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32L4xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32L4xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
     "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
-    "objdump": "${ARM_BIN}/arm-none-eabi-objdump"
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with a STM32L476RGTx_FLASH.ld and startup_stm32l476xx.s from a Cube example (Projects/NUCLEO-L476RG/Templates/SW4STM32). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree (sources, includes and defines from the example's SW4STM32 project)."
   },
   "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32L4xx/Include/stm32l476xx.h",
     "svd": "${SVD_DIR}/STM32L4x6.svd"
   },
   "image": {
-    "base": "0x0"
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x080FFFFF"
+    ],
+    "sram1": [
+      "0x20000000",
+      "0x20017FFF"
+    ],
+    "sram2": [
+      "0x10000000",
+      "0x10007FFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x5006FFFF"
+    ]
   },
   "renode": {
-    "platform": "platforms/cpus/stm32l476.repl",
+    "platform": "platforms/cpus/st/stm32l476.repl",
+    "board": "platforms/boards/st/nucleo_l476rg.repl",
     "pc_command": "cpu PC",
-    "vector_skip_traps": 0
+    "notes": "Board: platforms/boards/st/nucleo_l476rg.repl (LD2 PA5 = led2, B1 PC13 = sysbus.gpioPortC.userButton, active low, VCP usart2). SRAM2 is also aliased at 0x20018000. The CPU runs at PerformanceInMips 80; LL code that busy-polls SysTick (LL_mDelay) is MMIO-bound, so 'cpu PerformanceInMips 10' makes such firmware about ten times faster to emulate. DMA requests go through dmaRouter (STM32L4_DMARequestRouter, CSELR of DMA1/DMA2); timer channels drive their alternate-function pins; EXTICR lives in extiMux. ADC: 'adc1 SetVoltage 1650000 0' (microvolts, channel). UART input: 'usart2 WriteChar 0x31'. Test fixtures: tools/stm32cube/fixtures (lsi_tim16_l4.repl feeds the 32 kHz LSI to TIM16 for the IWDG examples' LSI measurement). Not modelled: ADC2/ADC3 (dual mode), COMP/OPAMP analog behaviour, the firewall, SWPMI, USB OTG FS, RTC tamper and backup registers above BKP19, controller-to-controller I2C/SPI wiring. Docs: tools/stm32cube/README.md (examples_l476.txt)."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeL4 examples (tools/stm32cube/run_examples.py with examples_l476.txt in the Renode tree)"
   }
 }
