@@ -300,6 +300,38 @@ def test_build_and_run_nrf51_periph(tmp_path):
     assert "nRF51 OK" in res["uart"]["uart0"], res
 
 
+def test_esp8266_profile(monkeypatch):
+    monkeypatch.setenv("RENODE_ROOT", "/r")
+    monkeypatch.setenv("XTENSA_LX106_BIN", "/x")
+    p = tools.load_profile("esp8266")
+    assert p["toolchain"]["cc"] == "/x/xtensa-lx106-elf-gcc"
+    assert "-T/r/tools/esp8266/tests/esp8266.ld" in p["toolchain"]["cflags"]
+    assert p["toolchain"]["cflags_post"][0] == "/r/tools/esp8266/tests/crt0.S"
+    assert p["renode"]["platform"] == "platforms/cpus/espressif/esp8266.repl"
+
+
+needs_esp8266 = pytest.mark.skipif(not (os.environ.get("XTENSA_LX106_BIN") and os.environ.get("RENODE_BIN")
+                                        and os.environ.get("RENODE_ROOT") and shutil.which("dotnet")),
+                                   reason="XTENSA_LX106_BIN, RENODE_BIN, RENODE_ROOT and dotnet needed")
+
+
+@needs_esp8266
+def test_build_and_run_esp8266_periph(tmp_path):
+    root = Path(os.environ["RENODE_ROOT"])
+    b = tools.build_firmware("esp8266", str(root / "tools/esp8266/tests/periph.c"), out_dir=str(tmp_path))
+    assert b["ok"], b
+    nm = subprocess.run([str(Path(os.environ["XTENSA_LX106_BIN"]) / "xtensa-lx106-elf-nm"), b["elf"]], capture_output=True,
+                        text=True).stdout
+    r = int(re.search(r"^([0-9a-f]{8}) [bB] r$", nm, re.M).group(1), 16)
+    res = tools.renode_run("platforms/cpus/espressif/esp8266.repl", b["load_commands"], run_for="0.01",
+                           before=["gpio Wire 2 4"], uart=["uart0"], reads=[f"0x{r + 4 * i:X}:32" for i in range(3, 12)])
+    # 5 FRC1 interrupts; CCOUNT/FRC2 = 16; CCOMPARE once, on time; flash read back by command and through the cache;
+    # RTC scratch; last MAC byte; all passed
+    assert list(res["reads"].values()) == ["0x00000005", "0x00000010", "0x00000001", "0x00000001", "0x9ABCDEF0",
+                                           "0xEDCBA987", "0x00C0FFEE", "0x00000056", "0x00000001"], res
+    assert "ESP8266 OK" in res["uart"]["uart0"], res
+
+
 def test_concerto_profiles(monkeypatch):
     monkeypatch.setenv("RENODE_ROOT", "/r")
     monkeypatch.setenv("C2000_CGT", "/cgt")

@@ -39,7 +39,9 @@ The agent kit packages that workflow so that an agent running a 27B-class open m
   cores; `build_firmware` makes bare-metal programs with the start-up in the Renode tree, Pico SDK
   programs build with CMake; load the behavioural boot ROM `tools/rp2040/bootrom/rp2040_bootrom.elf`
   before the program), the nRF51822 (GNU Arm with the nRF5 SDK 12.3 MDK; run with a 10 us quantum; load the
-  S130 SoftDevice HEX too for SoftDevice applications), plus an STM32L476 example for
+  S130 SoftDevice HEX too for SoftDevice applications), the ESP8266 (xtensa-lx106-elf GCC; bare-metal programs load
+  directly, ESP8266_RTOS_SDK applications boot from a flash image through the behavioural boot ROM
+  `tools/esp8266/bootrom/esp8266_bootrom.elf`), plus an STM32L476 example for
   SVD-described parts. Add your own in `$MCU_EMU_PROFILES`.
 
 ## Install

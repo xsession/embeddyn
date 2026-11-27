@@ -1,0 +1,78 @@
+{
+  "name": "esp8266",
+  "description": "Espressif ESP8266EX (Tensilica L106, 80/160 MHz, 96 KB DRAM, 64 KB IRAM, external SPI flash, WiFi): xtensa-lx106-elf GCC with ESP8266_RTOS_SDK v3.4, Renode ESP8266 models with a behavioural boot ROM",
+  "env_defaults": {
+    "XTENSA_LX106_BIN": "/opt/xtensa-lx106-elf/bin",
+    "IDF_PATH": "/opt/ESP8266_RTOS_SDK",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${XTENSA_LX106_BIN}/xtensa-lx106-elf-gcc",
+    "cflags": [
+      "-O1",
+      "-g",
+      "-mlongcalls",
+      "-mtext-section-literals",
+      "-nostdlib",
+      "-ffreestanding",
+      "-T${RENODE_ROOT}/tools/esp8266/tests/esp8266.ld"
+    ],
+    "cflags_post": [
+      "${RENODE_ROOT}/tools/esp8266/tests/crt0.S",
+      "-lgcc"
+    ],
+    "objcopy": "${XTENSA_LX106_BIN}/xtensa-lx106-elf-objcopy",
+    "objdump": "${XTENSA_LX106_BIN}/xtensa-lx106-elf-objdump",
+    "notes": "build_firmware makes bare-metal programs with the start-up and layout in the Renode tree (tools/esp8266/tests/crt0.S and esp8266.ld: code in IRAM at 0x40100000, data in DRAM, level-1 interrupts call isr(EXCCAUSE)); tools/esp8266/tests/periph.c is a register-level example. SDK applications build with the SDK's make (tools/esp8266/examples/build_examples.sh, which also writes flash.bin with bootloader, partition table and app)."
+  },
+  "files": {
+    "header": "${IDF_PATH}/components/esp8266/include/esp8266/eagle_soc.h"
+  },
+  "image": {
+    "base": "0x40100000",
+    "loader": "sysbus LoadELF @{elf}",
+    "notes": "Bare-metal ELFs load directly (the PC is set to their entry). SDK applications boot like the chip: load the boot ROM ({kind: elf, path: ${RENODE_ROOT}/tools/esp8266/bootrom/esp8266_bootrom.elf}) and the 4 MB flash image with 'flash LoadBinary @flash.bin 0x0'; the ROM loads the 2nd-stage bootloader from flash offset 0, which starts the app."
+  },
+  "memory": {
+    "dport": [
+      "0x3FF00000",
+      "0x3FF000FF"
+    ],
+    "wdev": [
+      "0x3FF20000",
+      "0x3FF21FFF"
+    ],
+    "dram": [
+      "0x3FFE8000",
+      "0x3FFFFFFF"
+    ],
+    "rom": [
+      "0x40000000",
+      "0x4000FFFF"
+    ],
+    "iram": [
+      "0x40100000",
+      "0x4010FFFF"
+    ],
+    "flash": [
+      "0x40200000",
+      "0x405FFFFF"
+    ],
+    "peripherals": [
+      "0x60000000",
+      "0x60000FFF"
+    ],
+    "rtcmem": [
+      "0x60001000",
+      "0x60001FFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/espressif/esp8266.repl",
+    "pc_command": "cpu PC",
+    "notes": "SDK apps print on uart0 at the SDK's console baud rate (74880 by default); 'uart0 CreateFileBackend @file true', input 'uart0 WriteChar <byte>'. Pins: 'gpio PinLevel <n>', 'gpio RecordPin <n>' then 'gpio PinEdges <n>', 'gpio OnGPIO <n> true|false' drives an input, 'gpio Wire <from> <to>' makes a jumper (GPIO16 included). ADC: 'sar Voltage <V>' on TOUT (0-1 V). Bit-banged I2C: 'machine LoadPlatformDescriptionFromString \"i2c: ESP8266.ESP8266_SoftI2C @ gpio { gpio: gpio; scl: 2; sda: 14 }\"' then devices such as 'mpu: Sensors.MPU6050 @ i2c 0x68'. HSPI devices attach to spi1. The eFuse MAC is 5C:CF:7F:12:34:56 ('dport SetEfuse'). No WiFi radio, deep sleep, I2S DMA, or second-megabyte OTA mapping. Docs: tools/esp8266/README.md and PERIPHERALS.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with ESP8266_RTOS_SDK v3.4 examples (tools/esp8266/examples/run_examples.py, examples.txt) and tools/esp8266/tests/periph.c"
+  }
+}
