@@ -133,6 +133,7 @@ nav:
       - ngspice adapter: reference/ngspice.md
       - MuJoCo adapter: reference/mujoco.md
       - Light-curtain bench and Webots: reference/light-curtain-bench.md
+      - Multi-board buses, radios and analyzer: reference/multiboard-comms.md
       - Instances and FMI: reference/instances-and-fmi.md
       - Metrics and tuning: reference/tuning.md
       - Tolerance analysis: reference/tolerance.md

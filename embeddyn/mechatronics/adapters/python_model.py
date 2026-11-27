@@ -67,8 +67,13 @@ class PythonModelAdapter(SimulatorAdapter):
 
     def __init__(self, model: str, root: str | None = None, parameters: Mapping[str, Any] | None = None,
                  inputs: Mapping[str, str] | None = None, outputs: Mapping[str, str] | None = None,
-                 max_step: float = 1e-4) -> None:
+                 max_step: float = 1e-4, events: Mapping[str, str] | None = None,
+                 subscribe: Mapping[str, str] | None = None) -> None:
         self.model = model
+        # Event ports (CAN frames, radio packets...): plant port -> event topic.
+        self.event_map = dict(events or {})          # outgoing: plant.pop_events() -> [(t, port, payload)]
+        self.subscribe_map = dict(subscribe or {})   # incoming: plant.receive(t, port, payload)
+        self._inbox: list[tuple[float, str, Any]] = []
         self.root = Path(root) if root else None
         self.parameter_spec = dict(parameters or {})
         self.input_map = dict(inputs or {})      # plant input name -> project signal
@@ -84,6 +89,10 @@ class PythonModelAdapter(SimulatorAdapter):
         unknown_out = set(self.output_map) - set(getattr(plant_class, "outputs", ()))
         if unknown_in or unknown_out:
             raise ValueError(f"{model}: unknown plant inputs {sorted(unknown_in)} / outputs {sorted(unknown_out)}")
+        unknown_events = (set(self.event_map) - set(getattr(plant_class, "event_outputs", ()))) | \
+            (set(self.subscribe_map) - set(getattr(plant_class, "event_inputs", ())))
+        if unknown_events:
+            raise ValueError(f"{model}: unknown event ports {sorted(unknown_events)}")
         self.plant_class = plant_class
 
     def _resolve_parameters(self, values: Mapping[str, float]) -> dict[str, Any]:
@@ -107,10 +116,31 @@ class PythonModelAdapter(SimulatorAdapter):
             raise ValueError(f"{self.model}: initial_state has {len(self.state)} values for {len(self.plant.states)} states")
         self.time = 0.0
 
+    @property
+    def subscribed_topics(self) -> set[str]:
+        return set(self.subscribe_map.values())
+
+    def receive_events(self, events: list[Any]) -> None:
+        """Events published by other instances on subscribed topics (see the orchestrator)."""
+        ports: dict[str, list[str]] = {}
+        for port, topic in self.subscribe_map.items():
+            ports.setdefault(topic, []).append(port)
+        for event in events:
+            for port in ports.get(event.topic, []):
+                self._inbox.append((float(event.time_seconds), port, event.payload))
+
     def step(self, time_seconds: float, step_seconds: float, inputs: Mapping[str, float]) -> StepResult:
         if self.plant is None:
             raise RuntimeError("python model adapter is not started")
         u = self._plant_inputs(inputs)
+        receive = getattr(self.plant, "receive", None)
+        if self._inbox and receive is not None:
+            for t_event, port, payload in sorted(self._inbox, key=lambda item: item[0]):
+                receive(t_event, port, payload)
+        self._inbox.clear()
+        advance = getattr(self.plant, "advance", None)
+        if advance is not None:                  # discrete-event plants: timers between the step's ends
+            advance(self.time, float(time_seconds), u)
         span = float(time_seconds) - self.time
         substeps = max(1, math.ceil(span / self.max_step - 1e-9)) if span > 0 else 0
         h = span / substeps if substeps else 0.0
@@ -126,8 +156,18 @@ class PythonModelAdapter(SimulatorAdapter):
             raise FloatingPointError(f"{self.model}: state diverged at t={t:.6g}; reduce max_step")
         self.state, self.time = x, float(time_seconds)
         plant_outputs = self.plant.output(self.time, self.state, u)
+        diagnostics: dict[str, Any] = {"substeps": substeps}
+        pop = getattr(self.plant, "pop_events", None)
+        if pop is not None:
+            events = []
+            for t_event, port, payload in pop():
+                topic = self.event_map.get(port)
+                if topic is not None:
+                    events.append({"time_seconds": float(t_event), "topic": topic, "payload": payload})
+            if events:
+                diagnostics["events"] = events
         return StepResult({signal: float(plant_outputs[name]) for name, signal in self.output_map.items()},
-                          {"substeps": substeps})
+                          diagnostics)
 
     def checkpoint(self) -> object:
         return {"time": self.time, "state": list(self.state)}

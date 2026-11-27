@@ -164,6 +164,13 @@ def make_handler(state: LabState):
                                        "renode": bool(os.environ.get("RENODE_BIN"))})
                 if url.path == "/api/session":
                     return self._json(state.session(query.get("session", "")).info())
+                if url.path == "/api/analyzer":
+                    return self._json(_analyzer_rows(state.session(query.get("session", "")), int(query.get("from", 0))))
+                if url.path == "/api/pcap":
+                    session = state.session(query.get("session", ""))
+                    return self._send(200, _pcap(session, query.get("proto", "can")), "application/vnd.tcpdump.pcap",
+                                      {"Content-Disposition": f'attachment; filename="run-{session.id}-'
+                                                              f'{query.get("proto", "can")}.pcap"'})
                 if url.path == "/api/csv":
                     session = state.session(query.get("session", ""))
                     return self._send(200, session.csv().encode(), "text/csv",
@@ -379,6 +386,55 @@ def make_handler(state: LabState):
             self._send(200, file.read_bytes(), content_type + ("; charset=utf-8" if content_type.startswith("text") else ""))
 
     return Handler
+
+
+def _analyzer_config(session: RunSession) -> dict[str, Any]:
+    metadata = ((session.graph.get("extra") or {}).get("metadata") or {})
+    return dict(metadata.get("analyzer") or {})
+
+
+def _analyzer_rows(session: RunSession, start: int) -> dict[str, Any]:
+    """Decoded bus and radio packets of a run, from packet `start` on (decoded once, cached on the session)."""
+    from ..comms.analyzer import decode_event
+    config = _analyzer_config(session)
+    topics = set(config.get("topics") or [])
+    cache = session.__dict__.setdefault("_analyzer", {"rows": [], "cursor": 0, "lock": threading.Lock()})
+    with cache["lock"]:
+        return _decode_new(session, cache, config, topics, start, decode_event)
+
+
+def _decode_new(session: RunSession, cache: dict[str, Any], config: dict[str, Any], topics: set[str], start: int,
+                decode_event: Any) -> dict[str, Any]:
+    status = session.info().get("status")                # before reading: a finished run has no more events
+    events, cursor = session.events_since(cache["cursor"])
+    # Keep the list in time order: hold back events that are newer than what the run has finished.
+    events = sorted(cache.pop("held", []) + list(events), key=lambda event: float(event.get("time_seconds", 0.0)))
+    if status not in {"done", "stopped", "error"} and events:
+        horizon = float(events[-1].get("time_seconds", 0.0)) - 0.002
+        cache["held"] = [e for e in events if float(e.get("time_seconds", 0.0)) > horizon]
+        events = [e for e in events if float(e.get("time_seconds", 0.0)) <= horizon]
+    for event in events:
+        if topics and event.get("topic") not in topics:
+            continue
+        row = decode_event(event, config)
+        if row is not None:
+            row["no"] = len(cache["rows"]) + 1
+            row["source_instance"] = event.get("source")
+            cache["rows"].append(row)
+    cache["cursor"] = cursor
+    return {"packets": cache["rows"][start:], "total": len(cache["rows"]), "status": status,
+            "pending": len(cache.get("held", []))}
+
+
+def _pcap(session: RunSession, proto: str) -> bytes:
+    import io
+    from ..comms.analyzer import write_pcap
+    config = _analyzer_config(session)
+    topics = set(config.get("topics") or [])
+    events = [e for e in session.events_since(0)[0] if not topics or e.get("topic") in topics]
+    buffer = io.BytesIO()
+    write_pcap(events, buffer, proto)
+    return buffer.getvalue()
 
 
 def serve(project: Path | None = None, host: str = "127.0.0.1", port: int = 8710) -> ThreadingHTTPServer:

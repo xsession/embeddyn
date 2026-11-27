@@ -76,6 +76,8 @@ def python_model_kwargs(project: MechatronicProject, cfg) -> dict:
         "inputs": dict(options.get("inputs", {})),
         "outputs": dict(options.get("outputs", {})),
         "max_step": float(options.get("max_step", project.step_seconds / 10)),
+        "events": dict(options.get("events") or {}),
+        "subscribe": dict(options.get("subscribe") or {}),
     }
 
 

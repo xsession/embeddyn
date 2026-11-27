@@ -29,6 +29,10 @@ class CoSimulationOrchestrator:
         self.manager = AdapterManager(self.adapters, self.instance_domains)
         self.scheduler = build_scheduler(project.scheduler, self.entries)
         self.events = EventQueue()
+        # Every published event with the instance that published it, for delivery to subscribers
+        # (adapters with `receive_events`); each instance reads from its own cursor.
+        self._event_log: list[tuple[str, Any]] = []
+        self._event_cursor: dict[str, int] = {}
         self.values: dict[str, Any] = {name: signal.initial for name, signal in project.signals.items()}
         self.history: dict[str, deque[float]] = {
             name: deque([float(signal.initial)], maxlen=self._max_delay_for(name) + 2)
@@ -190,6 +194,7 @@ class CoSimulationOrchestrator:
         adapter = self.adapters.get(instance)
         if adapter is None:
             return
+        self._deliver_events(instance, adapter)
         result = adapter.step(now, step_seconds, self._adapter_inputs())
         self.activation_count[instance] += 1
         for name, value in result.outputs.items():
@@ -199,12 +204,14 @@ class CoSimulationOrchestrator:
             elif signal.kind is SignalKind.EVENT:
                 if value is not None:
                     event = self.events.publish(now, name, value, adapter.name)
+                    self._event_log.append((instance, event))
                     writer = getattr(self, "_event_writer", None)
                     if writer is not None:
                         writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload, "source": event.source})
             elif signal.kind is SignalKind.BUS:
                 self.values[name] = value
                 event = self.events.publish(now, name, value, adapter.name)
+                self._event_log.append((instance, event))
                 writer = getattr(self, "_bus_writer", None)
                 if writer is not None:
                     writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload, "source": event.source})
@@ -215,9 +222,30 @@ class CoSimulationOrchestrator:
         diagnostics = result.diagnostics or {}
         for event in diagnostics.get("events", []):
             published = self.events.publish(float(event.get("time_seconds", now)), str(event["topic"]), event.get("payload"), adapter.name)
+            self._event_log.append((instance, published))
             writer = getattr(self, "_event_writer", None)
             if writer is not None:
                 writer.append({"time_seconds": published.time_seconds, "topic": published.topic, "payload": published.payload, "source": published.source})
+
+    def _deliver_events(self, instance: str, adapter: Any) -> None:
+        """Hand an adapter the events other instances published since its last activation."""
+        deliver = getattr(adapter, "receive_events", None)
+        if deliver is None:
+            return
+        topics = getattr(adapter, "subscribed_topics", None)
+        start = self._event_cursor.get(instance, 0)
+        fresh = [event for source, event in self._event_log[start:]
+                 if source != instance and (topics is None or event.topic in topics)]
+        self._event_cursor[instance] = len(self._event_log)
+        if fresh:
+            deliver(fresh)
+        if len(self._event_log) > 50_000:              # drop what every subscriber has read
+            readers = [self._event_cursor.get(name, 0) for name, a in self.adapters.items()
+                       if getattr(a, "receive_events", None) is not None]
+            done = min(readers, default=len(self._event_log))
+            if done:
+                del self._event_log[:done]
+                self._event_cursor = {name: max(0, cursor - done) for name, cursor in self._event_cursor.items()}
 
     def _adapter_inputs(self) -> dict[str, Any]:
         parameters = {name: quantity.value for name, quantity in self.project.parameters.items()}

@@ -4,6 +4,7 @@ import { fit, render as renderSchematic, setShowValues, updateValues } from './s
 import { rebuild as rebuildInstruments, redrawAll, reveal } from './instruments.js';
 import { render as renderInspector } from './inspector.js';
 import { draw as drawScene } from './scene3d.js';
+import { onFrame as analyzerFrame, runStarted as analyzerRunStarted, setVisible as setAnalyzer } from './analyzer.js';
 import { fit as fitBreadboard, projectSaved, setActive as setBreadboard, updateLive as updateBreadboard, bb } from './breadboard.js';
 
 const $ = (id) => document.getElementById(id);
@@ -150,6 +151,7 @@ async function run() {
     const body = { graph: state.graph, mock: $('opt-mock').checked, realtime: $('opt-realtime').checked, speed: Number($('opt-speed').value) || 1 };
     const info = await api('run', body);
     data.reset(info.names || [], info.units || {});
+    analyzerRunStarted();
     loggedLines = 0;
     setStatus(info);
     log(`run ${info.session} started${body.mock ? ' (mock hardware)' : ''}`);
@@ -239,6 +241,7 @@ function frame() {
     if (document.activeElement !== slider) slider.value = Math.max(0, data.cursor);
     updateValues();
     if (bb.active) updateBreadboard();
+    analyzerFrame();
     redrawAll();
   }
   drawScene();
@@ -247,7 +250,8 @@ function frame() {
 
 function showDock(name) {
   document.querySelectorAll('#dock-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.dock === name));
-  for (const page of ['instruments', 'console', 'metrics']) $('dock-' + page).classList.toggle('hidden', page !== name);
+  for (const page of ['instruments', 'console', 'metrics', 'analyzer']) $('dock-' + page).classList.toggle('hidden', page !== name);
+  setAnalyzer(name === 'analyzer');
   if (name === 'console') $('console-badge').classList.add('hidden'), ($('console-badge').textContent = '0');
 }
 

@@ -89,6 +89,7 @@
       <button data-dock="instruments" class="active">Instruments</button>
       <button data-dock="console">Console <span id="console-badge" class="badge hidden">0</span></button>
       <button data-dock="metrics">Metrics</button>
+      <button data-dock="analyzer" title="Decoded CAN/CANopen, BLE and Wi-Fi traffic">Analyzer</button>
     </nav>
     <div class="timeline">
       <button id="btn-replay" title="Replay the recorded run">⟲ replay</button>
@@ -102,6 +103,27 @@
       from <i>Instruments</i> and wire signals to its channels. Sliders and switches from <i>Sources</i> appear here as live controls.</div></div>
   <div id="dock-console" class="dock-page hidden"><pre id="console"></pre></div>
   <div id="dock-metrics" class="dock-page hidden"><div id="metrics"></div></div>
+  <div id="dock-analyzer" class="dock-page hidden">
+    <div id="an-bar">
+      <label class="an-proto" style="--c:#e67e22"><input type="checkbox" id="an-p-CANopen" checked> CAN/CANopen <span id="an-c-CANopen">0</span></label>
+      <label class="an-proto" style="--c:#2f80d1"><input type="checkbox" id="an-p-BLE" checked> BLE <span id="an-c-BLE">0</span></label>
+      <label class="an-proto" style="--c:#27ae60"><input type="checkbox" id="an-p-80211" checked> Wi-Fi <span id="an-c-80211">0</span></label>
+      <input id="an-filter" placeholder="filter: text · id==0x182 · src==gateway · type==SDO · ch==37 · rssi<-60">
+      <label class="small" title="Select the packet at the run's time cursor while scrubbing or replaying"><input type="checkbox" id="an-sync" checked> follow cursor</label>
+      <span id="an-count" class="small"></span>
+      <span class="small">pcap:</span>
+      <a id="an-pcap-can" class="button" download>CAN</a><a id="an-pcap-ble" class="button" download>BLE</a><a id="an-pcap-wifi" class="button" download>Wi-Fi</a>
+    </div>
+    <canvas id="an-lanes" title="One lane per sender; click to jump to a packet"></canvas>
+    <div id="an-main">
+      <div id="an-list" tabindex="0">
+        <div class="an-head"><span class="c-no">No.</span><span class="c-t">Time [s]</span><span class="c-proto">Proto</span><span class="c-src">Source</span><span class="c-dst">Destination</span><span class="c-len">Len</span><span class="c-info">Info</span></div>
+        <div id="an-rows"></div>
+      </div>
+      <div id="an-tree"></div>
+      <div id="an-hex"></div>
+    </div>
+  </div>
 </section>
 
 <div id="modal" class="modal hidden"><div class="modal-box"><div class="modal-head"><span id="modal-title"></span>

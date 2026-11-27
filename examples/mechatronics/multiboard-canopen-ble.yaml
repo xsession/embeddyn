@@ -1,0 +1,165 @@
+name: multiboard-canopen-ble
+step_seconds: 5.0e-4
+duration_seconds: 2.0
+metadata:
+  description: >
+    Four boards on one CAN bus (500 kbit/s) talk CANopen: a master boots the
+    network (SDO reads of device type and name, heartbeat configuration, NMT
+    start), sends SYNC every 10 ms and the axis set-point; the axis node reports
+    status and position on SYNC; a sensor node reports distance and a rising
+    temperature and raises an EMCY when it overheats; a gateway node listens and
+    advertises the system status over BLE. An ESP32-style bridge scans the BLE
+    advertisements and forwards them over Wi-Fi (UDP JSON) to an access point.
+    Open it in the Lab and run: the Analyzer tab decodes CANopen, BLE and 802.11.
+  # Decoder settings for the Lab's analyzer.
+  analyzer:
+    topics: [can, ble, wifi]
+    can: {bitrate: 500000}
+    canopen:
+      master: 1                   # SDO client: responses are addressed to it
+      nodes: {1: master, 2: axis, 3: sensor, 4: gateway}
+      pdos:
+        "0x182":
+          name: axis TPDO1
+          fields:
+            - {name: status, format: u16, bits: {0: ready, 1: switched on, 2: enabled, 10: target reached}}
+            - {name: position, format: i32, scale: 0.001, unit: mm}
+        "0x282":
+          name: axis TPDO2
+          fields:
+            - {name: velocity, format: i32, scale: 0.001, unit: mm/s}
+            - {name: current, format: i16, scale: 0.001, unit: A}
+        "0x202":
+          name: axis RPDO1 set-point
+          fields:
+            - {name: target, format: i32, scale: 0.001, unit: mm}
+            - {name: controlword, format: u16}
+        "0x183":
+          name: sensor TPDO1
+          fields:
+            - {name: distance, format: u16, unit: mm}
+            - {name: temperature, format: i16, scale: 0.1, unit: degC}
+    ble:
+      devices: {"C0:FF:EE:00:00:04": gateway}
+      manufacturer:
+        "0xFFFF":
+          name: gateway status
+          fields:
+            - {name: version, format: u8, summary: false}
+            - {name: operational, format: u8, bits: {0: master, 1: axis, 2: sensor, 3: gateway}, summary: false}
+            - {name: position, format: i32, scale: 0.001, unit: mm}
+            - {name: temperature, format: i16, scale: 0.1, unit: degC}
+            - {name: distance, format: u16, unit: mm}
+            - {name: flags, format: u8, bits: {0: EMCY active}}
+            - {name: counter, format: u8, summary: false}
+    wifi:
+      stations: {"02:00:00:00:00:01": ap, "24:0A:C4:00:00:05": bridge}
+
+instances:
+  setpoint:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: square, amplitude: 40.0, offset: 60.0, frequency: 1.0}
+      outputs: {value: master.target_mm}
+  target:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: sine, amplitude: 120.0, offset: 400.0, frequency: 1.5}
+      outputs: {value: sensor.distance_mm}
+  can:
+    domain: electrical
+    model: embeddyn.mechatronics.comms.can:CanBus
+    options:
+      backend: python
+      parameters: {bitrate: 500000}
+      outputs: {load: can.load, load_avg: can.load_avg, frames: can.frames}
+      subscribe: {tx: can.tx}
+      events: {wire: can}
+  master:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:CanopenMaster
+    options:
+      backend: python
+      parameters: {node_id: 1, nodes: [2, 3, 4], sync_ms: 10.0}
+      inputs: {target_mm: master.target_mm}
+      outputs: {nmt_state: master.nmt_state, nodes_operational: master.nodes_operational,
+                axis_position_mm: master.axis_position_mm, temperature_c: master.temperature_c}
+      events: {can_tx: can.tx}
+      subscribe: {can_rx: can}
+  axis:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:AxisNode
+    options:
+      backend: python
+      parameters: {node_id: 2}
+      outputs: {position_mm: axis.position_mm, velocity_mm_s: axis.velocity_mm_s, current_a: axis.current_a}
+      events: {can_tx: can.tx}
+      subscribe: {can_rx: can}
+  sensor:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:SensorNode
+    options:
+      backend: python
+      parameters: {node_id: 3, temp_limit: 60.0}
+      inputs: {distance_mm: sensor.distance_mm}
+      outputs: {temperature_c: sensor.temperature_c, overtemp: sensor.overtemp}
+      events: {can_tx: can.tx}
+      subscribe: {can_rx: can}
+  gateway:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:BleGateway
+    options:
+      backend: python
+      parameters: {node_id: 4, interval_ms: 100.0, rssi: -62.0}
+      outputs: {adv_count: gateway.adv_count}
+      events: {can_tx: can.tx, ble: ble}
+      subscribe: {can_rx: can}
+  bridge:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.boards:WifiBridge
+    options:
+      backend: python
+      parameters: {ssid: embeddyn-lab, channel: 6, report_ms: 250.0}
+      outputs: {wifi_state: bridge.wifi_state, ble_seen: bridge.ble_seen, udp_sent: bridge.udp_sent,
+                temperature_c: bridge.temperature_c}
+      events: {wifi_tx: wifi}
+      subscribe: {ble: ble, wifi_rx: wifi}
+  ap:
+    domain: environment
+    model: embeddyn.mechatronics.comms.boards:AccessPoint
+    options:
+      backend: python
+      parameters: {ssid: embeddyn-lab, channel: 6}
+      outputs: {stations: ap.stations}
+      events: {wifi_tx: wifi}
+      subscribe: {wifi_rx: wifi}
+
+signals:
+  master.target_mm: {domain: environment, unit: mm, initial: 0.0}
+  sensor.distance_mm: {domain: environment, unit: mm, initial: 400.0}
+  can.load: {domain: electrical, initial: 0.0}       # share of each 0.5 ms step the bus was busy
+  can.load_avg: {domain: electrical, initial: 0.0}   # 100 ms average
+  can.frames: {domain: electrical, initial: 0.0}
+  master.nmt_state: {domain: firmware, initial: -1.0}
+  master.nodes_operational: {domain: firmware, initial: 0.0}
+  master.axis_position_mm: {domain: firmware, unit: mm, initial: 0.0}
+  master.temperature_c: {domain: firmware, unit: degC, initial: 0.0}
+  axis.position_mm: {domain: firmware, unit: mm, initial: 0.0}
+  axis.velocity_mm_s: {domain: firmware, unit: mm/s, initial: 0.0}
+  axis.current_a: {domain: firmware, unit: A, initial: 0.0}
+  sensor.temperature_c: {domain: firmware, unit: degC, initial: 25.0}
+  sensor.overtemp: {domain: firmware, initial: 0.0}
+  gateway.adv_count: {domain: firmware, initial: 0.0}
+  bridge.wifi_state: {domain: firmware, initial: 0.0}
+  bridge.ble_seen: {domain: firmware, initial: 0.0}
+  bridge.udp_sent: {domain: firmware, initial: 0.0}
+  bridge.temperature_c: {domain: firmware, unit: degC, initial: 0.0}
+  ap.stations: {domain: environment, initial: 0.0}
+
+metrics:
+  bus_load: {type: stats, signal: can.load_avg}
+  axis: {type: stats, signal: axis.position_mm}
