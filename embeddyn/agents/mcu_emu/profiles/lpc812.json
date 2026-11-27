@@ -1,0 +1,57 @@
+{
+  "name": "lpc812",
+  "description": "NXP LPC812M101JDH20 (Cortex-M0+ 30 MHz, 16 KB flash, 4 KB SRAM, switch matrix, 3 USARTs, 2 SPIs, I2C, SCTimer/PWM, MRT, WKT, WWDT, analog comparator, CRC, boot ROM IAP): GNU Arm toolchain with the MCUXpresso SDK (mcux-sdk devices/LPC812), Renode lpc812 platform (board LPCXpresso812-MAX; all 29 SDK examples pass)",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "MCUX_SDK": "/opt/mcux-sdk",
+    "CMSIS": "/opt/CMSIS_5/CMSIS/Core/Include",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0plus",
+      "-mthumb",
+      "-mfloat-abi=soft",
+      "-Os",
+      "-g",
+      "-DCPU_LPC812M101JDH20",
+      "-I${MCUX_SDK}/devices/LPC812",
+      "-I${MCUX_SDK}/devices/LPC812/drivers",
+      "-I${CMSIS}",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Startup file devices/LPC812/gcc/startup_LPC812.S and a linker script from an example's armgcc folder (LPC812_flash.ld). Whole SDK examples build with tools/mcux/build_mcux.py in the Renode tree (sources, includes and flags from the example's CMake project and the SDK modules)."
+  },
+  "files": {
+    "header": "${MCUX_SDK}/devices/LPC812/LPC812.h"
+  },
+  "image": {
+    "base": "0x00000000",
+    "notes": "load the ELF; the vector table is at 0x00000000 (the boot ROM's checksum word at vector 7 is not checked)"
+  },
+  "memory": {
+    "flash": ["0x00000000", "0x00003FFF"],
+    "sram": ["0x10000000", "0x10000FFF"],
+    "rom": ["0x1FFF0000", "0x1FFF1FFF"],
+    "apb": ["0x40000000", "0x4007FFFF"],
+    "ahb": ["0x50000000", "0x50007FFF"],
+    "gpio": ["0xA0000000", "0xA0007FFF"]
+  },
+  "renode": {
+    "platform": "platforms/cpus/nxp/lpc812.repl",
+    "pc_command": "cpu PC",
+    "notes": "Board: platforms/boards/nxp/lpcxpresso812max.repl (RGB LED red PIO0_7 = gpio.ledRed, blue PIO0_16 = gpio.ledBlue, green PIO0_17 = gpio.ledGreen, active low; SW1 on PIO0_5 = gpio.sw1; debug console usart0). Clock tree: LPC8xx_SYSCON (IRC 12 MHz, PLL, main clock, SYSAHBCLKDIV to SysTick, U_PCLK with the fractional divider). Pins: 'sysbus.gpio OnGPIO 4 false' drives PIO0_4; movable functions reach pins through LPC8xx_SWM (SCT outputs CTOUT_0-3 = swm inputs 27-30, ACMP_O = 33). ACMP: 'sysbus.acmp SetInputVoltage 1 0.5' (ACMP_I1/I2). External bus masters for slave-mode firmware: 'sysbus.i2c0 MasterWrite 0x7E \"01 20 00\"', 'sysbus.i2c0 MasterWriteRead 0x7E \"01\" 32', 'sysbus.spi0 MasterTransfer \"00 01 02\"' (what they read is logged). IAP: the ROM at 0x1FFF0000 holds a stub at the IAP entry 0x1FFF1FF1 that calls LPC8xx_IAP. Deep power-down: WFI with PCON.PM = 3 and SLEEPDEEP; the next wake-up (WKT interrupt or the WAKEUP pin PIO0_4) resets with DPDFLAG set. Pattern match: PINT PMSRC/PMCFG/PMCTRL product terms, their PIN_INTn interrupts and GPIO_INT_BMAT (swm input 35). SCT inputs: CTIN_0-3 (swm functions 23-26) feed IO events and captures. I2C monitor: CFG.MONEN, MONRXDAT (START/NACK flags), MONIDLE; it also sees the scripted external master. ISP: IAP 57, or PIO0_12 low at a reset ('sysbus.gpio OnGPIO 12 false' then 'machine Reset'), halts the core and USART0 answers the ISP protocol ('?', 'Synchronized', clock, then U/B/A/W/R/P/C/E/I/J/K/M/N/S/G); 'G <addr> T' starts the core. Docs: tools/mcux/README.md (34 checks incl. tests/ programs)."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the MCUXpresso SDK examples for the LPCXpresso812-MAX (tools/mcux/run_mcux_examples.py with examples_lpc812.txt in the Renode tree)"
+  }
+}

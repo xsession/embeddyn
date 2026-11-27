@@ -31,7 +31,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | 14 | STM32L496G-DISCO (MB1261 B-01) | STM32L496AGI6 (seen) | done (`stm32l496` profile, board `st/stm32l496g_disco.repl`; STM32CubeL4 examples 17 pass / 18 skipped, no known gaps: LCD, camera, audio, USB OTG still to model) |
 | 15 | Arduino UNO Q (ABX00162) | Qualcomm QRB2210 (4× Cortex-A53, Linux) + STM32U585AII6 (seen) | U585: done (`stm32u585` profile; STM32CubeU5 examples on NUCLEO-U575ZI-Q 88 pass / 59 skipped, no known gaps, B-U585I-IOT02A 4 pass; UNO Q pin map still to add); QRB2210: new, Linux-class SoC |
 | 16 | STM32L0538-DISCO (MB1143 B-01) | STM32L053C8T6 (seen) | done (`stm32l053` profile, board `st/stm32l0538_disco.repl`; STM32CubeL0 examples 145 pass / 19 skipped, no known gaps, over this and NUCLEO-L053R8; e-paper still to model) |
-| 17 | LPCXpresso LPC812 rev A (with LPC-Link) | LPC812M101JDH20 (doc; marking under glare) | near (`nxp/lpc845.repl`) |
+| 17 | LPCXpresso LPC812 rev A (with LPC-Link) | LPC812M101JDH20 (doc; marking under glare) | done (`lpc812` profile, platform `nxp/lpc812.repl`; all 29 MCUXpresso SDK examples and 5 test programs (pattern match, SCT capture, I2C monitor, ISP) pass on the LPCXpresso812-MAX board file `nxp/lpcxpresso812max.repl`; a board file for this rev A layout still needs its pin map) |
 | 18 | FRDM-KL05Z | MKL05Z32VFM4 (seen "M05…") | done (`mkl05z32` profile, board `nxp/frdm_kl05z.repl`; Mbed OS 5.15 KL05Z HAL test programs 17 pass, every on-chip block modelled) |
 
 ## Secondary MCUs on the boards
@@ -65,7 +65,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | Capacitive touch panel controller (FT6x06-class, on LCD flex) | STM32L496G-DISCO | I²C | new |
 | Resistive/capacitive touch controller (on LCD flex) | SK-S7G2 | I²C | new |
 | Trim potentiometer (10 k, seen "WR10K") | YRPBRL78G13 | ADC input | covered by the ADC + signal source |
-| Trim potentiometer | LPCXpresso LPC812 | ADC / comparator input | covered by ACMP + signal source |
+| Trim potentiometer | LPCXpresso LPC812 | ADC / comparator input | done (`LPC8xx_ACMP` input voltage, `acmp SetInputVoltage`) |
 | Light sensor + thermistor (doc) | LP-MSPM0G3507 | ADC | covered by the MSPM0 ADC + signal source |
 
 ## Displays and light outputs
