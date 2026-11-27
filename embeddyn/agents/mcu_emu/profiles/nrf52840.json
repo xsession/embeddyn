@@ -1,0 +1,71 @@
+{
+  "name": "nrf52840",
+  "description": "Nordic nRF52840 (Cortex-M4F 64 MHz, 1 MB flash, 256 KB RAM, BLE/802.15.4 radio, USB, QSPI): GNU Arm toolchain with the nrfx drivers and MDK (from the nRF Connect SDK or the nrfx repository), Renode nRF52840 models",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "NRFX": "/opt/nrfx",
+    "CMSIS": "/opt/CMSIS/Core/Include",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m4",
+      "-mthumb",
+      "-mfpu=fpv4-sp-d16",
+      "-mfloat-abi=hard",
+      "-O1",
+      "-g",
+      "-DNRF52840_XXAA",
+      "-DNRF52_SERIES",
+      "-I${RENODE_ROOT}/tools/nrf52/glue",
+      "-I${NRFX}",
+      "-I${NRFX}/mdk",
+      "-I${NRFX}/hal",
+      "-I${NRFX}/drivers/include",
+      "-I${NRFX}/drivers",
+      "-I${CMSIS}",
+      "-nostartfiles",
+      "-ffunction-sections",
+      "-fdata-sections",
+      "-T${RENODE_ROOT}/tools/nrf52/glue/nrf52840.ld"
+    ],
+    "cflags_post": [
+      "${RENODE_ROOT}/tools/nrf52/glue/startup_nrf52840.c",
+      "${RENODE_ROOT}/tools/nrf52/glue/sample_support.c",
+      "${NRFX}/mdk/system_nrf52840.c",
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "-lc",
+      "-lgcc"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Bare-metal programs use the start-up in tools/nrf52/glue (vector table; interrupts go to the nrfx handler names such as nrfx_saadc_irq_handler, shared serial instances are dispatched by ENABLE). Add nrfx driver sources (${NRFX}/drivers/src/nrfx_<x>.c) as needed; the glue's nrfx_config.h enables all drivers. NRFX_LOG_* prints on UARTE1. Zephyr/NCS builds for nrf52840dk_nrf52840 also run (load zephyr.elf)."
+  },
+  "files": {
+    "svd": "${NRFX}/mdk/nrf52840.svd",
+    "header": "${NRFX}/mdk/nrf52840.h"
+  },
+  "image": {
+    "base": "0x0",
+    "notes": "load the ELF. Programs built for a SoftDevice or the Adafruit UF2 bootloader start at 0x1000/0x26000 and need their bootloader/SoftDevice image loaded too; prefer an application built without one (start at 0x0)."
+  },
+  "memory": {
+    "flash": ["0x00000000", "0x000FFFFF"],
+    "sram": ["0x20000000", "0x2003FFFF"],
+    "ficr": ["0x10000000", "0x10000FFF"],
+    "uicr": ["0x10001000", "0x10001FFF"],
+    "qspi_xip": ["0x12000000", "0x127FFFFF"],
+    "peripherals": ["0x40000000", "0x4002FFFF"],
+    "gpio": ["0x50000000", "0x50000AFF"]
+  },
+  "renode": {
+    "platform": "platforms/cpus/nordic/nrf52840.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/nordic/nrf52840dk_nrf52840.repl, platforms/boards/nordic/nrf52840_supermini.repl (LED P0.15). Serial instances twi0, twi1, spi2, spi3 are SPI/SPIM/SPIS/TWI/TWIM/TWIS by ENABLE; attach I2C devices with 'Sensors.X @ twi0 0x6A', one SPI device per instance. Analog: 'saadc SetInputVoltage <ain> <V>', 'comp SetInputVoltage <ain> <V>', or wire a GPIO output with 'gpio0: 31 -> saadc@1'. 'temp Temperature 30', 'qdec Rotate 10', 'clock VbusPresent true', 'clock SupplyVoltage 1.8'. Pins: add 'pins: Miscellaneous.PinRecorder @ gpio0 0' with connections 'gpio0:' / '    13 -> pins@13' (a .repl file), then 'sysbus.gpio0.pins Edges 13'; 'pwm0 Duty <ch>'. Jumpers of the nrfx samples: 'uart1 EnableLoopback', 'twi1 Loopback true', 'twi0 LinkTarget twi1'. QSPI flash is qspi_flash (MappedMemory at 0x12000000). Docs: tools/nrf52/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the nrfx samples (tools/nrf52/run_samples.py with samples_nrf52840.txt in the Renode tree)"
+  }
+}
