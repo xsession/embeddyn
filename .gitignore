@@ -18,3 +18,6 @@ examples/mechatronics/fmus/*.fmu
 
 # MkDocs build output
 site/
+
+# Webots per-world GUI state
+*.wbproj

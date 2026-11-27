@@ -21,6 +21,9 @@ All mechatronics commands live under `embeddyn mechatronics` (or `python -m embe
 | [`fmu-export`](#fmu-export) | Export a python plant as an FMI 3.0 co-simulation FMU (PythonFMU3), with state save/restore. |
 | [`fmu-check`](#fmu-check) | Validate an FMU (FMPy model-description checks) and run a short co-simulation. |
 | [`bindings-from-pinplan`](#bindings-from-pinplan) | Generate Renode GPIO/PWM/ADC bindings from a CodeLayer Forge pin plan. |
+| [`curtain-run`](#curtain-run) | Run a light-curtain scan algorithm against a scene (no Webots needed). |
+| [`curtain-sweep`](#curtain-sweep) | Sweep LED angle, intensity, algorithm, ... and tabulate the bench metrics. |
+| [`curtain-webots`](#curtain-webots) | Write a Webots world (IrLightCurtain PROTOs + light_curtain supervisor) for a bench file. |
 | [`doctor`](#doctor) | Report which external tools (Renode, ngspice, Webots, KiCad, LTspice) are found. |
 | [`kicad-export`](#kicad-export) | Export a KiCad schematic to a SPICE netlist with kicad-cli. |
 | [`kicad-plugin`](#kicad-plugin) | Create a KiCad IPC plugin skeleton that talks to the local Studio API. |
@@ -262,6 +265,48 @@ embeddyn mechatronics bindings-from-pinplan PLAN_FILE [OPTIONS]
 | `--output`, `-o` |  | Bindings YAML to write (default: stdout). |
 | `--merge` |  | Existing bindings whose non-pin entries (sysbus...) are kept. |
 | `--machine` |  |  |
+
+## curtain-run
+
+Run a light-curtain scan algorithm against a scene (no Webots needed).
+
+```text
+embeddyn mechatronics curtain-run BENCH_FILE [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--scenario` |  | static, approach, rod or orbit |
+| `--algorithm` |  | sequential, crossed, group or module:Class |
+| `--set`, `-p` |  | dotted.key=value, e.g. emitter.half_angle='20 deg' |
+| `--output`, `-o` |  | CSV of per-frame rows |
+
+## curtain-sweep
+
+Sweep LED angle, intensity, algorithm, ... and tabulate the bench metrics.
+
+```text
+embeddyn mechatronics curtain-sweep BENCH_FILE [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--grid`, `-g` |  | key=v1,v2,... (replaces the file's sweep) |
+| `--workers`, `-j` | `1` |  |
+| `--output`, `-o` |  | CSV with one row per variant |
+
+## curtain-webots
+
+Write a Webots world (IrLightCurtain PROTOs + light_curtain supervisor) for a bench file.
+
+```text
+embeddyn mechatronics curtain-webots BENCH_FILE [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--output`, `-o` |  | World file, in a Webots project's worlds/ folder |
+| `--arg` |  | extra controller argument |
 
 ## doctor
 

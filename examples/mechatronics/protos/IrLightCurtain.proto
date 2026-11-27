@@ -1,0 +1,104 @@
+#VRML_SIM R2025a utf8
+# template language: javascript
+# license: Apache License 2.0
+# keywords: industrial/sensor
+# An infrared light curtain: a rail of IR LEDs (LED devices "<prefix>em<k>")
+# facing a rail of photodiodes (LED devices "<prefix>rx<k>", lit while the
+# comparator sees light). Curtain frame: rails along x, light crosses along +y
+# from the emitter rail (y = -span/2) to the receiver rail (y = +span/2), the
+# curtain plane is z = 0.
+#
+# Only count, pitch, span, receiverOffset and prefix shape the geometry. The
+# optical fields are read live by the embeddyn "light_curtain" supervisor
+# controller (embeddyn/mechatronics/lightcurtain), so they can be changed in
+# the scene tree while the simulation runs: LED half angle, intensity or
+# total power, mounting tilt, scan algorithm.
+
+PROTO IrLightCurtain [
+  field SFVec3f    translation         0 0 0
+  field SFRotation rotation            0 0 1 0
+  field SFString   name                "curtain"
+  field SFString   prefix              "a_"     # device name prefix, one per curtain
+  field SFInt32    count               16       # LEDs (and photodiodes)
+  field SFFloat    pitch               0.024    # m between neighbours
+  field SFFloat    span                0.58     # m, emitter rail to receiver rail
+  field SFFloat    receiverOffset      0        # m, receiver row shifted along the rail
+  field SFFloat    emitterIntensity    0.01     # W/sr on axis (used when emitterPower is 0)
+  field SFFloat    emitterPower        0        # W total radiant flux; > 0 sets the intensity from the half angle
+  field SFFloat    emitterHalfAngle    10       # deg, half intensity
+  field SFFloat    emitterAperture     0.003    # m, lens diameter
+  field SFFloat    emitterDrive        1        # relative LED current
+  field SFFloat    emitterTilt         0        # deg, LEDs pitched about the rail (towards +z)
+  field SFFloat    emitterYaw          0        # deg, LEDs turned along the rail (towards +x)
+  field SFFloat    tiltSigma           0        # deg, random mounting error per LED
+  field SFFloat    intensitySpread     0        # relative sigma of LED intensity
+  field SFFloat    receiverHalfAngle   20       # deg, half sensitivity
+  field SFFloat    receiverArea        7e-6     # m^2
+  field SFFloat    receiverAperture    0.003    # m
+  field SFString   algorithm           "sequential"   # sequential | crossed | group | module:Class
+  field SFString   algorithmParams     "{}"     # JSON, e.g. {"reach": 2} or {"size": 4}
+  field SFBool     showBeams           TRUE     # the controller draws the beams of the algorithm
+  field SFBool     showCone            TRUE     # and the emission cone of the LED being scanned
+]
+{
+  %<
+    const n = fields.count.value;
+    const pitch = fields.pitch.value;
+    const span = fields.span.value;
+    const offset = fields.receiverOffset.value;
+    const prefix = fields.prefix.value;
+    const rail = (n - 1) * pitch + 0.03;
+  >%
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name
+    children [
+      Pose {
+        translation 0 %<= -span / 2 - 0.012 >% 0
+        children [
+          Shape {
+            appearance PBRAppearance { baseColor 0.12 0.12 0.13 roughness 0.6 metalness 0.2 }
+            geometry Box { size %<= rail >% 0.022 0.014 }
+          }
+        ]
+      }
+      Pose {
+        translation %<= offset >% %<= span / 2 + 0.012 >% 0
+        children [
+          Shape {
+            appearance PBRAppearance { baseColor 0.12 0.12 0.13 roughness 0.6 metalness 0.2 }
+            geometry Box { size %<= rail >% 0.022 0.014 }
+          }
+        ]
+      }
+      %< for (let k = 0; k < n; ++k) {
+           const x = (k - (n - 1) / 2) * pitch; >%
+      LED {
+        translation %<= x >% %<= -span / 2 >% 0
+        rotation 1 0 0 -1.5708
+        name "%<= prefix >%em%<= k >%"
+        color [ 1 0.15 0.1 ]
+        children [
+          Shape {
+            appearance PBRAppearance { baseColor 0.35 0.08 0.08 roughness 0.25 metalness 0 emissiveColor 0 0 0 }
+            geometry Cylinder { radius 0.0025 height 0.006 }
+          }
+        ]
+      }
+      LED {
+        translation %<= x + offset >% %<= span / 2 >% 0
+        rotation 1 0 0 1.5708
+        name "%<= prefix >%rx%<= k >%"
+        color [ 0.2 1 0.3 ]
+        children [
+          Shape {
+            appearance PBRAppearance { baseColor 0.08 0.1 0.3 roughness 0.25 metalness 0 emissiveColor 0 0 0 }
+            geometry Box { size 0.005 0.005 0.002 }
+          }
+        ]
+      }
+      %< } >%
+    ]
+  }
+}

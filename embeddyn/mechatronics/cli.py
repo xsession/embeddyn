@@ -462,6 +462,77 @@ def bindings_from_pinplan(
         raise typer.Exit(1)
 
 
+@mechatronics_app.command("curtain-run")
+def curtain_run(
+    bench_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Light-curtain bench YAML"),
+    scenario: Optional[str] = typer.Option(None, "--scenario", help="static, approach, rod or orbit"),
+    algorithm: Optional[str] = typer.Option(None, "--algorithm", help="sequential, crossed, group or module:Class"),
+    set_values: Optional[list[str]] = typer.Option(None, "--set", "-p", help="dotted.key=value, e.g. emitter.half_angle='20 deg'"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="CSV of per-frame rows"),
+) -> None:
+    """Run a light-curtain scan algorithm against a scene (no Webots needed)."""
+    from .lightcurtain.bench import load_bench, run_bench, set_path
+    raw = load_bench(bench_file)
+    if scenario:
+        raw["scenario"] = {**(raw.get("scenario") or {}), "type": scenario} if (raw.get("scenario") or {}).get("type") == scenario else {"type": scenario}
+    if algorithm:
+        set_path(raw, "scan.algorithm", algorithm)
+    for key, value in _key_values(set_values).items():
+        set_path(raw, key, value)
+    result = run_bench(raw)
+    if output:
+        rows = result["rows"]
+        keys = list(dict.fromkeys(k for row in rows for k in row))
+        import csv
+        with output.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(rows)
+    extra = {k: result[k] for k in ("approaches", "rods") if k in result}
+    typer.echo(json.dumps({"metrics": result["metrics"], **extra}, indent=2, default=float))
+
+
+@mechatronics_app.command("curtain-sweep")
+def curtain_sweep(
+    bench_file: Path = typer.Argument(..., exists=True, dir_okay=False, help="Bench YAML with a sweep: grid"),
+    grid: Optional[list[str]] = typer.Option(None, "--grid", "-g", help="key=v1,v2,... (replaces the file's sweep)"),
+    workers: int = typer.Option(1, "--workers", "-j"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="CSV with one row per variant"),
+) -> None:
+    """Sweep LED angle, intensity, algorithm, ... and tabulate the bench metrics."""
+    from .lightcurtain.bench import load_bench, sweep
+    raw = load_bench(bench_file)
+    table = None
+    if grid:
+        table = {}
+        for item in grid:
+            key, _, values = item.partition("=")
+            table[key.strip()] = [yaml.safe_load(v) for v in values.split(",")]
+    rows = sweep(raw, table, workers)
+    keys = list(dict.fromkeys(k for row in rows for k in row))
+    if output:
+        import csv
+        with output.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(rows)
+    typer.echo(json.dumps(rows, indent=2, default=float))
+
+
+@mechatronics_app.command("curtain-webots")
+def curtain_webots(
+    bench_file: Path = typer.Argument(..., exists=True, dir_okay=False),
+    output: Path = typer.Option(..., "--output", "-o", help="World file, in a Webots project's worlds/ folder"),
+    controller_args: Optional[list[str]] = typer.Option(None, "--arg", help="extra controller argument"),
+) -> None:
+    """Write a Webots world (IrLightCurtain PROTOs + light_curtain supervisor) for a bench file."""
+    from .lightcurtain.webots_world import write_world
+    path = write_world(bench_file, output, controller_args)
+    protos = path.resolve().parent.parent / "protos" / "IrLightCurtain.proto"
+    controller = path.resolve().parent.parent / "controllers" / "light_curtain" / "light_curtain.py"
+    typer.echo(json.dumps({"world": str(path), "proto_found": protos.exists(), "controller_found": controller.exists()}, indent=2))
+
+
 @mechatronics_app.command("doctor")
 def doctor() -> None:
     tools = {name: shutil.which(name) for name in ("webots", "ngspice", "ltspice", "kicad-cli", "renode")}

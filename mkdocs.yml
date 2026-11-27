@@ -132,6 +132,7 @@ nav:
       - Renode adapter: reference/renode.md
       - ngspice adapter: reference/ngspice.md
       - MuJoCo adapter: reference/mujoco.md
+      - Light-curtain bench and Webots: reference/light-curtain-bench.md
       - Instances and FMI: reference/instances-and-fmi.md
       - Metrics and tuning: reference/tuning.md
       - Tolerance analysis: reference/tolerance.md

@@ -204,10 +204,11 @@ class LightCurtain:
         power = transmittance * o.intensity * cos_e ** self._me * o.receiver_area * cos_r ** self._mr / distance ** 2
         return BeamReading(transmittance, power, o.responsivity * power)
 
-    def target_voltage(self, current: float, time: float) -> float:
+    def target_voltage(self, current: float, time: float, receivers: int = 1) -> float:
+        """Settled amplifier output for signal photocurrent `current`; `receivers` photodiodes share the node."""
         o = self.optics
         flicker = 1.0 + o.ambient_flicker * math.sin(2 * math.pi * o.flicker_hz * time)
-        ambient = o.responsivity * o.ambient * flicker * o.receiver_area
+        ambient = o.responsivity * o.ambient * flicker * o.receiver_area * max(1, receivers)
         shot = math.sqrt(2 * ELECTRON * (current + ambient) * o.bandwidth)
         noise = math.hypot(shot * o.gain, o.noise_floor)
         return o.offset + o.gain * (current + ambient * o.ambient_rejection) + self._rng.gauss(0.0, noise)
@@ -216,7 +217,16 @@ class LightCurtain:
                cast_from: RaycastFrom | None = None, transmittance: float | None = None) -> BeamReading | None:
         """Advance the multiplexer output by `dt` with `beam` selected (None: emitters off)."""
         reading = self.read_beam(beam, raycast, cast_from, transmittance) if beam is not None else None
-        target = self.target_voltage(reading.current if reading else 0.0, time)
+        self.drive(reading.current if reading else 0.0, time, dt)
+        return reading
+
+    def drive(self, current: float, time: float, dt: float, receivers: int = 1) -> float:
+        """Advance the receiver node by `dt` with signal photocurrent `current`; returns the voltage.
+
+        First-order settling towards the amplifier output (time constant `tau`), clamped to
+        the rails, then the Schmitt-trigger comparator.
+        """
+        target = self.target_voltage(current, time, receivers)
         alpha = 1.0 if self.optics.tau <= 0 else 1.0 - math.exp(-dt / self.optics.tau)
         self.voltage += (target - self.voltage) * alpha
         self.voltage = min(max(self.voltage, 0.0), self.optics.rail)
@@ -224,7 +234,7 @@ class LightCurtain:
             self.detect = True
         elif self.voltage <= self.optics.threshold_off:
             self.detect = False
-        return reading
+        return self.voltage
 
     def snapshot(self) -> dict[str, Any]:
         state = self._rng.getstate()

@@ -1,0 +1,8 @@
+# LED half angle x mounting error: narrow LEDs give intensity but need precise
+# aiming. Same intensity on axis for every LED, random tilt per LED.
+#   embeddyn mechatronics curtain-sweep examples/mechatronics/light-curtain/alignment-sweep.yaml -o alignment.csv
+include: spect-curtain.yaml
+scenario: {type: static, frames: 20, radius: 0.35}
+sweep:
+  emitter.half_angle: [3 deg, 6 deg, 10 deg, 20 deg]
+  emitter.tilt_sigma: [0 deg, 1 deg, 2 deg, 4 deg]

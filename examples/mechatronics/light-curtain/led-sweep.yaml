@@ -1,0 +1,13 @@
+# LED angle x intensity x algorithm sweep on the rod test (curtain resolution
+# and signal margins). Everything else comes from spect-curtain.yaml.
+#   embeddyn mechatronics curtain-sweep examples/mechatronics/light-curtain/led-sweep.yaml \
+#       --workers 4 -o led-sweep.csv
+include: spect-curtain.yaml
+scenario:
+  type: rod
+  diameters: [8 mm, 12 mm, 16 mm, 24 mm]
+  steps: 49
+sweep:
+  emitter.half_angle: [3 deg, 10 deg, 25 deg]
+  emitter.intensity: [2 mW/sr, 10 mW/sr, 40 mW/sr]
+  scan.algorithm: [sequential, crossed]

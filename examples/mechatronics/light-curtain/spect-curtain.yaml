@@ -1,0 +1,61 @@
+# Light-curtain bench: SPECT body contouring with IR light curtains.
+#
+# The same scene as examples/mechatronics/spect-body-contour.yaml (MuJoCo):
+# a patient phantom on the couch, two detector heads, each with a curtain of
+# 16 IR LEDs and 16 photodiodes 12 mm under its face. Here the scan algorithm
+# runs in Python, so LEDs, receivers and algorithms can be swapped and swept
+# in seconds; the Webots world spect_light_curtain.wbt is generated from this
+# file and runs the same code with the 3-D view.
+#
+#   embeddyn mechatronics curtain-run   examples/mechatronics/light-curtain/spect-curtain.yaml
+#   embeddyn mechatronics curtain-run   ... --scenario rod
+#   embeddyn mechatronics curtain-sweep examples/mechatronics/light-curtain/led-sweep.yaml
+#   embeddyn mechatronics curtain-webots examples/mechatronics/light-curtain/spect-curtain.yaml \
+#       -o examples/mechatronics/worlds/spect_light_curtain.wbt
+name: spect-curtain
+seed: 1
+
+scene:
+  obstacles:                       # metres; x = patient axis, z = up
+    - {name: torso, type: ellipsoid, radii: [0.45, 0.17, 0.11]}
+    - {name: arm_l, type: capsule, from: [-0.30, 0.235, 0.0], to: [0.30, 0.235, 0.0], radius: 0.045}
+    - {name: arm_r, type: capsule, from: [-0.30, -0.235, 0.0], to: [0.30, -0.235, 0.0], radius: 0.045}
+    - {name: head, type: sphere, position: [0.56, 0.0, 0.02], radius: 0.095}
+    - {name: couch, type: box, position: [0.0, 0.0, -0.125], size: [2.0, 0.5, 0.03]}
+
+curtain:
+  heads:
+    - {name: a, angle: 0 deg, radius: 0.35}       # above the patient
+    - {name: b, angle: 180 deg, radius: 0.35}     # below (opposite)
+  count: 16
+  pitch: 24 mm
+  span: 580 mm                     # emitter rail to receiver rail
+  below_face: 12 mm
+  emitter:                         # 940 nm IRED
+    intensity: 10 mW/sr            # on-axis radiant intensity (or `power: 3 mW` total flux)
+    half_angle: 10 deg
+    aperture: 3 mm
+    spread: 0.10                   # 10 % intensity spread between LEDs
+    tilt_sigma: 0.5 deg            # mounting error per LED
+  receiver:                        # BPW34-class photodiode
+    half_angle: 20 deg
+    area: 7 mm^2
+    aperture: 3 mm
+  chain:                           # amplifier, ambient light, noise, comparator
+    gain: 1.0e7                    # V/A
+    tau: 20 us
+    ambient: 1 W/m^2
+    threshold_on: 0.6 V
+    threshold_off: 0.4 V
+
+scan:
+  algorithm: sequential            # sequential | crossed | group | module:Class
+  params: {}                       # crossed: {reach: 1}; group: {size: 4}; sequential: {order: interleaved}
+  slot: 200 us                     # one LED/receiver pair per slot
+  settle: 150 us                   # sample instant after the multiplexer switches
+  rays: 1                          # rings per aperture disc: 49 rays per beam
+
+scenario:
+  type: approach                   # static | approach | rod | orbit
+  speed: 50 mm/s
+  angles: [0 deg, 30 deg, 60 deg, 90 deg]
