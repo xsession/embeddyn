@@ -30,7 +30,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | 13 | CH32V003F4P6 board (QSZNTEC) | CH32V003F4P6 (seen), 24 MHz xtal | new — the existing `wch/ch32v003.repl` is a placeholder (SiFive UART/GPIO, PLIC instead of PFIC) |
 | 14 | STM32L496G-DISCO (MB1261 B-01) | STM32L496AGI6 (seen) | near (`stm32l476.repl`) |
 | 15 | Arduino UNO Q (ABX00162) | Qualcomm QRB2210 (4× Cortex-A53, Linux) + STM32U585AII6 (seen) | U585: near (`stm32u575.repl`); QRB2210: new, Linux-class SoC |
-| 16 | STM32L0538-DISCO (MB1143 B-01) | STM32L053C8T6 (seen) | near (`stm32l071/l072.repl`) |
+| 16 | STM32L0538-DISCO (MB1143 B-01) | STM32L053C8T6 (seen) | done (`stm32l053` profile, board `st/stm32l0538_disco.repl`; STM32CubeL0 examples 138 pass / 7 known gaps over this and NUCLEO-L053R8; e-paper still to model) |
 | 17 | LPCXpresso LPC812 rev A (with LPC-Link) | LPC812M101JDH20 (doc; marking under glare) | near (`nxp/lpc845.repl`) |
 | 18 | FRDM-KL05Z | MKL05Z32VFM4 (seen "M05…") | near (`nxp/mkl25z128.repl`) |
 
@@ -61,7 +61,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | MMA8451Q 3-axis accelerometer (U7, seen "MMA 451") | FRDM-KL05Z | I²C 0x1D | base (`MMA8451.cs`) |
 | MP34DT01 PDM MEMS microphones ×2 (seen) | STM32L496G-DISCO | DFSDM / SAI PDM | new |
 | Capacitive touch slider (TSI electrodes) | FRDM-KL05Z | TSI peripheral | new (part of the KL05 TSI model) |
-| Touch-sensing linear slider (TSC electrodes) | STM32L0538-DISCO | TSC peripheral | new (part of the L053 TSC model) |
+| Touch-sensing linear slider (TSC electrodes) | STM32L0538-DISCO | TSC peripheral | done (STM32_TSC; TouchSensing_Linear passes) |
 | Capacitive touch panel controller (FT6x06-class, on LCD flex) | STM32L496G-DISCO | I²C | new |
 | Resistive/capacitive touch controller (on LCD flex) | SK-S7G2 | I²C | new |
 | Trim potentiometer (10 k, seen "WR10K") | YRPBRL78G13 | ADC input | covered by the ADC + signal source |
