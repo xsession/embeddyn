@@ -94,7 +94,9 @@ and a saved project behaves the same from the CLI.
   **Metrics** shows the project's `metrics:` results.
 * **Analyzer** (dock tab): decoded CAN/CANopen, BLE and 802.11 traffic of the run, with
   protocol toggles, a filter, one lane per sender, a field tree with a linked hex dump, and
-  pcap export. Clicking a packet moves the time cursor there. See
+  pcap export. Clicking a packet moves the time cursor there. Its **Changes** view shows
+  one row per message with the changed bytes highlighted, bit flip counts, and any byte
+  range read as an integer and plotted, for reverse engineering. See
   [Multi-board buses, radios and the analyzer](multiboard-comms.md#in-the-lab).
 * **3-D view:** drag to orbit, shift- or right-drag to pan, wheel to zoom, double-click to
   re-frame. Angles follow the signal unit (deg or rad) unless the body's `unit` is set.
@@ -192,7 +194,7 @@ part exposes gets a net-label terminal.
 | `gui/session.py` | `RunSession`: thread around `CoSimulationOrchestrator.iterate()`; pause, stop, real-time pacing, forced signals, metrics, CSV |
 | `gui/server.py` | `ThreadingHTTPServer`; JSON API under `/api`, Server-Sent Events at `/api/stream` |
 | `gui/breadboard.py` | SPICE netlist parser, part types and palette, automatic breadboard layout, connectivity check, netlist export, `.breadboard.yaml` sidecars |
-| `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `breadboard.js` (breadboard view), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `analyzer.js` (protocol analyzer), `scene3d.js` (flat-shaded canvas renderer) |
+| `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `breadboard.js` (breadboard view), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `analyzer.js` (protocol analyzer) with `bytediff.js` (changes view), `scene3d.js` (flat-shaded canvas renderer) |
 
 Two core changes support the Lab:
 

@@ -105,6 +105,7 @@
   <div id="dock-metrics" class="dock-page hidden"><div id="metrics"></div></div>
   <div id="dock-analyzer" class="dock-page hidden">
     <div id="an-bar">
+      <span class="an-modes"><button id="an-mode-list" class="active" title="Packet list, field tree and bytes">Packets</button><button id="an-mode-diff" title="One row per message; changed bytes highlighted (reverse engineering)">Changes</button></span>
       <label class="an-proto" style="--c:#e67e22"><input type="checkbox" id="an-p-CANopen" checked> CAN/CANopen <span id="an-c-CANopen">0</span></label>
       <label class="an-proto" style="--c:#2f80d1"><input type="checkbox" id="an-p-BLE" checked> BLE <span id="an-c-BLE">0</span></label>
       <label class="an-proto" style="--c:#27ae60"><input type="checkbox" id="an-p-80211" checked> Wi-Fi <span id="an-c-80211">0</span></label>
@@ -115,6 +116,18 @@
       <a id="an-pcap-can" class="button" download>CAN</a><a id="an-pcap-ble" class="button" download>BLE</a><a id="an-pcap-wifi" class="button" download>Wi-Fi</a>
     </div>
     <canvas id="an-lanes" title="One lane per sender; click to jump to a packet"></canvas>
+    <div id="an-diff" class="hidden">
+      <div id="an-diff-left">
+        <div id="an-diff-opts">
+          <label class="small" title="Hide messages whose bytes never changed"><input type="checkbox" id="an-d-static" checked> hide static</label>
+          <label class="small" title="Ignore BLE CRC, 802.11 FCS, sequence number and beacon timestamp"><input type="checkbox" id="an-d-mask" checked> ignore CRC/FCS/seq</label>
+          <label class="small" title="How long a change stays highlighted">fade <input type="number" id="an-d-fade" value="500" min="10" step="50"> ms</label>
+          <span class="small an-legend"><span class="db hot">new</span><span class="db" style="background:#f0b42966">recent</span><span class="db">changed before</span><span class="db static">never</span><span class="db mask">ignored</span></span>
+        </div>
+        <div id="an-diff-table"></div>
+      </div>
+      <div id="an-diff-side"></div>
+    </div>
     <div id="an-main">
       <div id="an-list" tabindex="0">
         <div class="an-head"><span class="c-no">No.</span><span class="c-t">Time [s]</span><span class="c-proto">Proto</span><span class="c-src">Source</span><span class="c-dst">Destination</span><span class="c-len">Len</span><span class="c-info">Info</span></div>

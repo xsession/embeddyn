@@ -204,6 +204,37 @@ run streams.
 * **pcap:** CAN (LINKTYPE_CAN_SOCKETCAN, 227), BLE (LINKTYPE_BLUETOOTH_LE_LL, 251) and
   Wi-Fi (LINKTYPE_IEEE802_11, 105), nanosecond timestamps.
 
+### Changes view (reverse engineering)
+
+**Packets | Changes** switches the analyzer to a view in the style of cansniffer and
+SavvyCAN, for working out what an unknown payload means. There is one row per message:
+
+* the CAN identifier;
+* the BLE sender and PDU type;
+* or the 802.11 sender, receiver and frame type.
+
+Each row shows the message count, its period and the latest bytes:
+
+* **orange:** changed in the latest packet;
+* **amber, fading:** changed within the fade window (500 ms by default);
+* **grey:** changed earlier;
+* **dim:** never changed;
+* **struck through:** ignored (BLE CRC, 802.11 FCS, sequence number, beacon timestamp).
+
+**hide static** leaves only the messages that carry changing data. The view follows the
+time cursor: with **follow** off, scrub or press **⟲ replay**, and the bytes light up as
+the run plays.
+
+Select a row to see the **bits** of its changing bytes as a flip-count heat map. Bits that
+flipped in the latest packet are outlined, so a counter, a flag bit and a slowly moving
+value look different. Click a byte (shift-click to extend to 4 bytes) to read the selection
+as u8/i8, u16/i16 and u32/i32 in both byte orders. When the decoder knows those bytes, the
+view names them (*decoder: temperature: 65.9 degC*). The chosen reading is plotted over
+the whole run, which tells a counter from a set-point or a sensor value at a glance.
+
+In **Packets**, the hex dump marks the bytes that differ from the previous packet of the
+same message (hover for the old value).
+
 The API is `GET /api/analyzer?session=…&from=N` (decoded packets from packet N, in time
 order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`.
 

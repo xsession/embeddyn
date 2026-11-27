@@ -5,12 +5,14 @@
 // a filter, the field tree of the selected packet and its bytes; selecting a field highlights its
 // bytes. Clicking a packet moves the run's time cursor there, so instruments show that moment.
 import { data, emit, state } from './store.js';
+import { buildStats, messageKey, readingOf, readings } from './bytediff.js';
 
 const $ = (id) => document.getElementById(id);
 const COLORS = { CANopen: '#e67e22', CAN: '#d35400', BLE: '#2f80d1', '802.11': '#27ae60' };
 const TYPE_TINT = { EMCY: '#ff5c5c', 'SDO abort': '#ff5c5c', NMT: '#c39bd3', SYNC: '#8d96a5', heartbeat: '#6b7380', SDO: '#f0b429' };
 const an = { packets: [], session: null, polling: null, selected: null, field: null, visible: false, follow: true,
-  shown: [], lastCursor: -1, rowHeight: 20 };
+  shown: [], lastCursor: -1, rowHeight: 20,
+  mode: 'list', diffKey: null, diffRange: null, diffReading: null };
 
 const html = (tag, attrs = {}, ...children) => {
   const e = document.createElement(tag);
@@ -66,9 +68,133 @@ function render() {
   for (const p of an.packets) counts[p.proto === 'CAN' ? 'CANopen' : p.proto] = (counts[p.proto === 'CAN' ? 'CANopen' : p.proto] || 0) + 1;
   for (const key of ['CANopen', 'BLE', '802.11']) $(`an-c-${key.replace('.', '')}`).textContent = counts[key] || 0;
   $('an-count').textContent = `${an.shown.length} of ${an.packets.length} packets`;
-  renderList();
   renderLanes();
+  if (an.mode === 'diff') return renderDiff();
+  renderList();
   renderDetail();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Changes view (bytediff.js): one row per message, changed bytes highlighted.
+
+function diffUntil() { return data.length && !data.follow ? data.now() : Infinity; }
+
+function renderDiff() {
+  const until = diffUntil();
+  const stats = buildStats(an.shown, until, $('an-d-mask').checked);
+  an.diffStats = stats;
+  const fade = Math.max(0.01, Number($('an-d-fade').value) / 1000 || 0.5);
+  const now = Number.isFinite(until) ? until : Math.max(0, ...[...stats.values()].map((s) => s.last));
+  const hideStatic = $('an-d-static').checked;
+  const order = { CANopen: 0, CAN: 0, BLE: 1, '802.11': 2 };
+  const rows = [...stats.values()].filter((s) => !hideStatic || s.dynamic)
+    .sort((a, b) => order[a.proto] - order[b.proto] || a.key.localeCompare(b.key, undefined, { numeric: true }));
+  const table = $('an-diff-table');
+  const keep = table.scrollTop;
+  table.innerHTML = '';
+  if (!rows.length) table.append(html('div', { class: 'empty' }, stats.size ? 'No message changed: untick "hide static".' : 'Run the project first.'));
+  for (const s of rows) {
+    const bytes = html('span', { class: 'bytes' });
+    s.bytes.forEach((b, i) => {
+      const changes = s.changes[i] || 0;
+      let cls = 'db', style = '';
+      if (s.mask.has(i)) cls += ' mask';
+      else if (s.changedNow[i] && now - s.last < fade) cls += ' hot';
+      else if (changes) {
+        const age = now - (s.lastChange[i] ?? -1e9);
+        const alpha = age < fade ? 0.85 * (1 - age / fade) + 0.15 : 0;
+        if (alpha) style = `background: rgba(240,180,41,${alpha.toFixed(2)}); color: ${alpha > 0.5 ? '#111' : ''}`;
+      } else cls += ' static';
+      if (an.diffKey === s.key && an.diffRange && i >= an.diffRange[0] && i < an.diffRange[1]) cls += ' sel';
+      bytes.append(html('span', { class: cls, style,
+        title: `byte ${i}: 0x${b.toString(16).padStart(2, '0')} = ${b}` + (changes ? `, changed ${changes}× (last ${(s.lastChange[i]).toFixed(4)} s)` : ', never changed'),
+        onclick: (e) => { e.stopPropagation(); pickByte(s.key, i, e.shiftKey); } }, b.toString(16).padStart(2, '0')));
+    });
+    table.append(html('div', { class: 'dr' + (an.diffKey === s.key ? ' selected' : ''), onclick: () => { an.diffKey = s.key; an.diffRange = null; renderDiff(); } },
+      html('span', { class: 'k', title: s.key }, s.key), html('span', { class: 'ty', title: s.latest.summary }, s.type),
+      html('span', { class: 'n' }, s.count), html('span', { class: 'per' }, s.period ? `${(s.period * 1000).toFixed(1)} ms` : ''), bytes));
+  }
+  table.scrollTop = keep;
+  renderDiffSide();
+}
+
+function pickByte(key, index, extend) {
+  if (extend && an.diffKey === key && an.diffRange) {
+    const start = Math.min(an.diffRange[0], index), end = Math.max(an.diffRange[1], index + 1);
+    an.diffRange = [start, Math.min(end, start + 4)];
+  } else an.diffRange = [index, index + 1];
+  an.diffKey = key;
+  const width = an.diffRange[1] - an.diffRange[0];
+  if (!an.diffReading || !an.diffReading.startsWith(width === 1 ? 'u8' : `u${8 * width}`) && !an.diffReading.startsWith(width === 1 ? 'i8' : `i${8 * width}`)) {
+    an.diffReading = width === 1 ? 'u8' : `u${8 * width} LE`;
+  }
+  renderDiff();
+}
+
+function renderDiffSide() {
+  const side = $('an-diff-side');
+  side.innerHTML = '';
+  const s = an.diffStats?.get(an.diffKey);
+  if (!s) { side.append(html('div', { class: 'empty' }, 'Select a message. Click a byte (shift-click for up to 4) to read it as a number and plot it.')); return; }
+  side.append(html('div', { class: 'an-title' }, `${s.key} · ${s.count} packets` + (s.period ? ` · every ${(s.period * 1000).toFixed(1)} ms` : '') +
+    (s.lengths.size > 1 ? ` · lengths ${[...s.lengths].join('/')}` : ` · ${s.bytes.length} bytes`)), html('div', { class: 'note' }, s.latest.summary));
+  // Bit grid: flip counts as a heat map, current bit values, bits that flipped in the latest packet outlined.
+  const bitsTitle = html('h4', {}, 'Bits of the changing bytes (flip-count heat map, MSB left)');
+  const grid = html('table', { class: 'bitgrid' });
+  const maxFlips = Math.max(1, ...s.flips.filter(Boolean).flat());
+  grid.append(html('tr', {}, html('td', { class: 'idx' }, ''), html('td', { class: 'idx' }, ''), [7, 6, 5, 4, 3, 2, 1, 0].map((b) => html('td', { class: 'idx' }, b))));
+  s.bytes.forEach((byte, i) => {
+    const selected = an.diffRange && i >= an.diffRange[0] && i < an.diffRange[1];
+    if (!selected && (s.mask.has(i) || !s.changes[i])) return;      // constants and checksums: not here
+    const row = html('tr', { class: selected ? 'sel' : '' }, html('td', { class: 'idx', onclick: (e) => pickByte(s.key, i, e.shiftKey) }, i),
+      html('td', { class: 'hx' }, byte.toString(16).padStart(2, '0')));
+    for (let b = 7; b >= 0; b--) {
+      const flips = s.flips[i]?.[b] || 0;
+      const heat = flips / maxFlips;
+      const flippedNow = s.before && s.before[i] !== undefined && ((s.before[i] ^ byte) >> b & 1);
+      row.append(html('td', { class: flippedNow ? 'now' : '', title: `byte ${i} bit ${b}: flipped ${flips}×`,
+        style: `background: ${flips ? `rgba(255,${Math.round(200 - 140 * heat)},40,${(0.25 + 0.75 * heat).toFixed(2)})` : '#22262c'}; color: ${heat > 0.5 ? '#111' : '#9aa3b0'}`,
+        onclick: (e) => pickByte(s.key, i, e.shiftKey) }, byte >> b & 1));
+    }
+    grid.append(row);
+  });
+  if (!an.diffRange) { side.append(bitsTitle, grid); return; }
+  const [start, end] = an.diffRange;
+  const decoded = [];
+  const walk = (fields) => { for (const f of fields || []) { if (f.bytes && f.bytes[0] <= start && f.bytes[1] >= end && !f.children?.length) decoded.push(`${f.label}: ${f.value}`); walk(f.children); } };
+  walk(s.latest.fields);
+  side.append(html('h4', {}, `Bytes ${start}${end - start > 1 ? `–${end - 1}` : ''} read as`));
+  if (decoded.length) side.append(html('div', { class: 'note' }, `decoder: ${decoded.join(' · ')}`));
+  const table = html('table', { class: 'readings' });
+  for (const [kind, value] of readings(s.bytes, start, end)) {
+    table.append(html('tr', { class: kind === an.diffReading ? 'on' : '', onclick: () => { an.diffReading = kind; renderDiffSide(); } },
+      html('td', {}, kind), html('td', {}, value), html('td', {}, `0x${(value < 0 ? value + 2 ** (8 * (end - start)) : value).toString(16).toUpperCase()}`)));
+  }
+  side.append(table, html('canvas', { id: 'an-spark', title: 'The selected reading over the run (yellow: time cursor)' }), bitsTitle, grid);
+  drawSpark(s, start, end);
+}
+
+function drawSpark(s, start, end) {
+  const canvas = $('an-spark');
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const points = s.history.map((p) => [p.time, readingOf((p.hex.match(/../g) || []).map((x) => parseInt(x, 16)), start, end, an.diffReading)])
+    .filter(([, v]) => v !== null);
+  if (!points.length) return;
+  const t1 = Math.max(state.graph?.duration_seconds || 0, points[points.length - 1][0], 1e-3);
+  let lo = Math.min(...points.map((p) => p[1])), hi = Math.max(...points.map((p) => p[1]));
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const x = (t) => 4 + (t / t1) * (w - 8), y = (v) => h - 14 - ((v - lo) / (hi - lo)) * (h - 26);
+  g.strokeStyle = '#3fd0ff'; g.lineWidth = 1.3; g.beginPath();
+  points.forEach(([t, v], i) => { if (i) g.lineTo(x(t), y(points[i - 1][1])); (i ? g.lineTo : g.moveTo).call(g, x(t), y(v)); });
+  g.stroke();
+  g.fillStyle = '#8d96a5'; g.font = '10px monospace';
+  g.fillText(`max ${hi}`, 6, 10); g.fillText(`min ${lo}  (${an.diffReading}, ${points.length} samples)`, 6, h - 3);
+  if (data.length) { g.fillStyle = '#ffd60a'; g.fillRect(x(data.now()), 0, 1, h); }
 }
 
 function renderList() {
@@ -125,12 +251,17 @@ function renderDetail() {
   add(p.fields, tree, 0);
   const bytes = p.hex.match(/../g) || [];
   const range = an.field?.bytes;
+  const key = messageKey(p);
+  const index = an.packets.indexOf(p);
+  let previous = null;
+  for (let k = index - 1; k >= 0; k--) if (messageKey(an.packets[k]) === key) { previous = an.packets[k].hex.match(/../g) || []; break; }
   for (let i = 0; i < bytes.length; i += 16) {
     const line = html('div', { class: 'an-hexline' }, html('span', { class: 'off' }, i.toString(16).padStart(4, '0')));
     const hexPart = html('span', { class: 'hx' }), ascii = html('span', { class: 'asc' });
     for (let j = i; j < Math.min(i + 16, bytes.length); j++) {
       const on = range && j >= range[0] && j < range[1];
-      hexPart.append(html('span', { class: on ? 'on' : '' }, bytes[j] + ' '));
+      const changed = previous && previous[j] !== undefined && previous[j] !== bytes[j];
+      hexPart.append(html('span', { class: (on ? 'on ' : '') + (changed ? 'chg' : ''), title: changed ? `was ${previous[j]}` : '' }, bytes[j] + ' '));
       const c = parseInt(bytes[j], 16);
       ascii.append(html('span', { class: on ? 'on' : '' }, c >= 32 && c < 127 ? String.fromCharCode(c) : '.'));
     }
@@ -205,6 +336,7 @@ function scrollTo(p) {
 export function onFrame() {
   if (!an.visible || !an.packets.length || data.cursor === an.lastCursor) return;
   an.lastCursor = data.cursor;
+  if (an.mode === 'diff') { renderLanes(); renderDiff(); return; }
   if (!$('an-sync').checked) { renderLanes(); return; }
   const now = data.now();
   let best = null;
@@ -245,6 +377,21 @@ function bind() {
   $('an-filter').addEventListener('input', refilter);
   for (const key of ['CANopen', 'BLE', '80211']) $(`an-p-${key}`).addEventListener('change', refilter);
   $('an-list').addEventListener('scroll', renderList);
+  const setMode = (mode) => {
+    an.mode = mode;
+    $('an-mode-list').classList.toggle('active', mode === 'list');
+    $('an-mode-diff').classList.toggle('active', mode === 'diff');
+    $('an-main').classList.toggle('hidden', mode !== 'list');
+    $('an-diff').classList.toggle('hidden', mode !== 'diff');
+    if (mode === 'diff' && !an.diffKey) {
+      const p = current();
+      if (p) an.diffKey = messageKey(p);
+    }
+    render();
+  };
+  $('an-mode-list').onclick = () => setMode('list');
+  $('an-mode-diff').onclick = () => setMode('diff');
+  for (const id of ['an-d-static', 'an-d-mask', 'an-d-fade']) $(id).addEventListener('input', () => an.mode === 'diff' && renderDiff());
   $('an-lanes').addEventListener('click', lanesClick);
   $('an-list').addEventListener('keydown', (e) => {
     if (!['ArrowDown', 'ArrowUp'].includes(e.key) || !an.shown.length) return;
