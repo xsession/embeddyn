@@ -288,3 +288,22 @@ def test_lost_can_clear_command_leaves_the_fault_latched(tmp_path):
     assert sent is False
     assert "fault cleared (CAN)" not in [line for _, line in _console(rows)]
     assert rows[-1]["mcu.fault_led"] == 1.0 and rows[-1]["mcu.can_fault"] == 1.0
+
+
+@needs_renode_117
+def test_firmware_on_the_shared_can_bus_round_trip():
+    """Real firmware frames cross the CanBus model to a restbus node, and the restbus's 0x200 [1]
+    command crosses back into the firmware's bxCAN and clears a latched fault."""
+    import yaml
+    path = ROOT / "examples/mechatronics/rc-servo-l476-canbus.yaml"
+    raw = yaml.safe_load(path.read_text())
+    raw["faults"] = [{"name": "pot-stuck", "signal": "servo.feedback_voltage", "type": "stuck", "start": 0.6, "end": 1.2,
+                      "value": 0.4}]
+    raw["duration_seconds"] = 2.0
+    project = MechatronicProject.from_mapping(raw, path.parent)
+    rows = CoSimulationOrchestrator(project, build_adapters(project)).run()
+    wire = [e["payload"] for r in rows for e in r.get("__events__", []) if e["topic"] == "can"]
+    assert sum(1 for f in wire if f["id"] == 0x101 and f.get("src") == "mcu") >= 15
+    assert rows[-1]["restbus.heard"] >= 15
+    fault = {round(r["time"], 2): r["mcu.can_fault"] for r in rows}
+    assert fault[1.4] == 1.0 and fault[1.8] == 0.0              # latched, then cleared by the bus command at 1.5 s

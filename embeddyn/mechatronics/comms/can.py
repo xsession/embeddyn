@@ -124,3 +124,68 @@ def _arbitration_key(frame: Mapping[str, Any]) -> tuple[int, int, int]:
     if frame.get("ext"):
         return (frame_id >> 18, 1, frame_id & 0x3FFFF)
     return (frame_id, 0, int(bool(frame.get("rtr"))))
+
+
+class CanRestbus:
+    """Restbus simulation: the frames of nodes that are not there, on a schedule (python plant).
+
+    ``frames`` is a list of ``{id, data, period_ms, start, count, counter}``: `data` hex, sent every
+    `period_ms` from `start` seconds (`period_ms` 0: once), `count` times (0: forever); `counter`
+    names a byte whose low nibble counts up (a rolling message counter). Frames it hears on
+    `rx` are counted per identifier in `heard` (the last one heard is the `last_id` output).
+    """
+
+    inputs = ()
+    outputs = ("sent", "heard", "last_id")
+    states = ()
+    event_inputs = ("rx",)
+    event_outputs = ("tx",)
+
+    def __init__(self, frames: Sequence[Mapping[str, Any]] = (), name: str = "restbus") -> None:
+        self.name = name
+        self.frames = []
+        for spec in frames:
+            frame_id = int(str(spec["id"]), 0) if isinstance(spec["id"], str) else int(spec["id"])
+            self.frames.append({"id": frame_id, "data": bytearray(bytes.fromhex(str(spec.get("data", "")))),
+                                "period": float(spec.get("period_ms", 0.0)) / 1000.0, "next": float(spec.get("start", 0.0)),
+                                "left": int(spec.get("count", 0)) or None, "counter": spec.get("counter")})
+        self.sent = 0
+        self.heard: dict[int, int] = {}
+        self.last_id = 0
+        self._out: list[tuple[float, str, Any]] = []
+
+    def initial_state(self) -> list[float]:
+        return []
+
+    def derivatives(self, t: float, x: Sequence[float], u: Mapping[str, float]) -> list[float]:
+        return []
+
+    def receive(self, t: float, port: str, payload: Any) -> None:
+        if isinstance(payload, dict) and "id" in payload and payload.get("src") != self.name:
+            self.heard[int(payload["id"])] = self.heard.get(int(payload["id"]), 0) + 1
+            self.last_id = int(payload["id"])
+
+    def advance(self, t0: float, t1: float, u: Mapping[str, float]) -> None:
+        for frame in self.frames:
+            while frame["next"] is not None and frame["next"] <= t1:
+                if frame["counter"] is not None:
+                    index = int(frame["counter"])
+                    frame["data"][index] = (frame["data"][index] & 0xF0) | ((frame["data"][index] + 1) & 0x0F)
+                payload = {"proto": "can", "id": frame["id"], "data": bytes(frame["data"]).hex(), "src": self.name}
+                if frame["id"] > 0x7FF:
+                    payload["ext"] = True
+                self._out.append((frame["next"], "tx", payload))
+                self.sent += 1
+                if frame["left"] is not None:
+                    frame["left"] -= 1
+                    if frame["left"] <= 0:
+                        frame["next"] = None
+                        break
+                frame["next"] = frame["next"] + frame["period"] if frame["period"] > 0 else None
+
+    def output(self, t: float, x: Sequence[float], u: Mapping[str, float]) -> dict[str, float]:
+        return {"sent": float(self.sent), "heard": float(sum(self.heard.values())), "last_id": float(self.last_id)}
+
+    def pop_events(self) -> list[tuple[float, str, Any]]:
+        out, self._out = self._out, []
+        return out

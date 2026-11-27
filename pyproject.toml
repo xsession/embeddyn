@@ -80,6 +80,9 @@ mechatronics-storage = [
 rf = [
     "scikit-rf>=1.9,<3",
 ]
+comms = [
+    "cryptography>=41",       # LoRaWAN MIC check and payload decryption in the analyzer
+]
 docs = [
     "mkdocs-material>=9.5",
     "matplotlib>=3.8",

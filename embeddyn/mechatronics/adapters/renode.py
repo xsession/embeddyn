@@ -50,6 +50,18 @@ machine's CAN hub carries frames to and from embeddyn::
       fields:                         # decode received frames into signals
         - {signal: mcu.can_setpoint, id: 0x101, offset: 0, format: "<h", scale: 0.01}
 
+With ``publish`` / ``subscribe`` the firmware joins a CAN bus shared with other
+instances (``comms.can.CanBus`` and virtual boards): its frames go out on the
+``publish`` topic (the bus model's input), and every frame other instances put on the
+``subscribe`` topic (the wire) is written into the machine's CAN controller::
+
+    can:
+      bus: extcan
+      signal: mcu.can
+      publish: can.tx                 # frames the firmware sends -> the shared bus
+      subscribe: can                  # frames on the bus -> the firmware
+      name: mcu                       # sender name on the bus (default: the signal)
+
 ``can_write(frame_id, data)`` sends a frame. Like UART input it is a logged
 boundary input that takes effect at Renode's next sync point.
 
@@ -520,13 +532,40 @@ class RenodeAdapter(SimulatorAdapter):
             outputs.update({signal: values[field] for field, signal in spec["outputs"].items()})
         if self.can:
             outputs.update(self._can_outputs())
-            topic = str(self.can.get("signal", "can"))
-            events = diagnostics.setdefault("events", [])
-            for frame in self._can_frames:
-                events.append({"time_seconds": frame.time_ns / 1e9 - self._origin_us / 1e6, "topic": topic,
-                               "payload": {"id": frame.frame_id, "data": frame.data.hex()}})
-            self._can_frames.clear()
+            diagnostics.setdefault("events", []).extend(self._can_events())
         return StepResult(outputs, diagnostics)
+
+    def _can_events(self) -> list[dict[str, Any]]:
+        """Frames the firmware sent this step: on its signal topic, or on the shared bus's input topic."""
+        topic = str(self.can.get("publish") or self.can.get("signal", "can"))
+        sender = str(self.can.get("name") or self.can.get("signal", "can"))
+        events = []
+        for frame in self._can_frames:
+            payload: dict[str, Any] = {"id": frame.frame_id, "data": frame.data.hex()}
+            if self.can.get("publish"):
+                payload.update(proto="can", src=sender)
+                if frame.frame_id > 0x7FF:
+                    payload["ext"] = True
+            events.append({"time_seconds": frame.time_ns / 1e9 - self._origin_us / 1e6, "topic": topic, "payload": payload})
+        self._can_frames.clear()
+        return events
+
+    @property
+    def subscribed_topics(self) -> set[str]:
+        topic = (self.can or {}).get("subscribe")
+        return {str(topic)} if topic else set()
+
+    def receive_events(self, events: list[Any]) -> None:
+        """Frames other instances put on the shared bus: into the machine's CAN controller."""
+        sender = str(self.can.get("name") or self.can.get("signal", "can"))
+        for event in events:
+            frame = event.payload
+            if not isinstance(frame, dict) or "id" not in frame or frame.get("src") == sender or frame.get("rtr"):
+                continue
+            try:
+                self.can_write(int(frame["id"]), bytes.fromhex(str(frame.get("data", ""))))
+            except (KeyError, ValueError):
+                continue
 
     def stop(self) -> None:
         for uart in self.uarts:

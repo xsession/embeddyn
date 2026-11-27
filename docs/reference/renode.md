@@ -130,6 +130,33 @@ arrives at Renode's next sync point and is a logged boundary input. In
 `rc-servo-l476-can.yaml` the firmware sends status frame `0x101` every
 100 ms, and frame `0x200` with `[1]` clears a latched fault (tested).
 
+**Firmware on a shared bus.** Add `publish` and `subscribe` and the firmware joins a CAN
+bus with other instances: the `comms.can.CanBus` model, virtual CANopen boards or a
+restbus node. Its frames go to the bus model's input topic. Every frame others put on the
+wire is written into the machine's CAN controller (its own frames excepted):
+
+```yaml
+can:
+  bus: extcan
+  signal: mcu.can
+  publish: can.tx        # firmware → bus model (arbitration, timing, medium impairments)
+  subscribe: can         # bus wire → firmware
+  name: mcu              # sender name on the bus
+```
+
+`rc-servo-l476-canbus.yaml` puts the STM32L476 servo firmware on a 500 kbit/s bus with
+15 m of cable, next to a restbus node (`comms.can.CanRestbus`). The restbus sends a
+body-controller frame every 20 ms with a rolling counter, and `0x200 [1]` at 1.5 s. With
+real Renode 1.17:
+
+* the firmware's 0x101 status frames reach the restbus over the bus model;
+* the analyzer decodes them with named fields;
+* when a stuck feedback pot latches a fault, the restbus command crosses back into the
+  firmware's bxCAN and clears it (`test_firmware_on_the_shared_can_bus_round_trip`).
+
+Build the firmware first (`make -C examples/mechatronics/firmware/rc-servo-l476`). An ELF
+built before the CAN code sends nothing.
+
 Frame faults on `mcu.can` or a UART's signal lose or corrupt CAN frames and
 UART bytes in either direction ([bus frames](faults.md#bus-frames)).
 

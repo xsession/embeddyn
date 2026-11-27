@@ -366,3 +366,41 @@ def test_http_inject_import_and_config(lab, tmp_path):
     rows = json.loads(urllib.request.urlopen(f"{lab}/api/analyzer?session={opened['session']}&from=0", timeout=10).read())
     assert [p["proto"] for p in rows["packets"]] == ["CAN", "CAN"] and rows["capture"] == str(log)
     assert _post(lab, "analyzer/dbc", {"config": config})["text"].count("BO_ ") >= 4
+
+
+# -- Renode firmware on a shared bus ------------------------------------------------------------------------
+CANBUS = ROOT / "examples/mechatronics/rc-servo-l476-canbus.yaml"
+
+
+def test_renode_adapter_bridges_the_shared_bus():
+    from embeddyn.mechatronics.adapters.renode import RenodeAdapter
+    from embeddyn.mechatronics.adapters.renode_api_v2 import CanFrame, RenodeMessageClient
+    from embeddyn.mechatronics.runtime.events import RuntimeEvent
+    project = MechatronicProject.load(CANBUS)
+    adapter = build_adapters(project)["mcu"]
+    assert isinstance(adapter, RenodeAdapter) and adapter.subscribed_topics == {"can"}
+    sent = []
+    client = object.__new__(RenodeMessageClient)
+    client.can_send = lambda machine, bus, frame_id, data: sent.append((bus, frame_id, data))
+    adapter.client = client
+    adapter.receive_events([RuntimeEvent(0.1, 1, "can", {"proto": "can", "id": 0x200, "data": "01", "src": "restbus"}),
+                            RuntimeEvent(0.1, 2, "can", {"proto": "can", "id": 0x101, "data": "00", "src": "mcu"}),   # its own echo
+                            RuntimeEvent(0.1, 3, "can", {"proto": "can", "id": 0x7E0, "data": "", "rtr": True})])
+    assert sent == [("extcan", 0x200, b"\x01")]
+    adapter._on_can_frame(CanFrame(250_000_000, 0x101, bytes(8)))
+    (event,) = adapter._can_events()
+    assert event["topic"] == "can.tx" and event["payload"] == {"id": 0x101, "data": "00" * 8, "proto": "can", "src": "mcu"}
+
+
+def test_restbus_schedule_and_counter():
+    restbus = can.CanRestbus([{"id": 0x300, "data": "0000", "period_ms": 10, "start": 0.0, "counter": 1},
+                              {"id": "0x200", "data": "01", "start": 0.025},
+                              {"id": 0x18FF50E5, "data": "aa", "period_ms": 5, "count": 2}])
+    restbus.advance(0.0, 0.03, {})
+    out = restbus.pop_events()
+    ids = [p["id"] for _, _, p in out]
+    assert ids.count(0x300) == 4 and ids.count(0x200) == 1 and ids.count(0x18FF50E5) == 2
+    counters = [bytes.fromhex(p["data"])[1] & 0x0F for _, _, p in out if p["id"] == 0x300]
+    assert counters == [1, 2, 3, 4] and next(p for _, _, p in out if p["id"] == 0x18FF50E5)["ext"]
+    restbus.receive(0.03, "rx", {"id": 0x101, "data": "00"})
+    assert restbus.output(0.03, [], {})["heard"] == 1

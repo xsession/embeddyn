@@ -16,6 +16,7 @@ All examples live in `examples/mechatronics/`. Run any of them with `embeddyn me
 | `rc-servo-lab.yaml` | function generator · pulse generator · **RCServo** · slider; Lab layout | — | [Tutorial 11](../tutorials/lab.md) |
 | `rc-servo-l476.yaml` | **Renode** STM32L476 · RCServo · replayed operator; UART console | Renode | [Tutorial 4](../tutorials/rc-servo-firmware.md) |
 | `rc-servo-l476-can.yaml` | as above with **CAN** status/command frames | Renode ≥ 1.17 | [Renode adapter](renode.md#can-renode-117) |
+| `rc-servo-l476-canbus.yaml` | **Renode** STM32L476 on a shared **CAN bus** model with a restbus node; 15 m cable | Renode ≥ 1.17 | [Renode CAN](renode.md#can-renode-117) |
 | `mujoco-arm-firmware.yaml` | **Renode** STM32L476 · H-bridge · DCMotorRL · ThermalRC · **MuJoCo**; encoder, **SPI** AS5047P, **I²C** AS6221 | Renode ≥ 1.17, `mujoco` | [Tutorial 5](../tutorials/arm-joint-sensors.md) |
 | `ir-curtain-channel.yaml` | strobe (firmware) · obstacle · `IrBeamPath` · **ngspice** IR LED driver, phototransistor and comparator | libngspice | [Lab breadboard view](lab.md#breadboard-view) |
 | `multiboard-canopen-ble.yaml` | 4 CANopen boards on a **CAN bus** model · BLE gateway · Wi-Fi bridge and access point | — | [Multi-board buses and analyzer](multiboard-comms.md) |

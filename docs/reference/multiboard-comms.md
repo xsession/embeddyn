@@ -83,7 +83,7 @@ The codecs are checked against published values:
   "test" with a valid MIC;
 * the time on air of 13 bytes at SF7 / 125 kHz is 46.3 ms.
 
-LoRaWAN decryption needs the `cryptography` package. Without it, frames decode without
+LoRaWAN decryption needs the `cryptography` package (`pip install embeddyn[comms]`). Without it, frames decode without
 the MIC check and the payload.
 
 ## Impaired media: noise, fading, interference, crosstalk
@@ -282,6 +282,25 @@ published since its last activation, on topics it subscribed to, from **other**
 instances. A frame therefore reaches its receivers at their next activation: one step of
 latency per hop, 0.5 ms in the example. Adapters other than python plants take part by
 implementing `receive_events(events)` and `subscribed_topics`.
+
+## Real firmware on the bus
+
+A Renode machine with an External Control CAN endpoint (Renode ≥ 1.17) takes part like
+any board. Its `can:` options gain `publish: can.tx` and `subscribe: can` (see
+[Renode CAN](renode.md#can-renode-117)), so emulated firmware, virtual CANopen boards
+and restbus nodes share one bus model. The firmware's frames are arbitrated, timed and
+impaired (`media:`) like everyone else's.
+
+**Restbus simulation.** `CanRestbus` (`comms.can`) stands in for the nodes that are not
+there:
+
+```yaml
+frames:
+  - {id: 0x300, data: "0000000000000000", period_ms: 20, counter: 7}   # rolling counter in byte 7
+  - {id: 0x200, data: "01", start: 1.5}                                   # once
+```
+
+It counts what it hears (`heard`, `last_id`).
 
 ## CAN bus (`comms.can`)
 
