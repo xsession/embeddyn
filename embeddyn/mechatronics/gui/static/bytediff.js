@@ -95,3 +95,50 @@ export function readingOf(bytes, start, end, kind) {
   const found = readings(bytes, start, end).find(([name]) => name === kind);
   return found ? found[1] : null;
 }
+
+// Byte ranges whose integer reading follows a signal: Pearson r over the packets, and the linear
+// fit signal = scale * reading + offset. `signalAt(t)` gives the signal at a packet's time.
+export function correlate(packets, signalAt, maskNoise = true, limit = 12) {
+  const stats = buildStats(packets, Infinity, maskNoise);
+  const results = [];
+  for (const s of stats.values()) {
+    if (s.history.length < 5) continue;
+    const ys = s.history.map((p) => signalAt(p.time));
+    if (ys.some((y) => y === null || !Number.isFinite(y))) continue;
+    const rows = s.history.map((p) => (p.hex.match(/../g) || []).map((x) => parseInt(x, 16)));
+    const width = Math.min(...rows.map((r) => r.length));
+    for (let start = 0; start < width; start++) {
+      if (s.mask.has(start)) continue;
+      for (const size of [1, 2, 4]) {
+        const span = [...Array(size).keys()].map((k) => start + k);
+        if (start + size > width || span.some((i) => s.mask.has(i)) || !span.some((i) => s.changes[i])) continue;
+        for (const [kind] of readings(rows[0], start, start + size)) {
+          const xs = rows.map((r) => readingOf(r, start, start + size, kind));
+          const fit = linearFit(xs, ys);
+          if (fit) results.push({ key: s.key, start, end: start + size, kind, ...fit });
+        }
+      }
+    }
+  }
+  results.sort((a, b) => Math.abs(b.r) - Math.abs(a.r) || (a.end - a.start) - (b.end - b.start));
+  const seen = new Set(), best = [];
+  for (const item of results) {                    // one result per key and start byte
+    const id = `${item.key}|${item.start}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    best.push(item);
+    if (best.length >= limit) break;
+  }
+  return best;
+}
+
+export function linearFit(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  if (sxx === 0 || syy === 0) return null;
+  const scale = sxy / sxx;
+  return { r: sxy / Math.sqrt(sxx * syy), scale, offset: my - scale * mx, n };
+}

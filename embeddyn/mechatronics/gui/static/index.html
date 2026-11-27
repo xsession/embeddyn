@@ -112,8 +112,21 @@
       <input id="an-filter" placeholder="filter: text · id==0x182 · src==gateway · type==SDO · ch==37 · rssi<-60">
       <label class="small" title="Select the packet at the run's time cursor while scrubbing or replaying"><input type="checkbox" id="an-sync" checked> follow cursor</label>
       <span id="an-count" class="small"></span>
+      <button id="an-open" title="Open a capture from real hardware: pcap, pcapng or candump log">Open capture…</button>
+      <button id="an-send-toggle" title="Send frames into the running simulation">Send…</button>
+      <button id="an-dbc" title="CAN messages and named fields as a DBC file">DBC</button>
       <span class="small">pcap:</span>
       <a id="an-pcap-can" class="button" download>CAN</a><a id="an-pcap-ble" class="button" download>BLE</a><a id="an-pcap-wifi" class="button" download>Wi-Fi</a>
+    </div>
+    <div id="an-send" class="hidden">
+      <input id="an-s-topic" list="an-s-topics" placeholder="topic" title="Event topic (CAN: the bus input, e.g. can.tx)"><datalist id="an-s-topics"></datalist>
+      <select id="an-s-proto"><option value="can">CAN</option><option value="ble">BLE</option><option value="wifi">Wi-Fi</option></select>
+      <input id="an-s-id" placeholder="id 0x123" title="CAN identifier (hex with 0x, or decimal)">
+      <input id="an-s-data" placeholder="data hex: 01 02 03" title="Payload bytes (CAN: up to 8; BLE/Wi-Fi: the whole packet)">
+      <label class="small">every <input id="an-s-period" type="number" min="0" step="1" value="0"> ms</label>
+      <label class="small">× <input id="an-s-count" type="number" min="0" step="1" value="0" title="0 = until stopped"></label>
+      <button id="an-s-send" class="primary">Send</button><button id="an-s-stop">Stop all</button>
+      <span id="an-s-list" class="small"></span>
     </div>
     <canvas id="an-lanes" title="One lane per sender; click to jump to a packet"></canvas>
     <div id="an-diff" class="hidden">

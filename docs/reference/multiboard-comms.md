@@ -235,8 +235,59 @@ the whole run, which tells a counter from a set-point or a sensor value at a gla
 In **Packets**, the hex dump marks the bytes that differ from the previous packet of the
 same message (hover for the old value).
 
+### Reverse-engineering tools
+
+* **Find the bytes that carry a signal** (Changes view, top of the side panel). After a
+  run, pick any project signal, for example `sensor.temperature_c`, and press **Find**.
+  Every 1-, 2- and 4-byte reading of every message (both byte orders, signed and
+  unsigned) is correlated with the signal at the packet times. The best matches are listed
+  with Pearson *r* and the least-squares fit `signal ≈ scale × raw + offset`.
+  * In the example, `axis.position_mm` lands on CAN 0x182 bytes 2–5 (scale 0.001, µm →
+    mm), `sensor.temperature_c` on 0x183 bytes 2–3 (×0.1) and `sensor.distance_mm` on
+    0x183 bytes 0–1.
+  * Clicking a match selects those bytes and that reading.
+  * This is how simulated ground truth helps decode a protocol: on the bench you would log
+    the physical value next to the bus.
+* **Name these bytes…** adds the selection to the decoder as a named field: name, unit,
+  and scale and offset, filled in from the fit. Fields live in `metadata.analyzer.fields`,
+  keyed by message (`"CAN 0x183"`, `"BLE <address> <PDU type>"`, `"Wi-Fi <from> → <to>
+  <type>"`). They are saved with the project:
+
+  ```yaml
+  fields:
+    "CAN 0x183": [{name: heat, start: 2, reading: i16 LE, scale: 0.1, offset: 0, unit: degC}]
+  ```
+
+  The run is decoded again: every matching packet gets a *named fields* branch, and the
+  values are appended to its summary.
+* **DBC** writes a CAN database from the CANopen PDO layouts and the named CAN fields
+  (Intel/Motorola byte order, signedness, scale, offset, range, unit), for SavvyCAN,
+  cantools or a CAN tool chain.
+* **Open capture…** loads traffic recorded from real hardware without running anything:
+  * pcap or pcapng with SocketCAN (227), BLE LL (251, or 256 with PHDR) or 802.11 (105);
+  * `candump -l` logs and `candump` console output (29-bit ids, remote frames).
+
+  Times start at the first packet. CAN can be decoded as CANopen with the project's
+  node names, or as plain CAN. Every view works on the capture: changes, bits, readings,
+  plots, named fields, DBC. Correlation needs a run's signals.
+* **Send…** puts frames into the running simulation:
+  * enter a topic, a CAN id or a radio packet, data bytes, and optionally a period and
+    repeat count;
+  * **Stop all** or **×** on an entry ends a periodic sender;
+  * in the packet view, **↻ Replay** sends the selected packet again, and **✎ Edit & send**
+    copies it into the sender.
+
+  Injected events go out at the next macro step with source `lab`. CAN frames go to the
+  bus model's input (`metadata.analyzer.inject: {can: can.tx}`), so they are arbitrated
+  and timed like any board's. Use it for replay tests, an NMT stop to a node, malformed
+  SDOs, or flooding the bus to see the load and the latencies.
+
+  `CoSimulationOrchestrator.inject(topic, payload)` does the same from scripts.
+
 The API is `GET /api/analyzer?session=…&from=N` (decoded packets from packet N, in time
-order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`.
+order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`, plus POST
+`analyzer/inject`, `analyzer/inject_stop`, `analyzer/import`, `analyzer/config` and
+`analyzer/dbc`.
 
 ## Tests
 
@@ -250,7 +301,10 @@ order, cached per run) and `GET /api/pcap?session=…&proto=can|ble|wifi`.
 * 802.11 beacons, UDP/JSON data, ACKs and FCS errors;
 * the example (network up, EMCY, the BLE → Wi-Fi path, bus load);
 * the decoded traffic of every kind, pcap headers, Renode-style CAN events, and the
-  analyzer and pcap API.
+  analyzer and pcap API;
+* candump, pcap and pcapng reading, named fields and DBC output, injection through the
+  orchestrator (a node obeys an injected NMT stop), and the send, import and config
+  endpoints.
 
 The pcap layouts follow the link-type specifications. They have not been opened in
 Wireshark here, and the BLE CRC-24 follows the Ubertooth convention without an outside

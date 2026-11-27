@@ -33,6 +33,8 @@ class CoSimulationOrchestrator:
         # (adapters with `receive_events`); each instance reads from its own cursor.
         self._event_log: list[tuple[str, Any]] = []
         self._event_cursor: dict[str, int] = {}
+        # Events injected from outside (the Lab's frame sender), published at the next macro step.
+        self._injections: deque[tuple[str, Any]] = deque()
         self.values: dict[str, Any] = {name: signal.initial for name, signal in project.signals.items()}
         self.history: dict[str, deque[float]] = {
             name: deque([float(signal.initial)], maxlen=self._max_delay_for(name) + 2)
@@ -134,6 +136,7 @@ class CoSimulationOrchestrator:
                 step_index += 1
                 macro_end = min(step_index * macro, self.project.duration_seconds)
                 self._apply_forced()
+                self._drain_injections(macro_start)
                 for activation in self.scheduler.activations(macro_start, macro_end):
                     self._activate(activation.instance or activation.domain.value, activation.domain,
                                    activation.time_seconds, activation.step_seconds)
@@ -226,6 +229,21 @@ class CoSimulationOrchestrator:
             writer = getattr(self, "_event_writer", None)
             if writer is not None:
                 writer.append({"time_seconds": published.time_seconds, "topic": published.topic, "payload": published.payload, "source": published.source})
+
+    def inject(self, topic: str, payload: Any) -> None:
+        """Publish an event from outside the run (thread-safe); it goes out at the start of the next
+        macro step, to subscribers like any adapter's event (source "lab")."""
+        self._injections.append((str(topic), payload))
+
+    def _drain_injections(self, now: float) -> None:
+        while self._injections:
+            topic, payload = self._injections.popleft()
+            event = self.events.publish(now, topic, payload, "lab")
+            self._event_log.append(("lab", event))
+            writer = getattr(self, "_event_writer", None)
+            if writer is not None:
+                writer.append({"time_seconds": event.time_seconds, "topic": event.topic, "payload": event.payload,
+                               "source": event.source})
 
     def _deliver_events(self, instance: str, adapter: Any) -> None:
         """Hand an adapter the events other instances published since its last activation."""

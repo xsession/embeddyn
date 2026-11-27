@@ -261,3 +261,108 @@ def test_http_analyzer_and_pcap(lab):
     assert more["packets"][0]["no"] == 51
     pcap = urllib.request.urlopen(f"{lab}/api/pcap?session={info['session']}&proto=wifi", timeout=10).read()
     assert struct.unpack_from("<I", pcap, 20)[0] == 105 and len(pcap) > 24
+
+
+# -- reverse-engineering tools ---------------------------------------------------------------------------
+from embeddyn.mechatronics.comms.analyzer import apply_fields, dbc, message_key, read_field   # noqa: E402
+from embeddyn.mechatronics.comms.captures import read_candump, read_capture, read_pcap        # noqa: E402
+
+
+def test_candump_formats():
+    events = read_candump("(1700000000.100000) can0 182#3702A8610000\n"
+                          "can0  123   [2]  DE AD\n"
+                          "(1700000000.200000) can0 18FF50E5#R\n"
+                          "garbage line\n")
+    assert [e["payload"]["id"] for e in events] == [0x182, 0x123, 0x18FF50E5]
+    assert [round(e["time_seconds"], 4) for e in events] == [0.0, 0.001, 0.1]
+    assert events[1]["payload"]["data"] == "dead" and events[2]["payload"]["ext"] and events[2]["payload"]["rtr"]
+
+
+def test_pcap_and_pcapng_read_back(run, tmp_path):
+    _, events, config = run
+    for proto in ("can", "ble", "wifi"):
+        path = tmp_path / f"{proto}.pcap"
+        count = write_pcap(events, path, proto)
+        back = read_capture(path)
+        assert len(back) == count and back[0]["time_seconds"] == 0.0
+        original = sorted((e for e in events if e["payload"].get("proto") == proto), key=lambda e: e["time_seconds"])
+        assert [e["payload"]["data"] for e in back] == [e["payload"]["data"] for e in original]
+    # pcapng: section header, interface (802.11, microseconds), one enhanced packet block
+    frame = wifi.beacon("02:00:00:00:00:01", "lab", 6, 1, 0)
+    shb = struct.pack("<IIIHHq", 0x0A0D0D0A, 28, 0x1A2B3C4D, 1, 0, -1) + struct.pack("<I", 28)
+    idb = struct.pack("<IIHHI", 1, 20, 105, 0, 0) + struct.pack("<I", 20)
+    padded = frame + b"\0" * (-len(frame) % 4)
+    epb_len = 32 + len(padded)
+    epb = struct.pack("<IIIIIII", 6, epb_len, 0, 0, 1_500_000, len(frame), len(frame)) + padded + struct.pack("<I", epb_len)
+    (event,) = read_pcap(shb + idb + epb)
+    assert event["payload"]["proto"] == "wifi" and bytes.fromhex(event["payload"]["data"]) == frame
+    with pytest.raises(ValueError):
+        read_pcap(b"not a capture at all, sorry")
+
+
+def test_named_fields_and_dbc():
+    row = decode_event({"time_seconds": 0, "topic": "can", "payload": {"proto": "can", "id": 0x183, "data": "f401930200"}},
+                       {"fields": {"CAN 0x183": [{"name": "temp", "start": 2, "reading": "i16 LE", "scale": 0.1, "unit": "degC"}]}})
+    assert message_key(row) == "CAN 0x183" and row["named"]["temp"].startswith("65.9 degC")
+    assert row["summary"].endswith("| temp=65.9 degC")
+    assert read_field(bytes([1, 2, 3, 4]), 1, "i16 BE") == 0x0203 and read_field(b"\xff", 0, "i8") == -1
+    assert read_field(b"\x01", 0, "u16 LE") is None
+    text = dbc({"canopen": {"pdos": {"0x182": {"name": "axis TPDO1", "fields": [{"name": "status", "format": "u16"},
+                                                                                {"name": "position", "format": "i32", "scale": 0.001, "unit": "mm"}]}}},
+                "fields": {"CAN 0x300": [{"name": "rpm", "start": 0, "reading": "u16 BE", "scale": 0.25}],
+                           "BLE x ADV_IND": [{"name": "ignored", "start": 0, "reading": "u8"}]}})
+    assert "BO_ 386 axis_TPDO1: 6 embeddyn" in text
+    assert ' SG_ position : 16|32@1- (0.001,0)' in text
+    assert ' SG_ rpm : 7|16@0+ (0.25,0) [0|16383.75] ""' in text and "ignored" not in text
+
+
+def test_orchestrator_injection_reaches_the_boards():
+    project = MechatronicProject.load(EXAMPLE)
+    project.duration_seconds = 0.3
+    orchestrator = CoSimulationOrchestrator(project, build_adapters(project))
+    rows = []
+    for row in orchestrator.iterate():
+        rows.append(row)
+        if abs(row["time"] - 0.2) < 1e-9:
+            orchestrator.inject("can.tx", {"proto": "can", "id": 0x000, "data": "0203", "src": "lab"})   # NMT stop node 3
+    events = [e for r in rows for e in r.get("__events__", [])]
+    assert any(e["topic"] == "can.tx" and e["source"] == "lab" for e in events)
+    heartbeats = [e["payload"]["data"] for e in events if e["topic"] == "can" and e["payload"]["id"] == 0x703]
+    assert heartbeats[-1] == "04"                         # the sensor obeyed the injected NMT stop
+
+
+def test_http_inject_import_and_config(lab, tmp_path):
+    graph = load_graph(EXAMPLE)
+    info = _post(lab, "run", {"graph": graph, "duration": 0.6, "realtime": True, "speed": 1.0})
+    for _ in range(100):
+        status = json.loads(urllib.request.urlopen(f"{lab}/api/session?session={info['session']}", timeout=10).read())
+        if status["status"] == "running":
+            break
+        time.sleep(0.05)
+    sent = _post(lab, "analyzer/inject", {"session": info["session"], "topic": "can.tx",
+                                          "payload": {"id": "0x321", "data": "deadbeef"}, "period_ms": 20, "count": 3})
+    assert sent["injections"][0]["topic"] == "can.tx"
+    with pytest.raises(urllib.error.HTTPError):
+        _post(lab, "analyzer/inject", {"session": info["session"], "topic": "can.tx", "payload": {"id": 1, "data": "00" * 9}})
+    for _ in range(200):
+        status = json.loads(urllib.request.urlopen(f"{lab}/api/session?session={info['session']}", timeout=10).read())
+        if status["status"] in ("done", "error"):
+            break
+        time.sleep(0.1)
+    packets = json.loads(urllib.request.urlopen(f"{lab}/api/analyzer?session={info['session']}&from=0", timeout=10).read())["packets"]
+    injected = [p for p in packets if p.get("id") == 0x321]
+    assert len(injected) == 3 and injected[0]["source"] == "lab"
+    # named field via the config endpoint: decoded again
+    config = dict(graph["extra"]["metadata"]["analyzer"])
+    config["fields"] = {"CAN 0x321": [{"name": "magic", "start": 0, "reading": "u32 BE"}]}
+    _post(lab, "analyzer/config", {"session": info["session"], "config": config})
+    packets = json.loads(urllib.request.urlopen(f"{lab}/api/analyzer?session={info['session']}&from=0", timeout=10).read())["packets"]
+    assert next(p for p in packets if p.get("id") == 0x321)["named"]["magic"].startswith(str(0xDEADBEEF))
+    # a candump capture, decoded as plain CAN
+    log = tmp_path / "bus.log"
+    log.write_text("(10.000000) can0 0C9#0BEA\n(10.010000) can0 0C9#0BEB\n")
+    opened = _post(lab, "analyzer/import", {"path": str(log), "graph": graph, "canopen": False})
+    assert opened["events"] == 2 and opened["topics"] == {"can": 2}
+    rows = json.loads(urllib.request.urlopen(f"{lab}/api/analyzer?session={opened['session']}&from=0", timeout=10).read())
+    assert [p["proto"] for p in rows["packets"]] == ["CAN", "CAN"] and rows["capture"] == str(log)
+    assert _post(lab, "analyzer/dbc", {"config": config})["text"].count("BO_ ") >= 4

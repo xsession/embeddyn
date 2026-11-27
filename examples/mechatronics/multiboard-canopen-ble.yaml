@@ -14,6 +14,7 @@ metadata:
   # Decoder settings for the Lab's analyzer.
   analyzer:
     topics: [can, ble, wifi]
+    inject: {can: can.tx, ble: ble, wifi: wifi}   # where the frame sender puts frames (CAN: into the bus model)
     can: {bitrate: 500000}
     canopen:
       master: 1                   # SDO client: responses are addressed to it

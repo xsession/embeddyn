@@ -6,6 +6,7 @@ project files and launches simulators, so it is a local tool.
 """
 from __future__ import annotations
 
+import copy
 import json
 import mimetypes
 import os
@@ -22,7 +23,7 @@ import yaml
 from . import breadboard
 from .document import graph_from_raw, instance_ports, load_graph, project_from_graph, raw_from_graph, to_yaml
 from .parts import EXAMPLES, instantiate_part, part_library
-from .session import RunSession
+from .session import CaptureSession, RunSession
 
 STATIC = Path(__file__).resolve().parent / "static"
 _PATH_KEYS = ("script", "firmware", "bindings", "log")
@@ -304,6 +305,73 @@ def make_handler(state: LabState):
             target.write_text(breadboard.export_netlist(body["board"], original), encoding="utf-8")
             return {"path": str(target)}
 
+        # analyzer: frame sender, captures, decoder settings ------------------------------------------
+        def _post_analyzer_inject(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = state.session(str(body["session"]))
+            payload = body.get("payload")
+            if not isinstance(payload, dict) or "data" not in payload:
+                raise ValueError("payload must be an object with hex `data` (and `id` for CAN)")
+            bytes.fromhex(str(payload["data"]))                      # refuse malformed hex here
+            if payload.get("proto", "can") == "can":
+                payload = {**payload, "proto": "can", "id": int(str(payload.get("id", 0)), 0)
+                           if isinstance(payload.get("id"), str) else int(payload.get("id", 0))}
+                if not 0 <= payload["id"] <= 0x1FFFFFFF or len(bytes.fromhex(payload["data"])) > 8:
+                    raise ValueError("CAN id must be 0..0x1FFFFFFF and data at most 8 bytes")
+            if not hasattr(session, "inject"):
+                raise LookupError("captures cannot take frames: run the project")
+            return session.inject(str(body.get("topic") or ""), payload, float(body.get("period_ms") or 0) / 1000.0,
+                                  int(body.get("count") or 0))
+
+        def _post_analyzer_inject_stop(self, body: dict[str, Any]) -> dict[str, Any]:
+            session = state.session(str(body["session"]))
+            if not hasattr(session, "stop_injection"):
+                return {"injections": []}
+            return session.stop_injection(body.get("id"))
+
+        def _post_analyzer_import(self, body: dict[str, Any]) -> dict[str, Any]:
+            from ..comms.captures import read_capture
+            path = Path(str(body.get("path") or "")).expanduser()
+            if not str(body.get("path") or ""):
+                raise ValueError("a capture path is needed")
+            if not path.is_absolute():
+                path = Path(str(body.get("root") or os.getcwd())) / path
+            path = path.resolve()
+            if path.suffix.lower() not in {".pcap", ".pcapng", ".cap", ".log", ".txt", ".candump", ".asc"}:
+                raise ValueError("open a .pcap, .pcapng or candump .log capture")
+            events = read_capture(path)
+            graph = copy.deepcopy(dict(body.get("graph") or {}))
+            if not body.get("canopen", True):                    # plain CAN: drop the CANopen decoder settings
+                analyzer = ((graph.get("extra") or {}).get("metadata") or {}).get("analyzer")
+                if isinstance(analyzer, dict):
+                    analyzer.pop("canopen", None)
+                    analyzer.pop("topics", None)
+            else:
+                analyzer = ((graph.get("extra") or {}).get("metadata") or {}).get("analyzer")
+                if isinstance(analyzer, dict):
+                    analyzer.pop("topics", None)                 # a capture has its own topics
+            session = CaptureSession(graph, events, str(path))
+            with state.lock:
+                state.sessions[session.id] = session
+            topics: dict[str, int] = {}
+            for event in events:
+                topics[event["topic"]] = topics.get(event["topic"], 0) + 1
+            return {**session.info(), "topics": topics}
+
+        def _post_analyzer_config(self, body: dict[str, Any]) -> dict[str, Any]:
+            """New decoder settings for a run's analyzer (named fields...): decode it again."""
+            session = state.session(str(body["session"]))
+            config = dict(body.get("config") or {})
+            graph = session.graph
+            extra = graph.setdefault("extra", {})
+            metadata = extra.setdefault("metadata", {})
+            metadata["analyzer"] = config
+            session.__dict__.pop("_analyzer", None)
+            return {"ok": True}
+
+        def _post_analyzer_dbc(self, body: dict[str, Any]) -> dict[str, Any]:
+            from ..comms.analyzer import dbc
+            return {"text": dbc(dict(body.get("config") or {}))}
+
         def _post_run(self, body: dict[str, Any]) -> dict[str, Any]:
             session = RunSession(body["graph"], mock=bool(body.get("mock")), realtime=bool(body.get("realtime")),
                                  speed=float(body.get("speed") or 1.0), duration=body.get("duration"))
@@ -423,7 +491,8 @@ def _decode_new(session: RunSession, cache: dict[str, Any], config: dict[str, An
             cache["rows"].append(row)
     cache["cursor"] = cursor
     return {"packets": cache["rows"][start:], "total": len(cache["rows"]), "status": status,
-            "pending": len(cache.get("held", []))}
+            "pending": len(cache.get("held", [])), "injections": session.injection_list(),
+            "capture": getattr(session, "path", None)}
 
 
 def _pcap(session: RunSession, proto: str) -> bytes:

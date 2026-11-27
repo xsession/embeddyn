@@ -35,6 +35,7 @@ class RunSession:
         self.metrics: dict[str, Any] = {}
         self.wall_seconds = 0.0
         self.forced: dict[str, float] = controls(graph)
+        self.injections: dict[str, dict[str, Any]] = {}  # frame sender: id -> {topic, payload, period, ...}
         self._lock = threading.Lock()
         self._resume = threading.Event()
         self._resume.set()
@@ -105,6 +106,55 @@ class RunSession:
             return {"instance": name, "bytes": count}
         raise LookupError(f"no UART publishes {signal}")
 
+    def inject(self, topic: str, payload: Any, period: float = 0.0, count: int = 0) -> dict[str, Any]:
+        """Send an event into the running simulation (a CAN frame, a radio packet...).
+
+        `period` > 0 repeats it every `period` seconds of simulated time (`count` times, 0 = until
+        stopped); the returned id stops it (`stop_injection`)."""
+        if self._orchestrator is None or self.finished:
+            raise LookupError("the run is not active")
+        if not topic:
+            raise ValueError("a topic is needed")
+        if period < 0 or (period and period < 1e-5):
+            raise ValueError("period must be 0 (once) or at least 10 us")
+        self._injection_count = getattr(self, "_injection_count", 0) + 1
+        ident = f"i{self._injection_count}"
+        with self._lock:
+            self.injections[ident] = {"id": ident, "topic": topic, "payload": payload, "period": float(period),
+                                      "left": int(count), "next": None, "sent": 0}
+        return {"id": ident, "injections": self.injection_list()}
+
+    def stop_injection(self, ident: str | None = None) -> dict[str, Any]:
+        with self._lock:
+            if ident:
+                self.injections.pop(ident, None)
+            else:
+                self.injections.clear()
+        return {"injections": self.injection_list()}
+
+    def injection_list(self) -> list[dict[str, Any]]:
+        return [{k: v for k, v in item.items() if k != "next"} for item in self.injections.values()]
+
+    def _pump_injections(self, now: float) -> None:
+        """Called in the run thread after each step: hand due injections to the orchestrator."""
+        if not self.injections:
+            return
+        with self._lock:
+            for ident, item in list(self.injections.items()):
+                if item["next"] is None:
+                    item["next"] = now
+                if item["next"] > now + 1e-12:
+                    continue
+                payload = dict(item["payload"]) if isinstance(item["payload"], dict) else item["payload"]
+                if isinstance(payload, dict):
+                    payload.setdefault("src", "lab")
+                self._orchestrator.inject(item["topic"], payload)
+                item["sent"] += 1
+                if item["period"] <= 0 or (item["left"] and item["sent"] >= item["left"]):
+                    self.injections.pop(ident)
+                else:
+                    item["next"] += item["period"]
+
     def snapshot(self, cursor: int) -> tuple[list[list[float | None]], int]:
         with self._lock:
             rows = self.rows[cursor:]
@@ -160,6 +210,7 @@ class RunSession:
                     self.status = "running" if self._resume.is_set() else "paused"
                     self.log.append(f"running {project.duration_seconds:g} s at {project.step_seconds:g} s steps")
                 self._emit(row)
+                self._pump_injections(float(row["time"]))
                 if self._stop.is_set():
                     break
                 if not self._resume.is_set():
@@ -201,3 +252,37 @@ class RunSession:
             for row in self.rows:
                 lines.append(",".join("" if v is None else repr(v) for v in row))
         return "\n".join(lines) + "\n"
+
+
+class CaptureSession:
+    """A recorded capture (candump log, pcap, pcapng) opened in the analyzer, without a run.
+
+    It answers what the analyzer endpoints ask of a `RunSession`: id, graph (for the
+    decoder settings), events and status.
+    """
+
+    finished = True
+
+    def __init__(self, graph: dict[str, Any], events: list[dict[str, Any]], path: str) -> None:
+        self.id = "cap" + uuid.uuid4().hex[:9]
+        self.graph = graph
+        self.events = events
+        self.path = path
+        self.status = "done"
+        self.injections: dict[str, Any] = {}
+
+    def events_since(self, cursor: int) -> tuple[list[dict[str, Any]], int]:
+        items = self.events[cursor:]
+        return items, cursor + len(items)
+
+    def info(self) -> dict[str, Any]:
+        return {"session": self.id, "status": "done", "capture": self.path, "events": len(self.events)}
+
+    def stop(self) -> None:
+        pass
+
+    def join(self, timeout: float | None = None) -> None:
+        pass
+
+    def injection_list(self) -> list[dict[str, Any]]:
+        return []

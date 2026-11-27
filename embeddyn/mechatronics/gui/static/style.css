@@ -286,3 +286,17 @@ label { user-select: none; }
 .readings td:first-child { color: var(--muted); }
 #an-spark { width: 100%; height: 120px; display: block; background: #1a1d22; border-radius: 4px; margin-top: 4px; }
 .an-hexline .chg { color: #ff9f1a; font-weight: bold; }
+
+#an-send { display: flex; gap: 6px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: #232830; }
+#an-send.hidden { display: none; }
+#an-s-topic { width: 90px; } #an-s-id { width: 80px; font-family: monospace; } #an-s-data { width: 230px; font-family: monospace; }
+#an-s-period, #an-s-count { width: 56px; }
+.an-inj { background: #34404f; border-radius: 8px; padding: 0 6px; margin-right: 4px; }
+.an-inj b { cursor: pointer; color: var(--err); margin-left: 4px; }
+.an-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 2px 0 6px; }
+.an-tools select { max-width: 200px; }
+.corr td { padding: 1px 5px; font-family: monospace; cursor: pointer; white-space: nowrap; } .corr tr:hover td { background: #2a3038; }
+.corr tr.on td { background: #263a52; }
+.named { margin: 4px 0; } .named div { font-family: monospace; } .named b { cursor: pointer; color: var(--err); margin-left: 6px; }
+.an-capture { color: var(--warn); }
+.an-title .mini { margin-left: 8px; padding: 0 6px; font-size: 11px; }
