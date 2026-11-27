@@ -41,7 +41,10 @@ The agent kit packages that workflow so that an agent running a 27B-class open m
   before the program), the nRF51822 (GNU Arm with the nRF5 SDK 12.3 MDK; run with a 10 us quantum; load the
   S130 SoftDevice HEX too for SoftDevice applications), the ESP8266 (xtensa-lx106-elf GCC; bare-metal programs load
   directly, ESP8266_RTOS_SDK applications boot from a flash image through the behavioural boot ROM
-  `tools/esp8266/bootrom/esp8266_bootrom.elf`), plus an STM32L476 example for
+  `tools/esp8266/bootrom/esp8266_bootrom.elf`), the classic ESP32 (`esp32`: Arduino-ESP32 / ESP-IDF images boot
+  on both cores from a 4 MB flash image through the behavioural boot ROM `tools/esp32/bootrom/esp32_bootrom.elf`,
+  loaded with `spi1.flash LoadImage @image 0`; the LilyGO T-Beam V1.1 board adds the SX1278 LoRa radio, AXP192,
+  NEO-6M GPS and SSD1306, and runs the Meshtastic release image), plus an STM32L476 example for
   SVD-described parts. Add your own in `$MCU_EMU_PROFILES`.
 
 ## Install

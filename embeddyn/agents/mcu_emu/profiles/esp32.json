@@ -1,0 +1,39 @@
+{
+  "name": "esp32",
+  "description": "Espressif ESP32 (ESP32-D0WD/D0WDQ6: dual Xtensa LX6 up to 240 MHz, 520 KB SRAM, external SPI flash, WiFi/BT) with Arduino-ESP32 / ESP-IDF; Renode ESP32 models with a behavioural boot ROM, LilyGO T-Beam V1.1 board (SX1278 LoRa, AXP192, NEO-6M GPS, SSD1306)",
+  "env_defaults": {
+    "XTENSA_ESP32_BIN": "/opt/esp-x32/bin",
+    "ARDUINO_ENV": "/opt/arduino/env.sh",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${XTENSA_ESP32_BIN}/xtensa-esp32-elf-gcc",
+    "objcopy": "${XTENSA_ESP32_BIN}/xtensa-esp32-elf-objcopy",
+    "objdump": "${XTENSA_ESP32_BIN}/xtensa-esp32-elf-objdump",
+    "notes": "Applications are Arduino sketches or ESP-IDF projects: build with arduino-cli (FQBN esp32:esp32:t-beam or esp32:esp32:esp32; ${RENODE_ROOT}/tools/esp32/examples/build_examples.sh wraps it) and boot the 4 MB merged image (<sketch>.ino.merged.bin: bootloader at 0x1000, partition table at 0x8000, app at 0x10000). build_firmware's bare compile is for objects only; there is no bare-metal start-up for this part."
+  },
+  "image": {
+    "base": "0x10000",
+    "loader": "spi1.flash LoadImage @{image} 0",
+    "notes": "Boot like the chip: load the boot ROM ({kind: elf, path: ${RENODE_ROOT}/tools/esp32/bootrom/esp32_bootrom.elf}) and the flash image with 'spi1.flash LoadImage @image.bin 0'; the ROM loads the 2nd-stage bootloader, which verifies and maps the app; the app starts the second core."
+  },
+  "memory": {
+    "drom_cache": ["0x3F400000", "0x3F7FFFFF"],
+    "dport": ["0x3FF00000", "0x3FF00FFF"],
+    "peripherals": ["0x3FF40000", "0x3FF7FFFF"],
+    "dram": ["0x3FFAE000", "0x3FFFFFFF"],
+    "rom": ["0x40000000", "0x4006FFFF"],
+    "iram": ["0x40070000", "0x4009FFFF"],
+    "irom_cache": ["0x400C2000", "0x403FFFFF"],
+    "rtc_slow": ["0x50000000", "0x50001FFF"]
+  },
+  "renode": {
+    "platform": "platforms/cpus/espressif/esp32.repl",
+    "board": "platforms/boards/lilygo/ttgo_t_beam_v1_1.repl",
+    "pc_command": "cpu0 PC",
+    "notes": "Two cores: cpu0 (PRO) and cpu1 (APP). Console on uart0 ('uart0 CreateFileBackend @file true'). Pins: 'gpio PinLevel <n>', 'gpio RecordPin <n>' / 'gpio PinEdges <n>', 'gpio OnGPIO <n> true|false'. T-Beam: AXP192 'axp BatteryVoltage 3.7', 'axp VbusVoltage 0', 'axp PressPowerKey'; GPS 'gps Latitude', 'gps Longitude', 'gps SpeedKnots', 'gps Satellites'; LoRa 'spi3.lora PacketsSent', 'spi3.lora LastSentPacket', 'spi3.lora InjectPacket \"<hex>\"', boards talk through 'emulation CreateIEEE802_15_4Medium \"air\"' + 'connector Connect spi3.lora air'; OLED 'oled Render'; button 'user_button Press'/'Release'. eFuse MAC 'efuse Mac \"24:0A:C4:12:34:56\"'. No WiFi/Bluetooth, PSRAM or ADC conversions. Run Renode with an open stdin (its console reader spins on EOF). Docs: tools/esp32/README.md and PERIPHERALS.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with Arduino-ESP32 4.0 sketches and LilyGO T-Beam examples (tools/esp32/examples/run_examples.py, examples.txt) and the Meshtastic 2.7.26 tbeam release image"
+  }
+}

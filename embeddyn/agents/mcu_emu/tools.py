@@ -61,14 +61,22 @@ def _need_file(p: Path | None, what: str) -> Path:
     return p
 
 
-def _run(cmd: list[str], cwd: Path | None = None, timeout: int = 600, env: dict | None = None) -> subprocess.CompletedProcess:
+def _run(cmd: list[str], cwd: Path | None = None, timeout: int = 600, env: dict | None = None,
+         open_stdin: bool = False) -> subprocess.CompletedProcess:
+    # open_stdin: give the program a stdin that stays open for the whole run (Renode's console reader spins on
+    # end-of-file, slowing the emulation and growing its memory)
+    feeder = subprocess.Popen(["sleep", str(timeout + 60)], stdout=subprocess.PIPE) if open_stdin else None
     try:
         return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
-                              env={**os.environ, **(env or {})})
+                              env={**os.environ, **(env or {})}, stdin=feeder.stdout if feeder else None)
     except FileNotFoundError as exc:
         raise ToolError(f"program not found: {cmd[0]} ({exc})") from exc
     except subprocess.TimeoutExpired as exc:
         raise ToolError(f"timed out after {timeout} s: {' '.join(cmd[:3])}...") from exc
+    finally:
+        if feeder:
+            feeder.kill()
+            feeder.wait()
 
 
 def _lines(text: str, pattern: str, limit: int = 20) -> list[str]:
@@ -472,7 +480,8 @@ def _run_script(lines: list[str], renode_root: str | None, timeout: int) -> tupl
         script = Path(tmp) / "run.resc"
         script.write_text("\n".join(lines + ["quit"]) + "\n")
         t0 = time.time()
-        r = _run([binary, "--disable-xwt", "--console", "-e", f"include @{script}"], cwd=root, timeout=timeout)
+        r = _run([binary, "--disable-xwt", "--console", "-e", f"include @{script}"], cwd=root, timeout=timeout,
+                 open_stdin=True)
     clean = re.sub(r"\x1b\[[0-9;]*m", "", r.stdout + r.stderr).replace("\r", "").replace("﻿", "")
     return clean, time.time() - t0
 
@@ -491,7 +500,7 @@ def _load_lines(loads: list | None) -> list[str]:
         if isinstance(item, str):
             # monitor commands ("sysbus ...", "cpu LoadTIProgram ...", "c28 LoadTIProgram ...", "m3 VectorTableOffset 0")
             # pass through; a bare path is a binary to load
-            raw = item.startswith(("sysbus", "cpu ")) or re.match(r"^\w+ [A-Z]\w+", item)
+            raw = item.startswith(("sysbus", "cpu ")) or re.match(r"^[\w.]+ [A-Z]\w+", item)
             out.append(item if raw else f"sysbus LoadBinary @{item}")
         else:
             kind = item.get("kind", "binary")

@@ -332,6 +332,38 @@ def test_build_and_run_esp8266_periph(tmp_path):
     assert "ESP8266 OK" in res["uart"]["uart0"], res
 
 
+def test_esp32_profile(monkeypatch):
+    monkeypatch.setenv("RENODE_ROOT", "/r")
+    monkeypatch.setenv("XTENSA_ESP32_BIN", "/x")
+    p = tools.load_profile("esp32")
+    assert p["toolchain"]["cc"] == "/x/xtensa-esp32-elf-gcc"
+    assert p["renode"]["platform"] == "platforms/cpus/espressif/esp32.repl"
+    assert p["renode"]["board"] == "platforms/boards/lilygo/ttgo_t_beam_v1_1.repl"
+    # flash loads through the SPI flash chip pass through as monitor commands
+    assert tools._load_lines(["spi1.flash LoadImage @a.bin 0"]) == ["spi1.flash LoadImage @a.bin 0"]
+
+
+needs_esp32 = pytest.mark.skipif(not (os.environ.get("ESP32_SELFTEST_IMAGE") and os.environ.get("RENODE_BIN")
+                                      and os.environ.get("RENODE_ROOT") and shutil.which("dotnet")),
+                                 reason="ESP32_SELFTEST_IMAGE (tbeam_selftest merged image), RENODE_BIN, RENODE_ROOT needed")
+
+
+@needs_esp32
+def test_run_esp32_tbeam_selftest():
+    root = Path(os.environ["RENODE_ROOT"])
+    loads = [{"kind": "elf", "file": str(root / "tools/esp32/bootrom/esp32_bootrom.elf")},
+             f"spi1.flash LoadImage @{os.environ['ESP32_SELFTEST_IMAGE']} 0"]
+    res = tools.renode_run("platforms/boards/lilygo/ttgo_t_beam_v1_1.repl", loads, run_for="4", uart=["uart0"],
+                           cpu="cpu0", timeout=1200)
+    out = res["uart"]["uart0"]
+    # ROM banner, bootloader, app on both cores; every board part answers
+    assert "rst:0x1 (POWERON_RESET)" in out, res
+    for check in ("i2c_scan", "axp192_id", "axp192_rails", "axp192_battery", "oled_on", "lora_begin", "lora_send",
+                  "gps_nmea", "button_released"):
+        assert f"PASS {check}" in out, (check, out[-2000:])
+    assert "SELFTEST DONE failures=0" in out, out[-2000:]
+
+
 def test_concerto_profiles(monkeypatch):
     monkeypatch.setenv("RENODE_ROOT", "/r")
     monkeypatch.setenv("C2000_CGT", "/cgt")
