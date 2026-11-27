@@ -8,8 +8,34 @@ import { api, data, emit, markDirty, state, toast } from './store.js';
 import { buildStats, correlate, messageKey, readingOf, readings } from './bytediff.js';
 
 const $ = (id) => document.getElementById(id);
-const COLORS = { CANopen: '#e67e22', CAN: '#d35400', BLE: '#2f80d1', '802.11': '#27ae60', NFC: '#c0392b', RFID: '#8e44ad', LoRa: '#16a085', I2C: '#b7950b' };
-const PROTO_KEYS = ['CANopen', 'BLE', '802.11', 'NFC', 'RFID', 'LoRa', 'I2C'];
+const COLORS = { CANopen: '#e67e22', CAN: '#d35400', BLE: '#2f80d1', '802.11': '#27ae60', NFC: '#c0392b', RFID: '#8e44ad', LoRa: '#16a085', I2C: '#b7950b',
+  SPI: '#8d6e63', UART: '#78909c', Modbus: '#ad1457', Ethernet: '#1e88e5' };
+const PROTO_KEYS = ['CANopen', 'BLE', '802.11', 'NFC', 'RFID', 'LoRa', 'I2C', 'SPI', 'UART', 'Modbus', 'Ethernet'];
+// Fault presets of the medium panel (comms.faults): merged into the faults JSON.
+const FAULT_PRESETS = {
+  'UART: receiver clock 5 % off': { baud_error_pct: 5 },
+  'UART: wrong baud rate (9600)': { rx_baud: 9600 },
+  'UART: receiver expects 8E1': { rx_format: '8E1' },
+  'UART/RS-485: noise spikes': { glitches_per_s: 2000, glitch_us: 3 },
+  'UART: overrun (1.5 ms ISR every 10 ms)': { overrun: { busy_us: 1500, period_ms: 10, fifo: 1 } },
+  'RS-485: no fail-safe bias': { bias: false, floating_noise: 0.6 },
+  'RS-485: driver enable held 3 ms': { de_hold_us: 3000 },
+  'RS-485: driver enable 40 µs late': { de_late_us: 40 },
+  'RS-485: gaps inside frames': { char_gap_us: 1600 },
+  'RS-485: ground offset 9 V': { ground_offset_v: 9 },
+  'SPI: slave in mode 1': { slave_mode: 1 },
+  'SPI: SCK ringing (extra clocks)': { double_clock: 0.1 },
+  'SPI: chip-select glitches': { cs_glitch: 0.1 },
+  'I2C: devices NACK (busy)': { nack: 0.05 },
+  'I2C: clock-stretch timeouts': { stretch_timeout: 0.05 },
+  'I2C: two devices on one address': { address_conflict: '0x3F' },
+  'I2C: SCL glitches': { scl_glitch: 0.05 },
+  'Ethernet: duplex mismatch': { duplex_mismatch: true },
+  'Ethernet: hub (half duplex)': { half_duplex: true },
+  'Ethernet: MTU 576': { mtu: 576 },
+  'Ethernet: duplicates': { duplicate: 0.05 },
+  'Ethernet: reordering': { reorder: 0.05, reorder_us: 800 },
+};
 const TYPE_TINT = { EMCY: '#ff5c5c', 'SDO abort': '#ff5c5c', NMT: '#c39bd3', SYNC: '#8d96a5', heartbeat: '#6b7380', SDO: '#f0b429' };
 const an = { packets: [], session: null, polling: null, selected: null, field: null, visible: false, follow: true,
   shown: [], lastCursor: -1, rowHeight: 20,
@@ -431,18 +457,20 @@ export function onFrame() {
 
 async function poll() {
   const session = sessionId();
-  if (!session) return;
+  if (!session || an.fetching) return;           // a slow answer must not be fetched twice (duplicate rows)
   if (session !== an.session) { an.session = session; an.packets = []; an.selected = null; }
+  an.fetching = true;
   try {
-    const response = await fetch(`/api/analyzer?session=${session}&from=${an.packets.length}`);
+    const from = an.packets.length;
+    const response = await fetch(`/api/analyzer?session=${session}&from=${from}`);
     const result = await response.json();
-    if (result.error) return;
+    if (result.error || session !== an.session || from !== an.packets.length) return;
     if (result.packets.length) { an.packets.push(...result.packets); render(); }
     renderInjections(result.injections || []);
     renderMediaStats(result.media);
-    for (const proto of ['can', 'ble', 'wifi', 'lora', 'nfc', 'i2c']) $(`an-pcap-${proto}`).href = `/api/pcap?session=${session}&proto=${proto}`;
+    for (const proto of ['can', 'ble', 'wifi', 'lora', 'nfc', 'i2c', 'spi', 'uart', 'rs485', 'eth']) $(`an-pcap-${proto}`).href = `/api/pcap?session=${session}&proto=${proto}`;
     if (['done', 'stopped', 'error'].includes(result.status) && result.total === an.packets.length) stopPolling();
-  } catch { /* the server restarted or the run is gone */ }
+  } catch { /* the server restarted or the run is gone */ } finally { an.fetching = false; }
 }
 
 function startPolling() { if (!an.polling) { an.polling = setInterval(poll, 400); poll(); } }
@@ -462,8 +490,11 @@ export function runStarted() {
 // ---------------------------------------------------------------------------------------------
 // Frame sender, captures, DBC
 
+const WIRED = { UART: 'uart', Modbus: 'rs485', SPI: 'spi', Ethernet: 'eth', I2C: 'i2c' };
+
 function payloadOf(p) {
   if (p.proto === 'CAN' || p.proto === 'CANopen') return { proto: 'can', id: p.id, data: p.hex };
+  if (WIRED[p.proto]) return { ...(p.send || {}), proto: WIRED[p.proto], data: p.hex };
   return { proto: p.proto === 'BLE' ? 'ble' : 'wifi', channel: p.channel, rssi: p.rssi, data: p.hex };
 }
 
@@ -514,6 +545,12 @@ function senderSend() {
     if (!Number.isFinite(id)) return toast('CAN id needed (0x123 or decimal)', true);
     payload.id = id;
     if (id > 0x7ff) payload.ext = true;
+  } else if (proto === 'uart' || proto === 'rs485') {
+    Object.assign(payload, { baud: proto === 'uart' ? 115200 : 19200, format: proto === 'uart' ? '8N1' : '8E1', src: 'analyzer' });
+  } else if (proto === 'spi') {
+    Object.assign(payload, { dir: 'mosi', cs: $('an-s-id').value.trim() || 'acc', mode: 0, hz: 1e6, src: 'analyzer' });
+  } else if (proto === 'eth') {
+    payload.src = 'analyzer';
   } else { payload.channel = proto === 'ble' ? 37 : 6; payload.rssi = -40; }
   send($('an-s-topic').value.trim() || injectTopic(proto), payload, Number($('an-s-period').value) || 0, Number($('an-s-count').value) || 0);
 }
@@ -578,13 +615,22 @@ function readMedium() {
     }
     if (Object.keys(sources).length) spec.link.sources = sources;
   }
+  const before = mediaConfig()[$('am-topic').value.trim()] || {};
   if (n('am-len') !== null) {
     spec.kind = 'wired';
-    spec.cable = { length_m: n('am-len'), type: $('am-ctype').value, shielded: $('am-shield').checked, emi_ber_per_m: n('am-emi') ?? 2e-7 };
+    spec.cable = { ...(before.cable || {}), length_m: n('am-len'), type: $('am-ctype').value, shielded: $('am-shield').checked,
+      termination: $('am-term').checked, category: $('am-cat').value };
+    if (n('am-emi') !== null) spec.cable.emi_ber_per_m = n('am-emi'); else delete spec.cable.emi_ber_per_m;
     if (n('am-rate')) spec.bitrate = n('am-rate');
     if ($('am-i2cmode').value) spec.cable.i2c = { mode: $('am-i2cmode').value, pullup_ohm: n('am-rp') || 4700, vdd: n('am-vdd') || 3.3, devices: n('am-dev') || 2 };
   }
-  spec.seed = 1;
+  const faults = $('am-faults').value.trim();
+  $('am-faults').classList.remove('bad');
+  if (faults) {
+    try { spec.faults = JSON.parse(faults); spec.kind = 'wired'; } catch { $('am-faults').classList.add('bad'); }
+  }
+  for (const key of ['fault_bursts', 'protocol', 'bursts', 'link']) if (before[key] !== undefined && spec[key] === undefined) spec[key] = before[key];
+  spec.seed = before.seed ?? 1;
   return spec;
 }
 
@@ -601,7 +647,9 @@ function showMedium(topic) {
   set('am-dist', link.distance_m); set('am-ptx', link.tx_dbm); set('am-exp', link.exponent ?? 2); set('am-walls', link.walls_db ?? 0);
   $('am-srcs').value = Object.entries(link.sources || {}).map(([k, v]) => `${k}=${v.distance_m}`).join(', ');
   set('am-len', cable.length_m); $('am-ctype').value = cable.type || 'twisted'; $('am-shield').checked = !!cable.shielded;
-  set('am-emi', cable.emi_ber_per_m ?? 2e-7); set('am-rate', spec.bitrate ?? 500000);
+  set('am-emi', cable.emi_ber_per_m); set('am-rate', spec.bitrate ?? 500000);
+  $('am-term').checked = cable.termination !== false; $('am-cat').value = cable.category || '5e';
+  $('am-faults').value = spec.faults ? JSON.stringify(spec.faults) : '';
   $('am-i2cmode').value = cable.i2c?.mode || ''; set('am-rp', cable.i2c?.pullup_ohm ?? 4700); set('am-vdd', cable.i2c?.vdd ?? 3.3); set('am-dev', cable.i2c?.devices ?? 2);
   checkMedium(topic, spec);
 }
@@ -648,6 +696,16 @@ function renderDerived(derived) {
       + `rise ${c.i2c.rise_ns} ns (max ${c.i2c.rise_max_ns}) with ${c.i2c.pullup_ohm} Ω · ${c.i2c.ok ? 'OK' : c.i2c.problems.join('; ')} · ${c.i2c.advice}`
       + (c.i2c.ber ? ` · BER ${c.i2c.ber.toExponential(1)}` : '')));
   }
+  for (const [key, label] of [['rs485', 'RS-485'], ['uart', 'RS-232'], ['spi', 'SPI'], ['eth', 'Ethernet']]) {
+    const k = c?.[key];
+    if (!k) continue;
+    const facts = key === 'rs485' ? `${k.baud} bit/s over ${k.length_m} m (max ${k.max_length_m} m), ${k.terminated ? 'terminated' : 'unterminated'}, settle ${k.settle_ns} ns`
+      : key === 'uart' ? `${k.cable_pf} pF of cable (max ${k.max_pf} pF at ${k.baud} bit/s, ${k.max_length_m} m)`
+        : key === 'spi' ? `MISO valid ${k.miso_ns} ns vs half clock ${k.half_period_ns} ns (max ${(k.max_hz / 1e6).toFixed(1)} MHz)`
+          : `${k.length_m} m Cat${k.category} at ${k.speed / 1e6} Mbit/s`;
+    box.append(html('div', { class: k.ok ? 'good' : 'bad' }, `${label}: ${facts} · ${k.ok ? 'OK' : k.problems.join('; ')}`
+      + (k.advice ? ` · ${k.advice}` : '') + (k.ber ? ` · BER ${k.ber.toExponential(1)}` : '')));
+  }
   box.append(...parts);
 }
 
@@ -657,8 +715,11 @@ function renderMediaStats(media) {
   if (topic && media[topic]?.derived && Object.keys(media[topic].derived).length) renderDerived(media[topic].derived);
   $('am-stats').textContent = Object.entries(media).map(([topic, m]) => {
     const st = m.stats || {};
+    const base = new Set(['frames', 'corrupted', 'flipped_bits', 'lost', 'errors', 'retransmissions', 'abandoned']);
+    const extra = Object.entries(st).filter(([k, v]) => !base.has(k) && v).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`);
     return `${topic}: ${st.frames || 0} frames, ${st.corrupted || 0} corrupted (${st.flipped_bits || 0} bits), ${st.lost || 0} lost`
-      + (st.errors ? `, ${st.errors} error frames, ${st.retransmissions} retransmissions` : '');
+      + (st.errors ? `, ${st.errors} error frames, ${st.retransmissions} retransmissions` : '')
+      + (extra.length ? `, ${extra.join(', ')}` : '');
   }).join(' · ');
 }
 
@@ -674,6 +735,16 @@ function bind() {
     showMedium($('am-topic').value);
   };
   $('am-topic').addEventListener('change', () => showMedium($('am-topic').value.trim()));
+  for (const name of Object.keys(FAULT_PRESETS)) $('am-fpreset').append(html('option', { value: name }, name));
+  $('am-fpreset').addEventListener('change', () => {
+    const preset = FAULT_PRESETS[$('am-fpreset').value];
+    $('am-fpreset').value = '';
+    if (!preset) return;
+    let faults = {};
+    try { faults = JSON.parse($('am-faults').value || '{}'); } catch { /* start again */ }
+    $('am-faults').value = JSON.stringify({ ...faults, ...preset });
+    checkMedium($('am-topic').value.trim());
+  });
   $('an-medium').addEventListener('change', (e) => { if (e.target.id !== 'am-topic') checkMedium($('am-topic').value.trim()); });
   $('am-apply').onclick = () => applyMedium(false);
   $('am-save').onclick = () => applyMedium(true);

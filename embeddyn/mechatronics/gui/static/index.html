@@ -113,6 +113,10 @@
       <label class="an-proto" style="--c:#8e44ad"><input type="checkbox" id="an-p-RFID" checked> RFID <span id="an-c-RFID">0</span></label>
       <label class="an-proto" style="--c:#16a085"><input type="checkbox" id="an-p-LoRa" checked> LoRa <span id="an-c-LoRa">0</span></label>
       <label class="an-proto" style="--c:#b7950b"><input type="checkbox" id="an-p-I2C" checked> I2C <span id="an-c-I2C">0</span></label>
+      <label class="an-proto" style="--c:#6d4c41"><input type="checkbox" id="an-p-SPI" checked> SPI <span id="an-c-SPI">0</span></label>
+      <label class="an-proto" style="--c:#546e7a"><input type="checkbox" id="an-p-UART" checked> UART <span id="an-c-UART">0</span></label>
+      <label class="an-proto" style="--c:#ad1457"><input type="checkbox" id="an-p-Modbus" checked> RS-485/Modbus <span id="an-c-Modbus">0</span></label>
+      <label class="an-proto" style="--c:#1565c0"><input type="checkbox" id="an-p-Ethernet" checked> Ethernet <span id="an-c-Ethernet">0</span></label>
       <input id="an-filter" placeholder="filter: text · id==0x182 · src==gateway · type==SDO · ch==37 · rssi<-60">
       <label class="small" title="Select the packet at the run's time cursor while scrubbing or replaying"><input type="checkbox" id="an-sync" checked> follow cursor</label>
       <span id="an-count" class="small"></span>
@@ -121,11 +125,11 @@
       <button id="an-dbc" title="CAN messages and named fields as a DBC file">DBC</button>
       <button id="an-medium-toggle" title="Noise, loss, fading, interference and crosstalk on a bus or radio channel">⚡ Medium…</button>
       <span class="small">pcap:</span>
-      <a id="an-pcap-can" class="button" download>CAN</a><a id="an-pcap-ble" class="button" download>BLE</a><a id="an-pcap-wifi" class="button" download>Wi-Fi</a><a id="an-pcap-lora" class="button" download>LoRa</a><a id="an-pcap-nfc" class="button" download>NFC</a><a id="an-pcap-i2c" class="button" download>I2C</a>
+      <a id="an-pcap-can" class="button" download>CAN</a><a id="an-pcap-ble" class="button" download>BLE</a><a id="an-pcap-wifi" class="button" download>Wi-Fi</a><a id="an-pcap-lora" class="button" download>LoRa</a><a id="an-pcap-nfc" class="button" download>NFC</a><a id="an-pcap-i2c" class="button" download>I2C</a><a id="an-pcap-spi" class="button" download title="USER1 link type: a direction byte (0 MOSI, 1 MISO), then the bytes">SPI</a><a id="an-pcap-uart" class="button" download title="USER0 link type: the received bytes">UART</a><a id="an-pcap-rs485" class="button" download title="USER3 link type: Modbus RTU frames (Wireshark: map DLT_USER 3 (150) to mbrtu)">RS-485</a><a id="an-pcap-eth" class="button" download>Ethernet</a>
     </div>
     <div id="an-send" class="hidden">
       <input id="an-s-topic" list="an-s-topics" placeholder="topic" title="Event topic (CAN: the bus input, e.g. can.tx)"><datalist id="an-s-topics"></datalist>
-      <select id="an-s-proto"><option value="can">CAN</option><option value="ble">BLE</option><option value="wifi">Wi-Fi</option></select>
+      <select id="an-s-proto"><option value="can">CAN</option><option value="ble">BLE</option><option value="wifi">Wi-Fi</option><option value="uart">UART</option><option value="rs485">RS-485</option><option value="spi">SPI (MOSI)</option><option value="eth">Ethernet</option></select>
       <input id="an-s-id" placeholder="id 0x123" title="CAN identifier (hex with 0x, or decimal)">
       <input id="an-s-data" placeholder="data hex: 01 02 03" title="Payload bytes (CAN: up to 8; BLE/Wi-Fi: the whole packet)">
       <label class="small">every <input id="an-s-period" type="number" min="0" step="1" value="0"> ms</label>
@@ -167,13 +171,19 @@
         <label>length m <input id="am-len" type="number" step="any" min="0" placeholder="—"></label>
         <label>type <select id="am-ctype"><option value="twisted">twisted pair</option><option value="untwisted">untwisted</option><option value="ribbon">ribbon</option><option value="coax">coax</option></select></label>
         <label><input type="checkbox" id="am-shield"> shielded</label>
-        <label title="EMI environment: bit error rate per metre of unprotected cable">EMI BER/m <input id="am-emi" type="number" step="any" min="0" value="2e-7"></label>
-        <label title="CAN bit rate (for the cable-length timing check)">bitrate <input id="am-rate" type="number" step="any" min="0" value="500000"></label>
+        <label title="EMI environment: bit error rate per metre of unprotected cable (empty: the protocol's default, 2e-6 for CAN/UART/SPI/I2C, 2e-8 RS-485, 1e-12 Ethernet)">EMI BER/m <input id="am-emi" type="number" step="any" min="0" placeholder="auto"></label>
+        <label title="Bit rate for the cable checks: CAN bit rate, UART/RS-485 baud, SPI clock, Ethernet speed">bitrate <input id="am-rate" type="number" step="any" min="0" value="500000"></label>
+        <label title="RS-485: 120 Ω at both ends"><input type="checkbox" id="am-term" checked> terminated</label>
+        <label title="Ethernet cable category">cat <select id="am-cat"><option value="5e">5e</option><option value="6">6</option><option value="5">5</option><option value="3">3</option></select></label>
         <b>I2C</b>
         <label><select id="am-i2cmode"><option value="">—</option><option value="standard">100 kHz</option><option value="fast">400 kHz</option><option value="fast-plus">1 MHz</option></select></label>
         <label>pull-up Ω <input id="am-rp" type="number" step="any" min="0" value="4700"></label>
         <label>VDD <input id="am-vdd" type="number" step="0.1" min="0" value="3.3"></label>
         <label>devices <input id="am-dev" type="number" step="1" min="1" value="2"></label>
+      </div>
+      <div class="am-row" title="Wired bus faults (UART, RS-485, SPI, I2C, Ethernet): a JSON object, see the presets">
+        <label>faults <select id="am-fpreset"><option value="">add a preset…</option></select></label>
+        <input id="am-faults" class="am-json" placeholder='{"baud_error_pct": 5}' spellcheck="false">
       </div>
       <div id="am-derived" class="small"></div>
       <div class="am-row">

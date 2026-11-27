@@ -167,7 +167,10 @@ Instead of fixed numbers, `link:` (radio distance, transmit power, walls) and `c
 errors, the CAN length limit and the I2C rise time. See
 [impaired media](multiboard-comms.md#impaired-media-noise-fading-interference-crosstalk) and
 [distance, cables and I2C](multiboard-comms.md#distance-cables-and-i2c-commsphysical).
-Signal-level faults (stuck, noise, dropout...) stay in `faults`.
+Wired buses (UART, RS-485, SPI, I2C, Ethernet) also take a `faults:` section per topic:
+baud-rate errors, overruns, bus contention, wrong SPI modes, stuck I2C buses, duplex
+mismatches. See [wired lab](multiboard-comms.md#faults-commsfaults).
+Signal-level faults (stuck, noise, dropout...) stay in the top-level `faults`.
 
 ## `components`
 

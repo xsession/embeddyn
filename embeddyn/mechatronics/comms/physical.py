@@ -35,6 +35,18 @@ rise time t_r = 0.8473 · Rp · Cb (30 % → 70 % of VDD) checked against the
 specification (UM10204): 1000 ns / 300 ns / 120 ns and 400 pF (550 pF in Fast-mode
 Plus). Too slow an edge makes SDA/SCL miss V_IH before the clock samples: bit errors
 that grow as t_r approaches the SCL high time.
+
+**RS-485** (`rs485_check`): the rule of thumb bit rate × length ≤ 10⁸ (bit/s·m) and
+1200 m at most; without termination the reflections take about three round trips
+(6 · L · 5 ns) to settle, harmless while that is under a quarter of a bit, sampled as
+wrong bits once it reaches the middle of the bit; more than 32 unit loads overload the
+drivers. **RS-232** (`uart_check`): 2500 pF of cable at up to 20 kbit/s (TIA-232), less
+at higher rates where the slew-rate-limited drivers no longer settle. **SPI**
+(`spi_check`): the master samples MISO half a clock after it shifted MOSI, so the round
+trip over the cable plus the slave's output delay must fit in half a period (else
+MISO arrives one bit late); fast edges on a long unterminated SCK ring, and a ring
+that crosses the threshold twice is an extra clock (bit slip). **Ethernet**
+(`ethernet_check`): 100 m per segment (BER climbs beyond it), Cat3 only for 10BASE-T.
 """
 from __future__ import annotations
 
@@ -141,7 +153,9 @@ def cable_effects(cable: Mapping[str, Any], proto: str | None = None, bitrate: f
     shielded = bool(cable.get("shielded", False))
     pickup = PICKUP.get(kind, 1.0) * (0.1 if shielded else 1.0)
     delay = length * float(cable.get("ns_per_m", 5.0)) * 1e-9
-    ber = float(cable.get("emi_ber_per_m", 2e-6)) * length * pickup * float(cable.get("environment", 1.0))
+    # Ethernet's transformer-coupled pairs and line codes shrug off what upsets a CAN or UART wire
+    default = {"eth": 1e-12, "rs485": 2e-8}.get(str(proto), 2e-6)
+    ber = float(cable.get("emi_ber_per_m", default)) * length * pickup * float(cable.get("environment", 1.0))
     out: dict[str, Any] = {"length_m": length, "type": kind, "shielded": shielded, "pickup": pickup, "delay_s": delay,
                            "emi_ber": ber, "timing_error": 0.0}
     if proto == "can":
@@ -194,3 +208,100 @@ def i2c_check(cable: Mapping[str, Any]) -> dict[str, Any]:
             "pf_per_m": per_m, "bus_pf": round(cb, 1), "cb_max_pf": limits["cb_pf"], "pullup_ohm": rp,
             "rise_ns": round(tr, 1), "rise_max_ns": limits["tr_ns"], "rp_min_ohm": round(rp_min), "rp_max_ohm": round(rp_max),
             "ok": not problems, "problems": problems, "advice": advice, "ber": ber}
+
+
+def _ramp(x: float, x0: float, x1: float, low: float = 1e-7, high: float = 0.05) -> float:
+    """0 below x0, then log-linear from `low` at x0 to `high` at x1 (and beyond)."""
+    if x <= x0:
+        return 0.0
+    f = min(1.0, (x - x0) / max(x1 - x0, 1e-12))
+    return 10 ** (math.log10(low) + f * (math.log10(high) - math.log10(low)))
+
+
+def rs485_check(cable: Mapping[str, Any], baud: float | None = None) -> dict[str, Any]:
+    """Length rule, termination and loading of an RS-485 bus."""
+    length = float(cable.get("length_m", 10.0))
+    rate = float(baud or cable.get("baud", 19200))
+    ns_per_m = float(cable.get("ns_per_m", 5.0))
+    terminated = bool(cable.get("termination", True))
+    loads = float(cable.get("unit_loads", 2))
+    bit = 1.0 / rate
+    settle = 6 * length * ns_per_m * 1e-9
+    problems, ber = [], 0.0
+    if length * rate > 1e8:
+        problems.append(f"{length:g} m × {rate:g} bit/s exceeds 10⁸ (max {1e8 / rate:.0f} m at this rate)")
+        ber += _ramp(length * rate / 1e8, 1.0, 3.0)
+    if length > 1200:
+        problems.append(f"{length:g} m > 1200 m")
+        ber += _ramp(length, 1200, 2400)
+    if not terminated:
+        ratio = settle / bit
+        ber += _ramp(ratio, 0.25, 0.5, 1e-6, 0.1)
+        if ratio > 0.25:
+            problems.append(f"no termination: reflections settle in {settle * 1e9:.0f} ns, {ratio:.0%} of a bit")
+    if loads > 32:
+        problems.append(f"{loads:g} unit loads > 32")
+        ber += _ramp(loads, 32, 64, 1e-6, 0.01)
+    return {"length_m": length, "baud": rate, "terminated": terminated, "settle_ns": round(settle * 1e9),
+            "max_length_m": round(min(1200.0, 1e8 / rate)), "unit_loads": loads, "ber": min(0.5, ber),
+            "ok": not problems, "problems": problems,
+            "advice": "terminate both ends with 120 Ω" if not terminated and problems else
+                      ("lower the bit rate or shorten the bus" if problems else "")}
+
+
+def uart_check(cable: Mapping[str, Any], baud: float | None = None) -> dict[str, Any]:
+    """RS-232 cable capacitance against TIA-232 (2500 pF up to 20 kbit/s)."""
+    length = float(cable.get("length_m", 2.0))
+    rate = float(baud or cable.get("baud", 115200))
+    kind = str(cable.get("type", "untwisted"))
+    pf = float(cable.get("pf_per_m", CABLE_PF_PER_M.get(kind, 50.0) + (60.0 if cable.get("shielded") and kind != "coax" else 0.0))) * length
+    limit = 2500.0 * min(1.0, 20000.0 / rate)
+    ber = _ramp(pf / limit, 1.0, 2.0, 1e-6, 0.05)
+    problems = [f"cable {pf:.0f} pF > {limit:.0f} pF allowed at {rate:g} bit/s"] if pf > limit else []
+    return {"length_m": length, "baud": rate, "cable_pf": round(pf), "max_pf": round(limit),
+            "max_length_m": round(limit / (pf / max(length, 1e-9)), 1), "ber": ber, "ok": not problems, "problems": problems}
+
+
+def spi_check(cable: Mapping[str, Any], hz: float | None = None) -> dict[str, Any]:
+    """MISO timing over a cable and SCK ringing (double clocking)."""
+    length = float(cable.get("length_m", 0.1))
+    clock = float(hz or cable.get("hz", 1e6))
+    ns_per_m = float(cable.get("ns_per_m", 5.0))
+    output_ns = float(cable.get("slave_output_ns", 40.0))      # SCK edge → MISO valid
+    setup_ns = float(cable.get("master_setup_ns", 10.0))
+    half = 0.5e9 / clock
+    need = 2 * length * ns_per_m + output_ns + setup_ns
+    ratio = need / half
+    series = float(cable.get("series_ohm", 0.0))
+    ring = 0.0 if length < 0.2 or series >= 22 else min(0.3, 0.02 * length / 0.2)
+    problems = []
+    if ratio > 1:
+        problems.append(f"MISO valid {need:.0f} ns after the edge > half a clock ({half:.0f} ns): read one bit late")
+    elif ratio > 0.8:
+        problems.append(f"MISO timing margin {half - need:.0f} ns: marginal")
+    if ring:
+        problems.append(f"{length:g} m of SCK without series termination rings: extra clocks")
+    max_hz = 0.5e9 / need
+    return {"length_m": length, "hz": clock, "miso_ns": round(need), "half_period_ns": round(half), "max_hz": round(max_hz),
+            "late": ratio > 1, "ber": _ramp(ratio, 0.8, 1.0, 1e-6, 0.05) if ratio <= 1 else 0.0, "double_clock": ring,
+            "ok": not problems, "problems": problems,
+            "advice": f"stay below {max_hz / 1e6:.1f} MHz" + (", add 22-33 Ω series resistors at the drivers" if ring else "")}
+
+
+def ethernet_check(cable: Mapping[str, Any], speed: float | None = None) -> dict[str, Any]:
+    """Segment length and cable category of twisted-pair Ethernet."""
+    length = float(cable.get("length_m", 10.0))
+    rate = float(speed or cable.get("speed", 100e6))
+    category = str(cable.get("category", "5e"))
+    problems, ber = [], 0.0
+    if length > 100:
+        problems.append(f"{length:g} m > 100 m per segment")
+        ber += _ramp(length, 100, 160, 1e-9, 0.01)
+    if category == "3" and rate > 10e6:
+        problems.append(f"Cat3 is for 10BASE-T only ({rate / 1e6:g} Mbit/s)")
+        ber += 1e-4
+    if category in ("5", "5e") and rate > 1e9:
+        problems.append(f"Cat{category} is rated to 1 Gbit/s")
+        ber += 1e-6
+    return {"length_m": length, "speed": rate, "category": category, "ber": min(0.5, ber), "ok": not problems,
+            "problems": problems, "advice": "add a switch (each port is a new 100 m segment)" if length > 100 else ""}

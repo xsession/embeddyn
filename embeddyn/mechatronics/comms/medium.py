@@ -37,6 +37,11 @@ checks (CRC, FCS, MIC) decide.
 CAN (`can_errors`): a frame with bit errors is not delivered; an error frame takes its
 place on the bus and the frame is sent again (up to `max_retries`), like a real
 transmitter that sees the error flag.
+
+UART, RS-485, SPI, I2C and Ethernet frames go through `comms.faults` instead of the
+generic bit flips: a bit-level UART line (baud mismatch, glitches, breaks, overruns,
+bus contention, floating RS-485 lines), SPI clock-mode and timing errors, I2C bus
+hangs and NACKs, Ethernet FCS errors and collisions, switched on by a ``faults:`` section.
 """
 from __future__ import annotations
 
@@ -46,19 +51,11 @@ import random
 import threading
 from typing import Any, Callable, Mapping
 
-from .physical import cable_effects, i2c_check, radio_link
+from . import faults
+from .faults import window as _window
+from .physical import cable_effects, ethernet_check, i2c_check, radio_link, rs485_check, spi_check, uart_check
 
 _RADIO = ("ble", "wifi", "lora", "nfc", "rfid")
-
-
-def _window(spec: Mapping[str, Any], t: float) -> bool:
-    start, end = float(spec.get("start", 0.0)), spec.get("end")
-    if t < start or (end is not None and t > float(end)):
-        return False
-    period = spec.get("period")
-    if period:
-        return ((t - start) % float(period)) < float(spec.get("duty", 0.5)) * float(period)
-    return True
 
 
 def _modulation(spec: Mapping[str, Any] | None, t: float) -> float:
@@ -86,18 +83,31 @@ class Medium:
         self.kind = str(self.spec.get("kind", "radio" if self.topic.split(".")[0] in _RADIO else "wired"))
         self.links: dict[str, dict[str, Any]] = {}            # last link budget per sender (radio)
         self.cable_cache: dict[str, dict[str, Any]] = {}       # cable effects per protocol (wired)
+        self.state: dict[str, Any] = {}                        # fault models' bus state (who drives, overruns...)
 
-    def cable(self, proto: str | None) -> dict[str, Any] | None:
+    def cable(self, proto: str | None, rate: float | None = None) -> dict[str, Any] | None:
+        """Cable effects for a protocol at a bit rate (`rate`: baud, SPI clock, Ethernet speed)."""
         cable = self.spec.get("cable")
         if not cable:
             return None
-        key = str(proto)
+        rate = rate or self.spec.get("bitrate")
+        key = f"{proto}@{rate}"
         if key not in self.cable_cache:
             effects = cable_effects(cable, proto, self.spec.get("bitrate"))
             if proto == "i2c" or cable.get("i2c"):
                 effects["i2c"] = i2c_check({**cable, **(cable.get("i2c") or {})})
+            checks = {"rs485": rs485_check, "uart": uart_check, "spi": spi_check, "eth": ethernet_check}
+            if proto in checks:
+                effects[str(proto)] = checks[str(proto)](cable, rate)
             self.cable_cache[key] = effects
         return self.cable_cache[key]
+
+    def protocol(self) -> str | None:
+        """The protocol on this topic: ``protocol:`` in the spec, else from the topic name (can.*, i2c ...)."""
+        if self.spec.get("protocol"):
+            return str(self.spec["protocol"])
+        head = self.topic.split(".")[0]
+        return head if head in ("can", "i2c", "spi", "uart", "rs485", "eth") else None
 
     def derived(self) -> dict[str, Any]:
         """What the physical models work out: link budgets (radio), cable and I2C checks (wired)."""
@@ -105,8 +115,7 @@ class Medium:
         if self.links:
             out["links"] = self.links
         if self.spec.get("cable"):
-            out["cable"] = self.cable(self.spec.get("protocol") or ("can" if self.topic.startswith("can") else
-                                                                     "i2c" if self.topic.startswith("i2c") else None))
+            out["cable"] = self.cable(self.protocol())
         return out
 
     def strength(self, t: float) -> tuple[float, float]:
@@ -224,6 +233,8 @@ class Media:
         if notes.get("lost"):
             medium.stats["lost"] += 1
             return [(t, self._mark(payload, notes))]
+        if isinstance(payload, dict) and proto in faults.WIRED and not radio:
+            return faults.apply(medium, t, payload, ber, notes, rng, self._flip, self._mark)
         original = payload.get("data") if isinstance(payload, dict) else None
         flipped = self._flip(payload, ber, notes.get("extra_bits", 0), rng)
         if flipped:

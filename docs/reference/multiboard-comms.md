@@ -7,6 +7,9 @@ instance subscribed to that topic. `embeddyn/mechatronics/comms/` provides:
 * a CAN bus model with arbitration and exact frame timing;
 * a CANopen stack for virtual boards;
 * BLE advertising and IEEE 802.11 frame builders;
+* NFC, RFID and LoRaWAN;
+* wired buses: UART (NMEA), RS-485 (Modbus RTU), SPI, I2C and Ethernet (ARP, IPv4,
+  UDP, TCP, Modbus/TCP), with a fault catalogue for each;
 * decoders for all of these.
 
 The Lab's **Analyzer** tab shows the traffic the way Wireshark would, and exports pcap
@@ -254,6 +257,150 @@ margin, the I2C capacitance, rise time, verdict and pull-up advice) update as yo
 before any run (`POST /api/analyzer/medium_check`). During a run they show what the run
 measures.
 
+## The wired lab: UART, RS-485, SPI, I2C and Ethernet
+
+```bash
+embeddyn mechatronics gui examples/mechatronics/wired-lab.yaml     # Run, then the Analyzer tab
+```
+
+Five buses, each clean at first and then broken the way benches break:
+
+| bus | boards | faults (time) |
+|---|---|---|
+| UART 115200 8N1 | `serial.GpsReceiver` (GGA + RMC every 50 ms) → `serial.NmeaReader` | receiver clock 5.5 % off (0.3–0.5 s), noise spikes (0.6–0.7 s), receiver overrun (0.8–1 s) |
+| RS-485 19200 8E1, 300 m | `serial.ModbusMaster` (PLC) ↔ `serial.ModbusSlave` (drive) | no fail-safe bias (0.25–0.45 s), driver enable held 3 ms (0.5–0.7 s), gaps inside frames (0.75–0.9 s) |
+| SPI 4 MHz mode 0 | `spi.SpiMaster` ↔ `spi.Lis3dh` | slave in mode 1 (0.3–0.5 s), CS glitches and SCK ringing (0.6–0.7 s), slave unpowered (0.8–0.85 s) |
+| I2C 400 kHz | `i2c.I2cMaster` ↔ `i2c.Tmp102` | bus stuck (0.4–0.45 s), a second device on the address (0.6–0.8 s), 1 % NACKs |
+| Ethernet 10 Mbit/s | `ethernet.EthPlc` ↔ `ethernet.EthIo` (ARP, TCP, Modbus/TCP, UDP telemetry) | duplex mismatch (PLC half duplex), link down (0.7–0.75 s) |
+
+One run (seeded) ends with:
+
+* **UART:** 28 good sentences, 12 checksum errors, 527 framing and 576 noise flags,
+  128 bytes lost to overruns.
+* **RS-485:** 24 good Modbus answers, 26 timeouts, 20 CRC errors at the PLC, 29 at the
+  drive, 11 bus contentions.
+* **SPI:** 174 polls, 7 wrong WHO_AM_I values, 10 transfers nobody answered (MISO reads 0xFF).
+* **I2C:** 12 NACKs, 20 transfers lost to the stuck bus.
+* **Ethernet:** 189 Modbus/TCP answers, 6 TCP retransmissions, 2 timeouts; 30 frames
+  deferred by carrier sense, 18 collisions (4 late), 61 frames lost while the link was down.
+
+### Payloads
+
+| proto | payload |
+|---|---|
+| `uart` | `{"data", "baud", "format": "8N1", "src"}`: one frame (an NMEA sentence); after the medium also `"errors": [{"i", "kind"}]` |
+| `rs485` | same as `uart`; decoded as Modbus RTU |
+| `spi` | `{"dir": "mosi"\|"miso", "data", "cs", "mode", "hz", "src"}`: the master's bytes, then the slave's answer at the same instant |
+| `i2c` | `{"dir": "m2s"\|"s2m", "data", "src"}` (see `comms.i2c`) |
+| `eth` | `{"data": frame with FCS, "src", "speed"}` |
+
+### The UART line model (`comms.serial`)
+
+`transmit` turns bytes into line levels: idle high, start bit, data LSB first, parity,
+stop bits. `receive` decodes them like a UART peripheral:
+
+* it waits for a falling edge, seen on its 16× sampling clock;
+* it checks the start bit in its middle, so a short spike on an idle line is ignored;
+* it samples each bit in the middle at *its own* baud rate, with a 3-sample majority vote
+  (noise flag when the samples disagree);
+* it checks parity and the stop bit (framing error; all zeros is a break) and re-arms in
+  the middle of the stop bit.
+
+So the errors are not dice rolls. A 5 % clock error drifts the sample point into the next
+bit by the end of a character; a late driver enable makes a data bit look like the start
+bit; noise on a floating RS-485 line becomes garbage bytes in front of the frame. The
+result is the same garbage a logic analyzer shows.
+
+Modbus RTU frames end after 1.5 idle characters, so gaps inside a frame split it (both
+parts fail the CRC).
+
+### Faults (`comms.faults`)
+
+A medium's `faults:` switches them on; `fault_bursts:` switches some on for a while
+(`start`/`end`, `period`/`duty`).
+
+| bus | fault | effect |
+|---|---|---|
+| UART, RS-485 | `baud_error_pct`, `rx_baud` | receiver clock off or a wrong rate: framing errors, garbage |
+| | `rx_format` | receiver expects another format (`8E1` vs `8N1`): parity errors |
+| | `glitches_per_s`, `glitch_us` | noise spikes: noise flags, false start bits |
+| | `breaks: [{start, end}]` | line held low: break |
+| | `overrun: {busy_us, period_ms, fifo}` | the CPU cannot read the UART: bytes lost, overrun flag |
+| | `char_gap_us` | the sender pauses between characters |
+| | `disconnected: [{start, end}]` | nothing arrives |
+| RS-485 | `bias: false` (`floating_noise`) | no fail-safe bias: receivers decode noise on the idle bus |
+| | `de_late_us` | driver enabled late: the start of the frame never reaches the bus |
+| | `de_hold_us` | driver released late: the answer collides with it (contention) |
+| | `ground_offset_v` | outside −7…+12 V common mode: nothing gets through |
+| SPI | `slave_mode` | the slave samples on the other clock edge: every bit one clock off (modes 0 and 3 agree) |
+| | `double_clock` | SCK ringing adds a clock: the rest of the transfer slips a bit |
+| | `cs_glitch` | chip select drops mid-transfer: the slave resets, MISO floats (0xFF) |
+| | `slave_off: [{start, end}]` | slave unpowered: nobody answers |
+| I2C | `stuck: [{start, end}]` | a slave holds SDA low: every transfer fails |
+| | `nack`, `stretch_timeout` | address NACKed (busy device); clock stretched past the master's timeout |
+| | `address_conflict` | a second device at the address: the open-drain bus ANDs both answers |
+| | `scl_glitch` | an extra SCL edge: the data shifts |
+| Ethernet | `duplex_mismatch: <node>` | that node is half duplex: it defers to its peer; the peer talks over it: collisions, late after 64 bytes |
+| | `half_duplex: true` | a hub: simultaneous starts collide, jam, binary exponential backoff, retransmission |
+| | `link_down: [{start, end}]` | no carrier |
+| | `mtu`, `duplicate`, `reorder` (`reorder_us`) | giants dropped; frames delivered twice; frames held back |
+
+The medium's bit error rate, crosstalk and cable effects still apply. On Ethernet, a
+frame whose FCS no longer matches is dropped by the receiving MAC. Each fault leaves its
+trace in three places:
+
+* the event: `"medium": {"faults": [...], "original": ...}`;
+* the medium statistics: `framing`, `parity`, `noise`, `break`, `overrun_lost`,
+  `collisions`, `late_collisions`, `deferred`, `fcs_errors`, `bus_stuck`, `nacks`,
+  `bit_slips`, `cs_glitches`...;
+* the analyzer row (⚡ with the reason).
+
+The Medium panel has a **faults** field (JSON) with presets for each of these.
+
+The duplex-mismatch model follows events in time order, so it cannot take back a frame it
+has already delivered. When the full-duplex side talks over a half-duplex frame, the
+damage lands on the later frame (lost, as the half-duplex MAC drops it). The half-duplex
+side's own frame stays intact in the capture.
+
+### Cable checks for the wired buses (`comms.physical`)
+
+| check | rule |
+|---|---|
+| `rs485_check` | bit rate × length ≤ 10⁸ and ≤ 1200 m; without termination the reflections take ~3 round trips (6·L·5 ns) to settle, harmless under a quarter of a bit, wrong bits once they reach mid-bit; ≤ 32 unit loads |
+| `uart_check` | RS-232: 2500 pF of cable up to 20 kbit/s, proportionally less above |
+| `spi_check` | MISO valid (2·L·5 ns + slave output delay + master setup) must fit in half a clock, else the master reads it one bit late; unterminated SCK over 0.2 m rings (extra clocks) unless 22–33 Ω series resistors |
+| `ethernet_check` | 100 m per segment; Cat3 only for 10BASE-T |
+
+The cable's EMI default is much lower for Ethernet and RS-485 than for CAN or a UART wire.
+Both use balanced, transformer- or receiver-coupled pairs.
+
+### Decoders and Wireshark
+
+| row | decodes | checks |
+|---|---|---|
+| UART | text, NMEA GGA/RMC (`uart: {protocol: nmea}`) | NMEA checksum, UART flags per byte |
+| Modbus | RTU request/response pairs, register names (`modbus: {units: {1: {name, registers}}}`), exceptions | CRC-16 |
+| SPI | register reads and writes (`spi: {devices: {acc: {read_bit, inc_bit, registers}}}`) | `expect` (WHO_AM_I) |
+| Ethernet | 802.1Q, ARP, IPv4, ICMP, UDP (JSON), TCP, Modbus/TCP, EtherType names (EtherCAT, PROFINET, PTP, LLDP...) | FCS, runts, giants, IP/UDP/TCP checksums |
+
+pcap export:
+
+| bus | link type | in Wireshark |
+|---|---|---|
+| Ethernet | 1, with the FCS | `-o eth.check_fcs:TRUE` verifies it |
+| UART | USER0 (147): the bytes | raw |
+| SPI | USER1 (148): a direction byte (0 MOSI, 1 MISO), then the bytes | raw |
+| RS-485 | USER3 (150): Modbus RTU frames | map DLT_USER 3 to `mbrtu` (Preferences → Protocols → DLT_USER) |
+
+USER2 (149) is not used because Wireshark reads it as Apple's PKTAP. The tests check
+these captures with tshark:
+
+* no malformed packets;
+* Wireshark's FCS verdict equals the analyzer's;
+* every intact Ethernet frame has good IP, UDP and TCP checksums;
+* Wireshark's Modbus CRC verdict (`mbrtu.crc_verification`) matches the analyzer's,
+  including the frames the faults broke.
+
 ## Event ports of python plants
 
 A python plant can send and receive events besides its signals:
@@ -365,7 +512,7 @@ applied otherwise.
 
 `comms.analyzer.decode_event(event, config)` turns an event into a packet row:
 
-* time and protocol (CANopen, CAN, BLE, 802.11);
+* time and protocol (CANopen, CAN, BLE, 802.11, NFC, RFID, LoRa, I2C, SPI, UART, Modbus, Ethernet);
 * source, destination and length;
 * a one-line summary;
 * a field tree whose entries carry byte ranges;

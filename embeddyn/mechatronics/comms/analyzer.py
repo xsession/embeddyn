@@ -1,11 +1,12 @@
 """Protocol analyzer: decoded packets from bus and radio events, and pcap export.
 
 `decode_event(event, config)` recognises CAN frames (also Renode's CAN events,
-``{"id", "data"}``), BLE advertising packets and 802.11 frames and returns a packet
-row for the Lab's analyzer:
+``{"id", "data"}``), BLE, 802.11, NFC, RFID, LoRa, I2C, SPI, UART (NMEA), RS-485
+(Modbus RTU) and Ethernet (ARP, IPv4, UDP, TCP, Modbus/TCP) and returns a packet row for
+the Lab's analyzer:
 
 ```text
-{"time", "topic", "proto": "CANopen"|"CAN"|"BLE"|"802.11", "type", "source", "target",
+{"time", "topic", "proto": "CANopen"|"CAN"|"BLE"|"802.11"|"UART"|"Modbus"|"SPI"|"Ethernet"|..., "type", "source", "target",
  "length", "summary", "fields": [{"label", "value", "bytes": [start, end], "children"}],
  "hex", "channel", "rssi", "ok"}
 ```
@@ -16,8 +17,12 @@ and object descriptions, BLE manufacturer-data layouts, 802.11 station names, an
 `message_key`), applied on top of every protocol decoder. `dbc(config)` writes the
 CAN ones (and CANopen PDO layouts) as a DBC file.
 
-`write_pcap(events, path, proto)` writes one capture per link type: SocketCAN
-(227), Bluetooth LE LL (251) or 802.11 (105).
+`write_pcap(events, path, proto)` writes one capture per link type: SocketCAN (227),
+Bluetooth LE LL with PHDR (256), 802.11 with radiotap (127), LoRaTap (270), ISO 14443
+(264), Linux I2C (209), Ethernet (1), and for the buses without a link type of their own
+the user link types: UART bytes (147, USER0), SPI (148, USER1: a direction byte, 0 MOSI
+or 1 MISO, then the bytes) and RS-485 (150, USER3: Modbus RTU frames; Wireshark reads 149 as
+Apple's PKTAP). In Wireshark, map USER3 to ``mbrtu`` (Preferences → Protocols → DLT_USER) to decode the Modbus frames.
 """
 from __future__ import annotations
 
@@ -25,18 +30,20 @@ import struct
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import ble, canopen, i2c, lora, nfc, rfid, wifi
+from . import ble, canopen, ethernet, i2c, lora, nfc, rfid, serial, spi, wifi
 
 # Link types (www.tcpdump.org/linktypes.html): SocketCAN, BLE LL with PHDR, 802.11 with radiotap,
-# LoRaTap, ISO 14443, Linux I2C.
-LINKTYPES = {"can": 227, "ble": 256, "wifi": 127, "lora": 270, "nfc": 264, "i2c": 209}
+# LoRaTap, ISO 14443, Linux I2C, Ethernet; USER0, USER1, USER3 for UART, SPI and RS-485.
+LINKTYPES = {"can": 227, "ble": 256, "wifi": 127, "lora": 270, "nfc": 264, "i2c": 209, "eth": 1,
+             "uart": 147, "spi": 148, "rs485": 150}
+PROTOCOLS = ("can", "ble", "wifi", "nfc", "rfid", "lora", "i2c", "spi", "uart", "rs485", "eth")
 
 
 def protocol_of(payload: Any) -> str | None:
     if not isinstance(payload, Mapping):
         return None
     proto = payload.get("proto")
-    if proto in ("can", "ble", "wifi", "nfc", "rfid", "lora", "i2c"):
+    if proto in PROTOCOLS:
         return str(proto)
     if "id" in payload and "data" in payload:          # Renode CAN events
         return "can"
@@ -49,8 +56,10 @@ def message_key(row: Mapping[str, Any]) -> str:
         return f"CAN 0x{int(row['id']):03X}"
     if row["proto"] == "BLE":
         return f"BLE {row.get('source') or '?'} {row['type']}"
-    if row["proto"] in ("NFC", "RFID", "LoRa", "I2C"):
+    if row["proto"] in ("NFC", "RFID", "LoRa", "I2C", "SPI", "UART", "Modbus"):
         return f"{row['proto']} {row.get('source') or row.get('target') or '?'} {row['type']}"
+    if row["proto"] == "Ethernet":
+        return f"Ethernet {row.get('source') or '?'} → {row.get('target') or '?'} {row['type']}"
     return f"Wi-Fi {row.get('source') or '?'} → {row.get('target') or '?'} {row['type']}"
 
 
@@ -189,6 +198,8 @@ def _decode(event: Mapping[str, Any], config: Mapping[str, Any], context: dict[s
                    source=payload.get("src"), target=device if direction == "m2s" else "master",
                    fields=[{"label": "bus", "value": "master → slave" if direction == "m2s" else "slave → master"}, *decoded["fields"]])
         return row
+    if proto in ("uart", "rs485", "spi", "eth"):
+        return _decode_wired(proto, row, data, payload, event, config, context)
     if proto == "lora":
         decoded = lora.decode(data, payload, config.get("lorawan"))
         row.update(proto="LoRa", type=decoded["type"], summary=decoded["summary"], ok=decoded.get("ok", True),
@@ -200,6 +211,69 @@ def _decode(event: Mapping[str, Any], config: Mapping[str, Any], context: dict[s
                target=decoded.get("target"), ok=decoded.get("fcs_ok", True),
                fields=[{"label": "radio", "value": f"channel {payload.get('channel')}, RSSI {payload.get('rssi')} dBm"},
                        *decoded["fields"]])
+    return row
+
+
+def _uart_line_text(payload: Mapping[str, Any]) -> str:
+    baud = payload.get("baud")
+    return f"{baud:g} bit/s {payload.get('format') or '8N1'}" if isinstance(baud, (int, float)) else str(payload.get("format") or "")
+
+
+def _decode_wired(proto: str, row: dict[str, Any], data: bytes, payload: Mapping[str, Any], event: Mapping[str, Any],
+                  config: Mapping[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    errors = list(payload.get("errors") or [])
+    row["send"] = {k: payload[k] for k in ("baud", "format", "dir", "cs", "mode", "hz", "speed") if k in payload}
+    if proto == "uart":
+        text = data.decode("latin-1")
+        uart_config = config.get("uart") or {}
+        printable = sum(32 <= b < 127 or b in (9, 10, 13) for b in data) >= 0.8 * max(1, len(data))
+        if uart_config.get("protocol", "nmea" if text.startswith("$") else "text") == "nmea" and text.startswith("$"):
+            decoded = serial.decode_nmea(text)
+        elif printable:
+            decoded = {"ok": True, "type": "text", "summary": repr(text.strip("\r\n"))[1:-1][:100], "fields": []}
+        else:
+            decoded = {"ok": True, "type": "bytes", "summary": data.hex(" ")[:120], "fields": []}
+        bytes_fields = [{"label": f"[{e['i']}] 0x{data[e['i']]:02X}" if e["i"] < len(data) else f"[{e['i']}]",
+                         "value": e["kind"], "bytes": [e["i"], e["i"] + 1]} for e in errors]
+        row.update(proto="UART", type=decoded["type"], source=payload.get("src"), target=payload.get("peer"),
+                   summary=decoded["summary"], ok=bool(decoded["ok"]) and not errors,
+                   fields=[{"label": "line", "value": _uart_line_text(payload)},
+                           {"label": "text", "value": repr(text)[1:-1][:200], "bytes": [0, len(data)]}, *decoded["fields"]]
+                   + ([{"label": "UART errors", "value": f"{len(errors)}", "children": bytes_fields}] if errors else []))
+        if errors:
+            row["flipped_bytes"] = sorted({e["i"] for e in errors})
+        return row
+    if proto == "rs485":
+        stream = context.setdefault(f"modbus:{event.get('topic')}", {})
+        decoded = serial.decode_rtu(data, config.get("modbus"), stream, payload.get("src"))
+        row.update(proto="Modbus", type=decoded["type"], summary=decoded["summary"],
+                   ok=decoded["ok"] and not errors, source=payload.get("src") or decoded.get("name"),
+                   target="master" if decoded.get("response") else decoded.get("name"),
+                   fields=[{"label": "RS-485", "value": _uart_line_text(payload)}, *decoded["fields"]]
+                   + ([{"label": "UART errors", "value": f"{len(errors)}",
+                        "children": [{"label": f"[{e['i']}]", "value": e["kind"], "bytes": [e["i"], e["i"] + 1]} for e in errors]}]
+                      if errors else []))
+        return row
+    if proto == "spi":
+        direction = str(payload.get("dir", "mosi"))
+        decoded = spi.decode(data, direction, config.get("spi"), context.setdefault(f"spi:{event.get('topic')}", {}),
+                             payload.get("cs"))
+        device = ((config.get("spi") or {}).get("devices") or {}).get(payload.get("cs") or "", {}).get("name") or payload.get("cs")
+        mode = payload.get("mode")
+        hz = payload.get("hz")
+        row.update(proto="SPI", type=decoded["type"], summary=decoded["summary"], ok=decoded.get("ok", True),
+                   source=payload.get("src"), target=device if direction == "mosi" else "master",
+                   fields=[{"label": "bus", "value": f"{direction.upper()}, CS {payload.get('cs')}"
+                                                     + (f", mode {mode}" if mode is not None else "")
+                                                     + (f", {float(hz) / 1e6:g} MHz" if hz else "")}, *decoded["fields"]])
+        return row
+    decoded = ethernet.decode(data, config.get("ethernet"), context.setdefault(f"eth:{event.get('topic')}", {}))
+    speed = payload.get("speed")
+    row.update(proto="Ethernet", type=decoded["type"], summary=decoded["summary"], ok=decoded["ok"],
+               source=decoded.get("source") or payload.get("src"), target=decoded.get("target"),
+               fields=([{"label": "link", "value": f"{float(speed) / 1e6:g} Mbit/s"}] if speed else []) + decoded["fields"])
+    if decoded.get("vlan") is not None:
+        row["vlan"] = decoded["vlan"]
     return row
 
 
@@ -229,8 +303,12 @@ def _medium_notes(row: dict[str, Any], payload: Mapping[str, Any]) -> None:
     children = []
     tags = []
     if payload.get("error"):
-        row["type"] = "error frame"
-        tags.append("CAN error frame → retransmission")
+        if row.get("proto") in ("CAN", "CANopen"):
+            row["type"] = "error frame"
+            tags.append("CAN error frame → retransmission")
+        else:
+            row["type"] = str(payload["error"]).split(":")[0]
+            tags.append(str(payload["error"]))
     if payload.get("retry"):
         tags.append(f"retransmission {payload['retry']}")
     if notes.get("lost"):
@@ -244,6 +322,13 @@ def _medium_notes(row: dict[str, Any], payload: Mapping[str, Any]) -> None:
         if notes.get("original"):
             children.append({"label": "sent as", "value": " ".join(notes["original"][i:i + 2] for i in range(0, len(notes["original"]), 2))})
         row["flipped_bytes"] = sorted({b // 8 for b in flipped})
+    for fault in notes.get("faults") or []:
+        children.append({"label": "fault", "value": str(fault)})
+    if notes.get("faults") and not flipped and not notes.get("lost"):
+        flags = [f for f in notes["faults"] if str(f).startswith("UART flags")]
+        tags.append(str(flags[0] if flags else notes["faults"][0]))
+        if notes.get("original") and notes["original"] != row.get("hex"):
+            children.append({"label": "sent as", "value": " ".join(notes["original"][i:i + 2] for i in range(0, len(notes["original"]), 2))})
     if notes.get("crosstalk"):
         children.append({"label": "crosstalk from", "value": str(notes["crosstalk"])})
     if notes.get("timing"):
@@ -327,7 +412,7 @@ def _frame(proto: str, payload: Mapping[str, Any], data: bytes) -> bytes | None:
         header = struct.pack("<BBHI", 0, 0, 16, (1 << 1) | (1 << 3) | (1 << 5)) + bytes([0x10, 0]) + \
             struct.pack("<HHb", freq, 0x00C0 if freq < 3000 else 0x0140, signal) + b"\0"
         return header + data
-    if proto == "lora":                                # LoRaTap v1: frequency, bandwidth, SF, RSSI, SNR, sync word
+    if proto == "lora":                                # LoRaTap v0: frequency, bandwidth, SF, RSSI, SNR, sync word
         bandwidth = {125: 1, 250: 2, 500: 4}.get(int(payload.get("bw") or 125), 1)
         rssi = payload.get("rssi")
         packet_rssi = max(0, min(255, int(round(float(rssi) + 139)))) if rssi is not None else 0
@@ -337,6 +422,12 @@ def _frame(proto: str, payload: Mapping[str, Any], data: bytes) -> bytes | None:
     if proto == "nfc":                                 # ISO 14443 pseudo-header: version, event (0xFE PCD→PICC, 0xFF PICC→PCD), length
         event = 0xFE if payload.get("dir", "pcd") == "pcd" else 0xFF
         return struct.pack(">BBH", 0, event, len(data)) + data
+    if proto == "eth":                                 # the frame as on the wire, FCS included
+        return data
+    if proto in ("uart", "rs485"):
+        return data
+    if proto == "spi":
+        return bytes([1 if payload.get("dir") == "miso" else 0]) + data
     if proto == "i2c":                                 # Linux I2C: bus, flags (bit 0: read), address byte, data
         if payload.get("dir") == "s2m":                # the data of a read: after the read address
             address = int(payload.get("_address", 0))

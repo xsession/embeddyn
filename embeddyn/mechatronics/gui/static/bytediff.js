@@ -11,14 +11,23 @@
 export function messageKey(p) {
   if (p.proto === 'CANopen' || p.proto === 'CAN') return `CAN 0x${Number(p.id).toString(16).toUpperCase().padStart(3, '0')}`;
   if (p.proto === 'BLE') return `BLE ${p.source || '?'} ${p.type}`;
-  if (['NFC', 'RFID', 'LoRa', 'I2C'].includes(p.proto)) return `${p.proto} ${p.source || p.target || '?'} ${p.type}`;
+  if (['NFC', 'RFID', 'LoRa', 'I2C', 'SPI', 'UART', 'Modbus'].includes(p.proto)) return `${p.proto} ${p.source || p.target || '?'} ${p.type}`;
+  if (p.proto === 'Ethernet') return `Ethernet ${p.source || '?'} → ${p.target || '?'} ${p.type}`;
   return `Wi-Fi ${p.source || '?'} → ${p.target || '?'} ${p.type}`;
 }
 
-// Bytes that always change and say nothing about the application: BLE CRC, 802.11 sequence and FCS.
+// Bytes that always change and say nothing about the application: BLE CRC, 802.11 sequence and FCS,
+// Modbus CRC, Ethernet FCS and the IPv4 identification and checksums.
 export function noiseMask(p, length) {
   const mask = new Set();
   if (p.proto === 'BLE') for (let i = Math.max(0, length - 3); i < length; i++) mask.add(i);
+  if (p.proto === 'Modbus') for (let i = Math.max(0, length - 2); i < length; i++) mask.add(i);
+  if (p.proto === 'Ethernet') {
+    for (let i = Math.max(0, length - 4); i < length; i++) mask.add(i);
+    if (length >= 34) for (const i of [18, 19, 24, 25]) mask.add(i);                // IPv4 identification, header checksum
+    if (p.type === 'UDP' && length >= 42) { mask.add(40); mask.add(41); }
+    if ((p.type === 'TCP' || p.type === 'Modbus/TCP') && length >= 54) for (const i of [38, 39, 40, 41, 42, 43, 44, 45, 50, 51]) mask.add(i);   // seq, ack, checksum
+  }
   if (p.proto === '802.11') {
     for (let i = Math.max(0, length - 4); i < length; i++) mask.add(i);
     if (length >= 24) { mask.add(22); mask.add(23); }

@@ -1,0 +1,263 @@
+name: wired-lab
+step_seconds: 5.0e-4
+duration_seconds: 1.0
+metadata:
+  description: >
+    Wired bus stress test: five buses, each clean at first and then broken the way
+    real benches break. UART: a GPS sends NMEA at 115200 baud; from 0.3 s the MCU's
+    clock is 5.5 % off, at 0.6 s noise spikes hit the line, from 0.8 s a long ISR makes
+    the receiver overrun. RS-485: a PLC polls a drive with Modbus RTU over 300 m;
+    0.25-0.45 s without fail-safe bias, 0.5-0.7 s the PLC holds its driver enabled
+    too long (the answers collide), 0.75-0.9 s it pauses between characters (frames
+    split). SPI: an MCU reads a LIS3DH; 0.3-0.5 s in the wrong clock mode, 0.6-0.7 s
+    chip-select glitches and SCK ringing, 0.8-0.85 s the sensor is unpowered. I2C: a
+    TMP102 that hangs the bus at 0.4 s and shares its address with another device
+    0.6-0.8 s. Ethernet: a PLC on 10 Mbit/s stuck at half duplex while the remote I/O
+    runs full duplex (late collisions, TCP retransmissions), and a link drop at 0.7 s.
+    Watch the error counters in the plots and the ⚡ rows in the analyzer.
+  analyzer:
+    topics: [uart, rs485, spi, i2c, eth]
+    inject: {uart: uart, rs485: rs485, spi: spi, i2c: i2c, eth: eth}
+    uart: {protocol: nmea}
+    modbus:
+      units:
+        1:
+          name: drive
+          registers:
+            0: {name: temperature, scale: 0.1, unit: degC, signed: true}
+            1: {name: pressure, scale: 0.01, unit: bar}
+            2: {name: status}
+            3: {name: request counter}
+            10: {name: set-point, scale: 0.1, unit: degC, signed: true}
+    spi:
+      devices:
+        acc:
+          name: LIS3DH
+          read_bit: 0x80
+          inc_bit: 0x40
+          registers:
+            "0x0F": {name: WHO_AM_I, expect: 0x33}
+            "0x20": {name: CTRL_REG1}
+            "0x28": {name: [x, y, z], format: i16 LE, shift: 4, scale: 0.001, unit: g}
+    i2c:
+      devices:
+        "0x48":
+          name: TMP102
+          registers: {"0": {name: temperature, shift: 4, scale: 0.0625, unit: degC}}
+    ethernet:
+      hosts: {"02:00:00:00:00:10": plc, "02:00:00:00:00:20": remote-io, "192.168.0.10": plc, "192.168.0.20": remote-io}
+
+media:
+  uart:
+    kind: wired
+    fault_bursts:
+      - {start: 0.3, end: 0.5, baud_error_pct: 5.5}
+      - {start: 0.6, end: 0.7, glitches_per_s: 3000, glitch_us: 3}
+      - {start: 0.8, end: 1.0, overrun: {busy_us: 1500, period_ms: 10, fifo: 1}}
+    seed: 1
+  rs485:
+    kind: wired
+    cable: {length_m: 300, type: twisted, termination: true}
+    fault_bursts:
+      - {start: 0.25, end: 0.45, bias: false, floating_noise: 0.6}
+      - {start: 0.5, end: 0.7, de_hold_us: 3000}
+      - {start: 0.75, end: 0.9, char_gap_us: 1600}
+    seed: 2
+  spi:
+    kind: wired
+    cable: {length_m: 0.1}
+    faults:
+      slave_off: [{start: 0.8, end: 0.85}]
+    fault_bursts:
+      - {start: 0.3, end: 0.5, slave_mode: 1}
+      - {start: 0.6, end: 0.7, cs_glitch: 0.3, double_clock: 0.2}
+    seed: 3
+  i2c:
+    kind: wired
+    faults:
+      stuck: [{start: 0.4, end: 0.45}]
+      nack: 0.01
+    fault_bursts:
+      - {start: 0.6, end: 0.8, address_conflict: 0x3F}
+    seed: 4
+  eth:
+    kind: wired
+    cable: {length_m: 40, category: 5e}
+    faults:
+      duplex_mismatch: plc
+      link_down: [{start: 0.7, end: 0.75}]
+    seed: 5
+
+instances:
+  heater:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: sine, amplitude: 15.0, offset: 45.0, frequency: 1.0}
+      outputs: {value: env.temperature}
+  pump:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: triangle, amplitude: 1.5, offset: 3.0, frequency: 2.0}
+      outputs: {value: env.pressure}
+  setpoint:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: square, amplitude: 10.0, offset: 50.0, frequency: 2.0}
+      outputs: {value: plc.setpoint}
+  vibration:
+    domain: environment
+    model: embeddyn.mechatronics.gui.sources:FunctionGenerator
+    options:
+      backend: python
+      parameters: {waveform: sine, amplitude: 0.5, offset: 0.0, frequency: 5.0}
+      outputs: {value: env.ax}
+
+  gps:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.serial:GpsReceiver
+    options:
+      backend: python
+      parameters: {baud: 115200, period_ms: 50.0}
+      outputs: {sentences: gps.sentences}
+      events: {tx: uart}
+  navigator:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.serial:NmeaReader
+    options:
+      backend: python
+      outputs: {lat: nav.lat, lon: nav.lon, speed_kn: nav.speed_kn, good: nav.good,
+                checksum_errors: nav.checksum_errors, uart_errors: nav.uart_errors}
+      subscribe: {rx: uart}
+
+  plc:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.serial:ModbusMaster
+    options:
+      backend: python
+      parameters: {unit: 1, period_ms: 20.0, baud: 19200, fmt: 8E1, timeout_ms: 15.0}
+      inputs: {setpoint: plc.setpoint}
+      outputs: {temperature: plc.temperature, pressure: plc.pressure, good: plc.good, timeouts: plc.timeouts,
+                crc_errors: plc.crc_errors, exceptions: plc.exceptions}
+      events: {tx: rs485}
+      subscribe: {rx: rs485}
+  drive:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.serial:ModbusSlave
+    options:
+      backend: python
+      parameters: {unit: 1, baud: 19200, fmt: 8E1, response_us: 2500.0}
+      inputs: {temperature: env.temperature, pressure: env.pressure}
+      outputs: {setpoint: drive.setpoint, requests: drive.requests, rx_crc_errors: drive.rx_crc_errors}
+      events: {tx: rs485}
+      subscribe: {rx: rs485}
+
+  mcu:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.spi:SpiMaster
+    options:
+      backend: python
+      parameters: {cs: acc, mode: 0, hz: 4000000.0, period_ms: 5.0}
+      outputs: {ax: mcu.ax, ay: mcu.ay, az: mcu.az, id_errors: mcu.id_errors, no_answer: mcu.no_answer, polls: mcu.polls}
+      events: {tx: spi}
+      subscribe: {rx: spi}
+  accelerometer:
+    domain: environment
+    model: embeddyn.mechatronics.comms.spi:Lis3dh
+    options:
+      backend: python
+      parameters: {cs: acc}
+      inputs: {ax: env.ax}
+      outputs: {transfers: acc.transfers}
+      events: {tx: spi}
+      subscribe: {rx: spi}
+
+  sensor_mcu:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.i2c:I2cMaster
+    options:
+      backend: python
+      parameters: {address: 0x48, period_ms: 5.0, scl_hz: 400000.0}
+      outputs: {temperature: i2c.temperature, nacks: i2c.nacks, reads: i2c.reads}
+      events: {tx: i2c}
+      subscribe: {rx: i2c}
+  tmp102:
+    domain: environment
+    model: embeddyn.mechatronics.comms.i2c:Tmp102
+    options:
+      backend: python
+      inputs: {temperature: env.temperature}
+      outputs: {transfers: tmp102.transfers}
+      events: {tx: i2c}
+      subscribe: {rx: i2c}
+
+  eth_plc:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.ethernet:EthPlc
+    options:
+      backend: python
+      parameters: {period_ms: 5.0, rto_ms: 3.0, speed: 10000000.0, name: plc}
+      outputs: {value: eth.value, good: eth.good, retransmissions: eth.retransmissions, timeouts: eth.timeouts,
+                connected: eth.connected}
+      events: {tx: eth}
+      subscribe: {rx: eth}
+  remote_io:
+    domain: firmware
+    model: embeddyn.mechatronics.comms.ethernet:EthIo
+    options:
+      backend: python
+      parameters: {telemetry_ms: 1.0, jitter_ms: 0.5, speed: 10000000.0, name: remote-io}
+      inputs: {value: env.pressure}
+      outputs: {requests: io.requests}
+      events: {tx: eth}
+      subscribe: {rx: eth}
+
+signals:
+  env.temperature: {domain: environment, unit: degC, initial: 45.0}
+  env.pressure: {domain: environment, unit: bar, initial: 3.0}
+  env.ax: {domain: environment, unit: g, initial: 0.0}
+  plc.setpoint: {domain: environment, unit: degC, initial: 50.0}
+  gps.sentences: {domain: firmware, initial: 0.0}
+  nav.lat: {domain: firmware, unit: deg, initial: 0.0}
+  nav.lon: {domain: firmware, unit: deg, initial: 0.0}
+  nav.speed_kn: {domain: firmware, unit: kn, initial: 0.0}
+  nav.good: {domain: firmware, initial: 0.0}
+  nav.checksum_errors: {domain: firmware, initial: 0.0}
+  nav.uart_errors: {domain: firmware, initial: 0.0}
+  plc.temperature: {domain: firmware, unit: degC, initial: 0.0}
+  plc.pressure: {domain: firmware, unit: bar, initial: 0.0}
+  plc.good: {domain: firmware, initial: 0.0}
+  plc.timeouts: {domain: firmware, initial: 0.0}
+  plc.crc_errors: {domain: firmware, initial: 0.0}
+  plc.exceptions: {domain: firmware, initial: 0.0}
+  drive.setpoint: {domain: firmware, unit: degC, initial: 0.0}
+  drive.requests: {domain: firmware, initial: 0.0}
+  drive.rx_crc_errors: {domain: firmware, initial: 0.0}
+  mcu.ax: {domain: firmware, unit: g, initial: 0.0}
+  mcu.ay: {domain: firmware, unit: g, initial: 0.0}
+  mcu.az: {domain: firmware, unit: g, initial: 0.0}
+  mcu.id_errors: {domain: firmware, initial: 0.0}
+  mcu.no_answer: {domain: firmware, initial: 0.0}
+  mcu.polls: {domain: firmware, initial: 0.0}
+  acc.transfers: {domain: environment, initial: 0.0}
+  i2c.temperature: {domain: firmware, unit: degC, initial: 0.0}
+  i2c.nacks: {domain: firmware, initial: 0.0}
+  i2c.reads: {domain: firmware, initial: 0.0}
+  tmp102.transfers: {domain: environment, initial: 0.0}
+  eth.value: {domain: firmware, unit: bar, initial: 0.0}
+  eth.good: {domain: firmware, initial: 0.0}
+  eth.retransmissions: {domain: firmware, initial: 0.0}
+  eth.timeouts: {domain: firmware, initial: 0.0}
+  eth.connected: {domain: firmware, initial: 0.0}
+  io.requests: {domain: firmware, initial: 0.0}
+
+metrics:
+  modbus_timeouts: {type: stats, signal: plc.timeouts}
+  nmea_checksum_errors: {type: stats, signal: nav.checksum_errors}
+  spi_id_errors: {type: stats, signal: mcu.id_errors}
+  eth_retransmissions: {type: stats, signal: eth.retransmissions}

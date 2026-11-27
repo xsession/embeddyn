@@ -309,3 +309,5 @@ label { user-select: none; }
 .an-hexline .flip { background: #ff3b30; color: #fff; }
 #am-srcs { width: 150px; } #am-derived { margin: 2px 0 4px; line-height: 1.5; } #am-derived .bad { color: var(--err); } #am-derived .good { color: var(--ok); }
 .am-row b { color: #c8d3e0; font-size: 11px; text-transform: uppercase; }
+.am-json { flex: 1; min-width: 240px; font-family: var(--mono, monospace); font-size: 11px; }
+.am-json.bad { outline: 1px solid #e74c3c; }
