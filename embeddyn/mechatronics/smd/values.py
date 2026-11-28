@@ -14,6 +14,18 @@ E96 = [100, 102, 105, 107, 110, 113, 115, 118, 121, 124, 127, 130, 133, 137, 140
        274, 280, 287, 294, 301, 309, 316, 324, 332, 340, 348, 357, 365, 374, 383, 392, 402, 412, 422, 432, 442,
        453, 464, 475, 487, 499, 511, 523, 536, 549, 562, 576, 590, 604, 619, 634, 649, 665, 681, 698, 715, 732,
        750, 768, 787, 806, 825, 845, 866, 887, 909, 931, 953, 976]
+E24 = [10, 11, 12, 13, 15, 16, 18, 20, 22, 24, 27, 30, 33, 36, 39, 43, 47, 51, 56, 62, 68, 75, 82, 91]
+
+
+def standard_series(mantissa: int, digits: int) -> bool:
+    """Whether the significant figures are a standard value: E24 for two digits (5 % parts), E96 or E24 for three."""
+    if digits == 2:
+        return mantissa in E24
+    if digits == 3:
+        return mantissa in E96 or (mantissa % 10 == 0 and mantissa // 10 in E24)
+    return True
+
+
 EIA96_MULTIPLIER = {"Z": 0.001, "Y": 0.01, "R": 0.01, "X": 0.1, "S": 0.1, "A": 1, "B": 10, "H": 10, "C": 100,
                     "D": 1e3, "E": 1e4, "F": 1e5}
 # EIA-198 capacitor code: letter = significant figures, digit = power of ten (pF); 9 means 0.1

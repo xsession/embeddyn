@@ -23,7 +23,7 @@ from PIL import Image
 from ...smd.packages import package as find_package
 from .image import BoardImage, straighten
 from .nets import Connectivity, align, conductor_regions, join_sides, net_ids
-from .parts import Pad, Part, body_mask, find_pads, find_parts, identify, number, read_markings
+from .parts import Pad, Part, _dark_with_text, body_mask, find_pads, find_parts, identify, number
 from .segment import Classes, classify, white_balance
 
 PREFIX = {"resistor": "R", "capacitor": "C", "inductor": "L", "diode": "D", "transistor": "Q", "mosfet": "Q",
@@ -52,6 +52,8 @@ class BoardResult:
     parts: list[Part] = field(default_factory=list)
     closeups: list[dict] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    # marking readers: the board photo's (transform None) and every placed close-up's (close-up px -> board px)
+    readers: list = field(default_factory=list)
 
     def part(self, ref: str) -> Part | None:
         return next((p for p in self.parts if p.ref == ref), None)
@@ -116,12 +118,15 @@ def read_board(top: Path, bottom: Path | None = None, closeups: list[Path] | Non
     top_res = _side(top_img, scale, "top")
     for part in top_res.parts:
         identify(part, top_res.pads, scale)
-    read_markings(top_res.balanced, top_res.parts, top_res.pads, scale)
-
+    from .markings import MarkingReader
+    readers = [(MarkingReader(top_res.balanced, _dark_with_text(top_res.classes, scale), str(top),
+                              min_side=max(6.0, 0.5 * scale), char=0.65 * scale).read(), None)]
     closeup_info: list[dict] = []
     if closeups:
         from .closeup import apply_closeups
-        closeup_info = apply_closeups(closeups, top_res, scale)
+        closeup_info, more = apply_closeups(closeups, top_res, scale)
+        readers += more
+    assign_markings(top_res.parts, readers, scale)
 
     # the scale from parts identified by their part number
     if not board_mm and not px_per_mm:
@@ -157,7 +162,8 @@ def read_board(top: Path, bottom: Path | None = None, closeups: list[Path] | Non
         connectivity = join_sides(conductor_regions(top_res.classes, top_res.bodies, scale, "top"), None, None,
                                   scale)
 
-    result = BoardResult(top_res, bottom_res, connectivity, scale, closeups=closeup_info, notes=notes)
+    result = BoardResult(top_res, bottom_res, connectivity, scale, closeups=closeup_info, notes=notes,
+                         readers=readers)
     _finish(result)
     return result
 
@@ -181,6 +187,74 @@ def _finish(result: BoardResult) -> None:
         part.ref = f"{prefix}{counters[prefix]}"
     result.parts = all_parts
     _rebuild_nets(result)
+
+
+def _to_board(m, x: float, y: float) -> tuple[float, float]:
+    if m is None:
+        return x, y
+    return float(m[0, 0] * x + m[0, 1] * y + m[0, 2]), float(m[1, 0] * x + m[1, 1] * y + m[1, 2])
+
+
+def _inside(part: Part, x: float, y: float, margin: float) -> bool:
+    dx, dy = x - part.cx, y - part.cy
+    u = abs(dx * math.cos(part.angle) + dy * math.sin(part.angle))
+    t = abs(-dx * math.sin(part.angle) + dy * math.cos(part.angle))
+    return u <= part.length / 2 + margin and t <= part.width / 2 + margin
+
+
+def _bodies_on(part: Part, readers: list, px_per_mm: float):
+    """(reader, body, its centre on the board) of every marking body that lies on ``part``."""
+    for reader, m in readers:
+        for body in reader.bodies:
+            x, y = _to_board(m, body.cx, body.cy)
+            if _inside(part, x, y, 0.3 * px_per_mm):
+                yield reader, m, body
+
+
+def assign_markings(parts: list[Part], readers: list, px_per_mm: float) -> int:
+    """Give every part the best marking read on it (close-ups count more: they are sharper). Parts whose marking
+    a person entered keep it. Returns how many parts have a read marking."""
+    from ...smd import decode
+    count = 0
+    for part in parts:
+        if any("marking entered by hand" == n for n in part.notes):
+            continue
+        best = None
+        for reader, m, body in _bodies_on(part, readers, px_per_mm):
+            # only confident readings that decode well: a wrong value that looks plausible is worse than none
+            words = [w for w in body.words if (w.conf >= 0.55 and w.score >= 0.6) or
+                     (w.conf >= 0.75 and len(w.text) >= 4 and any(c.isdigit() for c in w.text)
+                      and any(c.isalpha() for c in w.text))]
+            if not words:
+                continue
+            quality = float(np.mean([w.conf * (0.3 + w.score) for w in words])) * (1.2 if m is not None else 1.0)
+            if best is None or quality > best[0]:
+                best = (quality, reader, m, body)
+        if best is None:
+            continue
+        quality, reader, m, body = best
+        text = body.text
+        up = body.words[0].up
+        if m is not None:
+            v = m[:, :2] @ np.array(up)
+            n = float(np.linalg.norm(v)) or 1.0
+            up = (float(v[0] / n), float(v[1] / n))
+        decoded = decode(text, part.package or None, part.kind if part.kind in ("resistor", "capacitor") else None)
+        part.marking, part.marking_conf, part.up = text, round(min(1.0, quality), 2), up
+        part.decoded = [r.as_dict() for r in decoded.readings[:4]]
+        part.value = part.part_number = ""
+        if decoded.best:
+            if decoded.best.kind == "value" and decoded.best.value:
+                part.value = decoded.best.value.text
+                part.kind = decoded.best.value.kind if part.kind in ("", "resistor", "capacitor", "inductor") \
+                    else part.kind
+            else:
+                part.part_number = part.value = decoded.best.part
+        part.notes = [n for n in part.notes if not n.startswith("marking read on")]
+        part.notes.append(f"marking read on {Path(reader.source).name or 'the board photo'} by OCR: check it "
+                          "(typing the right one fixes it and teaches the reader)")
+        count += 1
+    return count
 
 
 def set_marking(result: BoardResult, ref: str, text: str, package: str | None = None,
@@ -212,11 +286,36 @@ def set_marking(result: BoardResult, ref: str, text: str, package: str | None = 
                     part.package = best.package
                 else:                       # a family only ("SOIC"): keep the measured size's package
                     part.notes.append(f"the part number says {best.package}")
+    part.notes = [n for n in part.notes if not n.startswith("marking read on")]
     part.notes.append("marking entered by hand")
     # the "up" of the letters, in image coordinates (y down)
     directions = {"upright": (0.0, -1.0), "upside_down": (0.0, 1.0), "reads_up": (-1.0, 0.0), "reads_down": (1.0, 0.0)}
     if pin1 in directions:
         part.up = directions[pin1]
+    # teach the marking readers this board's font: the characters of the typed marking, from the sharpest photo
+    # of the part, then read every part again with them
+    learned, orientation = 0, None
+    for reader, m, body in sorted(_bodies_on(part, result.readers, result.px_per_mm),
+                                  key=lambda item: item[1] is None):
+        n, up = reader.learn(body, text)
+        if n:
+            learned += n
+            if up is not None and orientation is None:
+                orientation = _to_board(m, *up) if m is None else tuple(m[:, :2] @ np.array(up))
+            break
+    if learned:
+        part.notes.append(f"learned {learned} characters of this board's marking font")
+        if pin1 in (None, "", "auto") and orientation is not None:
+            n_ = math.hypot(*orientation) or 1.0
+            part.up = (orientation[0] / n_, orientation[1] / n_)
+        for reader, _ in result.readers:
+            reader.reread()
+        changed = assign_markings([p for p in result.parts if p.side == "top"], result.readers, result.px_per_mm)
+        result.notes = [n for n in result.notes if not n.startswith("markings re-read")] + \
+            [f"markings re-read with the learned characters: {changed} parts"]
+        for other in result.parts:
+            if other is not part and other.marking:
+                number(other, (result.top if other.side == "top" else result.bottom).pads)
     number(part, side.pads)
     _rebuild_nets(result)
     return part

@@ -11,10 +11,8 @@ import math
 from pathlib import Path
 
 import numpy as np
-from scipy.spatial import cKDTree
 
 from .image import load, mask_hue, hsv
-from .parts import Part, body_mask, find_pads, find_parts, identify, read_markings
 from .segment import classify, white_balance
 
 
@@ -104,60 +102,26 @@ def place_by_image(close_rgb: np.ndarray, board_rgb: np.ndarray, board_px_per_mm
     return m, score
 
 
-def apply_closeups(paths: list[Path], board, board_px_per_mm: float) -> list[dict]:
-    """Read every close-up and give its markings to the board parts it shows. Returns one summary per photo."""
-    info = []
+def apply_closeups(paths: list[Path], board, board_px_per_mm: float) -> tuple[list[dict], list]:
+    """Place every close-up on the board and read its markings. Returns one summary per photo and the
+    (marking reader, close-up px -> board px transform) of every close-up that was placed."""
+    from .markings import MarkingReader
+    from .parts import _dark_with_text
+    info, readers = [], []
     for path in paths:
         rgb = load(path, 2400)
-        # a close-up shows some 30-60 mm of the board across its long side
-        ppm = max(rgb.shape[:2]) / 45.0
-        h, s, v = hsv(rgb)
-        hue = mask_hue(h, s, v)
-        balanced = white_balance(rgb)
-        classes = classify(rgb, ppm, hue)
-        bodies = body_mask(classes, ppm)
-        pads, pad_labels = find_pads(classes, ppm, "top", bodies)
-        pad_by_id = {p.id: p for p in pads}
-        parts = find_parts(balanced, classes, ppm, pads, pad_labels, "top")
-        for part in parts:
-            identify(part, pad_by_id, ppm)
+        ppm = max(rgb.shape[:2]) / 40.0            # a close-up shows some 30-60 mm of board across
         m, match_score = place_by_image(rgb, board.balanced, board_px_per_mm)
-        pairs = []
-        plausible = m is not None and 0.05 < float(np.sqrt(abs(np.linalg.det(m[:, :2])))) < 1.5
-        if plausible and match_score >= 0.45:
-            moved = np.array([_apply(m, np.array([[p.cx, p.cy]]))[0] for p in parts]) if parts else np.zeros((0, 2))
-            tree = cKDTree(np.array([[p.cx, p.cy] for p in board.parts]))
-            taken: dict[int, tuple[float, int]] = {}
-            for a, (x, y) in enumerate(moved):
-                d, j = tree.query((x, y), distance_upper_bound=1.0 * board_px_per_mm)
-                if np.isfinite(d) and (j not in taken or d < taken[j][0]):
-                    taken[int(j)] = (float(d), a)
-            pairs = [(a, b) for b, (_, a) in taken.items()]
-        else:
-            m = None
-        entry = {"photo": str(path), "parts": len(parts), "placed": m is not None, "matched": len(pairs),
-                 "match": round(float(match_score), 3), "markings": 0}
-        if m is None:
+        scale = float(np.sqrt(abs(np.linalg.det(m[:, :2])))) if m is not None else 0.0
+        entry = {"photo": str(path), "placed": False, "match": round(float(match_score), 3), "markings": 0}
+        if m is None or not (0.05 < scale < 1.5) or match_score < 0.45:
             entry["note"] = "could not place this close-up on the board (no clear match: too oblique or blurred?)"
             info.append(entry)
             continue
-        matched_close = [parts[a] for a, _ in pairs]
-        read_markings(balanced, matched_close, pad_by_id, ppm, only_dark=True)
-        lin = m[:, :2]
-        for a, b in pairs:
-            cp, bp = parts[a], board.parts[b]
-            if not cp.marking or cp.marking_conf <= bp.marking_conf:
-                continue
-            up = lin @ np.array(cp.up)
-            n = float(np.linalg.norm(up)) or 1.0
-            bp.marking, bp.marking_conf = cp.marking, cp.marking_conf
-            bp.up = (float(up[0] / n), float(up[1] / n))
-            bp.decoded, bp.value, bp.part_number = cp.decoded, cp.value, cp.part_number
-            if cp.kind in ("resistor", "capacitor", "inductor") and bp.kind != cp.kind:
-                bp.kind = cp.kind
-            bp.notes.append(f"marking read on {path.name}")
-            entry["markings"] += 1
-        sx = float(np.sqrt(abs(np.linalg.det(lin))))
-        entry["scale"] = round(sx, 4)
+        h, s_, v = hsv(rgb)
+        classes = classify(rgb, ppm, mask_hue(h, s_, v))
+        reader = MarkingReader(white_balance(rgb), _dark_with_text(classes, ppm), str(path)).read()
+        entry.update(placed=True, scale=round(scale, 4), bodies=len(reader.bodies), read=len(reader.marked))
+        readers.append((reader, m))
         info.append(entry)
-    return info
+    return info, readers

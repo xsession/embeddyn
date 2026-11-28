@@ -46,9 +46,22 @@ size on its own. **Import & open** turns the netlist into an emulated board proj
    between their metal ends), number of pads and on how many sides they sit give the **package**, from a table of
    about 100 SMD packages (chip sizes, SOD, SMA/B/C, tantalum cases, SOT, SOIC, TSSOP, SSOP, MSOP, DFN, QFN, LGA,
    LQFP, crystals, LEDs, electrolytics, power inductors).
-4. **Markings** are read by OCR on each part, turned to its axis, with the body's own texture removed; close-ups
-   are placed on the board by correlating edge images over scale and rotation, and their markings go to the parts
-   they show. A reading is kept only when it decodes (see below) or is a confident alphanumeric string.
+4. **Markings** are read text-first (`pcb_photo.markings`), on the board photo and on every close-up placed on
+   the board (by correlating edge images over scale and rotation):
+   * text is found two ways: dark bodies, and lines of bright character-sized strokes on dark plastic (so packed
+     parts whose bodies touch still give one word each);
+   * each is turned to its axis in every orientation it can have, its body's texture removed (a white top-hat);
+   * it is read by tesseract and by a character classifier: nearest neighbours on gradient features, trained
+     once on about 60 installed sans fonts with blur, weight, squeeze and noise variations (cached in
+     `~/.cache/embeddyn/`), plus digit shapes common on markings that fonts draw differently (the open 4);
+   * the orientation and reading whose words decode best win; chip parts are read as digits and R only, and
+     codes that are not standard E24/E96 values rank lower (`561` upside down is `195`: 19 is not an E24 value);
+   * every word keeps its position, so it lands on the part under it; close-ups count more than the board photo.
+
+   **Teaching the font.** Marking fonts repeat across a board (all resistors of one maker look alike). A marking
+   typed in by hand (the Lab's part panel, or `--marking`) is also learned: its characters, cut from the sharpest
+   photo of that part, are kept in `~/.config/embeddyn/glyphs/learned.npz` (12 per character at most) and every
+   part is read again with them, in seconds. A few typed codes on a board improve the rest.
 5. **Pins** are numbered counter-clockwise from pin 1: the lower left of the marking for dual-row and SOT parts,
    the upper left for quad parts. Without a marking (or a typed-in orientation) the numbering is a guess and
    marked red.
@@ -82,9 +95,13 @@ carry no licence that allows copying them into the repository. Codes you collect
   SOIC-8, three traces, slight perspective): all parts, packages and connections are found.
 * A real two-layer board (about 85 x 100 mm, phone photos of both sides): 132 parts, 67 nets with copper traced
   across the board, the bottom fitted onto the top to 0.4 mm. The weak points:
-  * markings: on the whole-board photo (25 px/mm) only a few are read; ICs with laser-etched markings are
-    unreadable there. Close-ups help where they can be placed; otherwise type the marking in (the Lab's part
-    panel or `--marking`): the decoder, the pin numbering and the netlist follow.
+  * markings: measured on four close-ups of that board against the 18 markings visible in
+    them (codes like `472`, `680`, `561`, `BZCW`, `74HC595D`, `F051K6`): 2-3 are read, plus many readings that
+    are not markings. Only confident readings that decode well are put on parts (7 parts on that board, about 4
+    of them right), each with "check it". Laser-etched IC markings and codes smaller than about 20 px are rarely
+    read. Type the marking in (the Lab's part panel or `--marking`): the decoder, pin numbering and netlist follow,
+    and the reader learns the font for the rest of the board. Close-ups at full resolution read a little more,
+    at three times the time; they are read at 2400 px.
   * shadows of tall parts (battery clips) and glare are taken for copper or bodies near them;
   * parts with many leads in shade (SOT-23s, optocouplers) can lose a lead;
   * what is not visible is not found: inner layers, traces under parts, tented vias whose hole is covered.

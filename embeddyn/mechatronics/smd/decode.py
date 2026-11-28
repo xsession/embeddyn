@@ -320,6 +320,11 @@ def decode(text: str, package: str | None = None, kind: str | None = None,
                 score *= 0.3                 # "089" is "680" upside down: codes do not start with 0
             if value.kind == "resistor" and not (0.01 <= value.value <= 22e6):
                 score *= 0.2
+            if value.system in ("3-digit", "3-digit pF", "4-digit", "3-digit µH") and digits.isdigit():
+                from .values import standard_series
+                figures = digits[:-1]
+                if not standard_series(int(figures), len(figures)):
+                    score *= 0.35            # not a standard value: more likely a misreading
             if value.kind == "capacitor" and not (0.5e-12 <= value.value <= 10e-3):
                 score *= 0.2
             result.readings.append(Reading("value", f"{value.text} {value.kind}", value.system, package or "",

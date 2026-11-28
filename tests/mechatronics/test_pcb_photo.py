@@ -258,3 +258,80 @@ def test_lab_board_photos(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# --- marking OCR ------------------------------------------------------------------------------------------------
+
+def _closeup_with_codes(codes, seed=5):
+    """A close-up-like picture: dark resistor bodies on green, white codes on them (about 50 px/mm)."""
+    rng = np.random.default_rng(seed)
+    w, h = 900, 300 * len(codes)
+    img = Image.new("RGB", (w, h), (40, 125, 105))
+    d = ImageDraw.Draw(img)
+    font = _font(46)
+    spots = []
+    for k, code in enumerate(codes):
+        cx, cy = 450, 150 + 300 * k
+        d.rectangle([cx - 160, cy - 60, cx - 110, cy + 60], fill=(210, 210, 205))       # end caps
+        d.rectangle([cx + 110, cy - 60, cx + 160, cy + 60], fill=(210, 210, 205))
+        d.rectangle([cx - 110, cy - 60, cx + 110, cy + 60], fill=(30, 30, 32))
+        d.text((cx, cy), code, fill=(225, 225, 220), font=font, anchor="mm")
+        spots.append((cx, cy))
+    arr = np.asarray(img.filter(ImageFilter.GaussianBlur(1.2)), np.float32) + rng.normal(0, 4, (h, w, 3))
+    rgb = np.clip(arr, 0, 255).astype(np.uint8)
+    dark = rgb.max(axis=2) < 90
+    return rgb, dark, spots
+
+
+needs_tesseract = pytest.mark.skipif(not __import__("shutil").which("tesseract"), reason="tesseract not installed")
+
+
+@needs_tesseract
+def test_marking_reader_reads_codes(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMBEDDYN_GLYPHS", str(tmp_path / "glyphs.npz"))
+    from embeddyn.mechatronics.importer.pcb_photo import glyphs
+    from embeddyn.mechatronics.importer.pcb_photo.markings import MarkingReader
+    glyphs._learned = glyphs._learned_masks = glyphs._learned_feats = None
+    rgb, dark, spots = _closeup_with_codes(["472", "680"])
+    reader = MarkingReader(rgb, dark, "test", char=48).read()
+    found = {}
+    for x, y in spots:
+        texts = [b.text for b in reader.bodies if b.words and abs(b.cx - x) < 120 and abs(b.cy - y) < 60]
+        found[(x, y)] = texts
+    assert any("472" in t for t in found[spots[0]]), found
+    assert any("680" in t for t in found[spots[1]]), found
+    # the reading direction: upright text has its up towards -y
+    body = next(b for b in reader.bodies if b.words and "472" in b.text)
+    assert body.words[0].up[1] < -0.9
+
+
+def test_learning_and_orientation(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMBEDDYN_GLYPHS", str(tmp_path / "glyphs.npz"))
+    from embeddyn.mechatronics.importer.pcb_photo import glyphs
+    from embeddyn.mechatronics.importer.pcb_photo.markings import MarkingReader
+    glyphs._learned = glyphs._learned_masks = glyphs._learned_feats = None
+    rgb, dark, spots = _closeup_with_codes(["562"])
+    reader = MarkingReader(rgb, dark, "test", char=48)
+    body = reader.body_at(*spots[0])
+    n, up = reader.learn(body, "562")
+    assert n == 3 and up is not None and up[1] < -0.9          # learned the right way up
+    assert (tmp_path / "glyphs.npz").exists() and len(glyphs.learned()) == 3
+    reader.reread()
+    glyphs._learned = glyphs._learned_masks = glyphs._learned_feats = None
+
+
+def test_standard_values_rank_first():
+    # "561" upside down reads "195": 56 is an E24 value, 19 is not
+    assert decode("561").best.score > decode("195").best.score
+    assert decode("4701").best.score > decode("4731").best.score
+
+
+@needs_tesseract
+def test_board_photo_reads_the_ic_marking(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMBEDDYN_GLYPHS", str(tmp_path / "glyphs.npz"))
+    from embeddyn.mechatronics.importer.pcb_photo import read_board
+    photo = tmp_path / "board.jpg"
+    expected = draw_board(photo)
+    result = read_board(photo, board_mm=(W_MM, H_MM))
+    u1 = _nearest(result, expected["U1"])
+    assert u1.marking.replace(" ", "") == "LM358"

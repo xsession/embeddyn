@@ -2,24 +2,20 @@
 
 A part is a dark or light body region (rectangle-like, 0.3 mm² to 4 cm²) with the metal blobs around it as its
 pads. The body's main axis and extent give its size in mm, the pads' layout (how many, on which sides) and the
-size give the package (``embeddyn.mechatronics.smd.classify``); the marking is read by OCR on a crop turned to the
-part's axis, and decoded (``embeddyn.mechatronics.smd.decode``); the reading direction of the marking orients the
+size give the package (``embeddyn.mechatronics.smd.classify``); the marking (read by ``markings``, assigned by the
+reader) is decoded with ``embeddyn.mechatronics.smd.decode``; the reading direction of the marking orients the
 pin numbering.
 """
 from __future__ import annotations
 
 import math
-import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
 from scipy import ndimage
 
-from ...smd import classify as classify_package, decode, number_pins
+from ...smd import classify as classify_package, number_pins
 from ...smd.packages import Package, package as find_package
 from .segment import Classes
 
@@ -257,135 +253,6 @@ def identify(part: Part, pads: dict[int, Pad], px_per_mm: float) -> None:
         part.kind = (kind if kind and kind in kinds else
                      "capacitor" if part.tone == "light" and "capacitor" in kinds else
                      kinds[0] if kinds else "")
-
-
-# --- OCR of markings ---------------------------------------------------------------------------------------------
-
-def _crop(rgb: np.ndarray, part: Part, px_per_mm: float, rotation: int) -> Image.Image:
-    """The part's marking area, turned by ``rotation`` degrees, as dark text on white for OCR."""
-    margin = 0.15 * px_per_mm
-    half = int(math.hypot(part.length, part.width) / 2 + margin + 2)
-    x0, y0 = int(part.cx) - half, int(part.cy) - half
-    pad = ((max(0, -y0), max(0, y0 + 2 * half - rgb.shape[0])), (max(0, -x0), max(0, x0 + 2 * half - rgb.shape[1])),
-           (0, 0))
-    window = np.pad(rgb, pad, mode="edge")[y0 + pad[0][0]:y0 + pad[0][0] + 2 * half,
-                                           x0 + pad[1][0]:x0 + pad[1][0] + 2 * half]
-    image = Image.fromarray(window).convert("L").rotate(math.degrees(part.angle) + rotation,
-                                                        resample=Image.BICUBIC)
-    long_frac = 0.72 if part.length > 1.6 * part.width else 0.92     # passives: skip the end caps
-    length, width = part.length * long_frac, part.width * 0.9
-    w, h = (length, width) if rotation % 180 == 0 else (width, length)
-    c = image.width / 2
-    image = image.crop((int(c - w / 2), int(c - h / 2), int(c + w / 2), int(c + h / 2)))
-    gray = np.asarray(image, dtype=np.float32)
-    if part.tone == "light":
-        gray = 255 - gray                   # dark text on a light body: make the text the bright part
-    # text = brighter than the body around it: remove the body's own shading and texture
-    size = max(5, int(0.6 * px_per_mm)) | 1
-    background = ndimage.median_filter(gray, size=size)
-    text = ndimage.gaussian_filter(gray - background, sigma=max(0.6, 0.025 * px_per_mm))
-    lo, hi = np.percentile(text, [50, 99.7])
-    text = np.clip((text - lo) / max(hi - lo, 1e-3), 0, 1)
-    image = Image.fromarray((255 - text * 255).astype(np.uint8))
-    target = 36.0                            # px per mm of text height is what tesseract likes (~30 px glyphs)
-    scale = max(0.5, min(6.0, 1.1 * target / px_per_mm * 1.0))
-    if scale * min(image.size) < 40:
-        scale = 40 / max(1, min(image.size))
-    image = image.resize((max(8, int(image.width * scale)), max(8, int(image.height * scale))), Image.LANCZOS)
-    border = Image.new("L", (image.width + 40, image.height + 40), 255)
-    border.paste(image, (20, 20))
-    return border
-
-
-def _otsu(arr: np.ndarray) -> float:
-    hist, edges = np.histogram(arr, bins=64, range=(0, 256))
-    w = np.cumsum(hist)
-    m = np.cumsum(hist * (edges[:-1] + 2))
-    total, mt = w[-1], m[-1]
-    between = (mt * w - m * total) ** 2 / np.maximum(w * (total - w), 1)
-    return float(edges[int(np.argmax(between))] + 2)
-
-
-def read_markings(rgb: np.ndarray, parts: list[Part], pads: dict[int, Pad], px_per_mm: float,
-                  only_dark: bool = True) -> None:
-    """OCR each part's marking in the orientations it can have; keep the reading that decodes best."""
-    if not shutil.which("tesseract"):
-        return
-    jobs = []
-    for part in parts:
-        if only_dark and part.tone != "dark":
-            continue
-        if part.width / px_per_mm < 0.6:
-            continue
-        rotations = (0, 180) if part.length > 1.6 * part.width else (0, 90, 180, 270)
-        for rot in rotations:
-            jobs.append((part, rot))
-    if not jobs:
-        return
-    pages: dict[int, list[tuple[int, int, str, float]]] = {}
-    with tempfile.TemporaryDirectory(prefix="pcbocr") as tmp:
-        batches: dict[str, list[int]] = {"7": [], "6": []}
-        for k, (part, rot) in enumerate(jobs):
-            _crop(rgb, part, px_per_mm, rot).save(Path(tmp) / f"{k:05d}.png")
-            small = part.length / px_per_mm < 3.5 or len(part.pads) <= 3
-            batches["7" if small else "6"].append(k)
-        for psm, ks in batches.items():
-            if not ks:
-                continue
-            listing = Path(tmp) / f"list{psm}.txt"
-            listing.write_text("\n".join(str(Path(tmp) / f"{k:05d}.png") for k in ks) + "\n")
-            out = subprocess.run(["tesseract", str(listing), "-", "--psm", psm, "-c",
-                                  "tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-                                  "tsv"], capture_output=True, text=True, timeout=900).stdout
-            for line in out.splitlines()[1:]:
-                cols = line.split("\t")
-                if len(cols) < 12 or cols[0] != "5" or not cols[11].strip():
-                    continue
-                page, block_line = ks[int(cols[1]) - 1], (int(cols[2]), int(cols[4]))
-                pages.setdefault(page, []).append((*block_line, cols[11].strip(), float(cols[10])))
-    best: dict[int, tuple[float, str, float, int]] = {}
-    for k, (part, rot) in enumerate(jobs):
-        words = pages.get(k, [])
-        if not words:
-            continue
-        lines: dict[tuple[int, int], list[str]] = {}
-        confs = []
-        for blk, ln, word, conf in words:
-            lines.setdefault((blk, ln), []).append(word)
-            confs.append(max(conf, 0))
-        text = "\n".join(" ".join(ws) for _, ws in sorted(lines.items()))
-        conf = float(np.mean(confs)) / 100 if confs else 0.0
-        decoded = decode(text, part.package or None)
-        top = decoded.best.score if decoded.best else 0.0
-        score = conf * (0.5 + top)
-        if part.id not in best or score > best[part.id][0]:
-            best[part.id] = (score, text, conf, rot)
-    for part in parts:
-        if part.id not in best:
-            continue
-        score, text, conf, rot = best[part.id]
-        compact = text.replace("\n", "").replace(" ", "")
-        decoded_check = decode(text, part.package or None)
-        useful = decoded_check.best is not None and decoded_check.best.score >= 0.5
-        if not compact or conf < 0.5 or not (useful or (conf >= 0.8 and len(compact) >= 3
-                                                         and any(c.isdigit() for c in compact))):
-            continue
-        part.marking, part.marking_conf = text, round(conf, 2)
-        # the crop was turned by (angle + rot) counter-clockwise; image "up" of the crop is the marking's up
-        a = part.angle + math.radians(rot)
-        part.up = (math.sin(a), -math.cos(a))
-        decoded = decode(text, part.package or None, part.kind or None)
-        part.decoded = [r.as_dict() for r in decoded.readings[:4]]
-        if decoded.best:
-            if decoded.best.kind == "value":
-                part.value = decoded.best.value.text if decoded.best.value else decoded.best.part
-                part.kind = decoded.best.value.kind if decoded.best.value else part.kind
-            else:
-                part.part_number = decoded.best.part
-                part.value = decoded.best.part
-                if decoded.best.package and find_package(decoded.best.package.split("-")[0] + "-"
-                                                         + decoded.best.package.split("-")[-1] if "-" in decoded.best.package else decoded.best.package):
-                    pass
 
 
 def number(part: Part, pads: dict[int, Pad], layout: str | None = None) -> None:
