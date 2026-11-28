@@ -1,0 +1,63 @@
+{
+  "name": "stm32f051",
+  "description": "ST STM32F051x8 / STM32F030x8 (Cortex-M0 48 MHz, 64 KB flash, 8 KB SRAM, USART1-2, SPI1-2, I2C1-2, TIM1/2/3/6/14/15/16/17, ADC, DAC, touch sensing): GNU Arm toolchain with the STM32CubeF0 HAL/LL, Renode stm32f051 platform",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeF0",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0",
+      "-mthumb",
+      "-mfloat-abi=soft",
+      "-Os",
+      "-g",
+      "-DSTM32F051x8",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32F0xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32F0xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with a STM32F051R8Tx_FLASH.ld and startup_stm32f051x8.s (STM32F030x8: -DSTM32F030x8, startup_stm32f030x8.s) from a Cube example (Projects/STM32F030R8-Nucleo/Templates or STM32F0-Discovery). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree; CubeIDE board projects build with `embeddyn mechatronics import`."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32F0xx/Include/stm32f051x8.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x0800FFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x20001FFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x480017FF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32f051.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/st/nucleo_f030r8.repl (STM32F030R8 runs on the F051 platform: LD2 PA5 = led2, B1 PC13 = sysbus.gpioPortC.userButton, active low, VCP usart2) and platforms/boards/st/stm32f0_discovery.repl (LD3 PC9 = ld3, LD4 PC8 = ld4, B1 PA0). The RCC clock tree (HSI/HSE/HSI48, PREDIV, PLL, HPRE, PPRE) drives SysTick and every timer. DMA requests go to their default channels (no SYSCFG remap). EXTI lines take the port SYSCFG_EXTICR selects. ADC: 'adc SetVoltage microvolts channel'. DAC channel 1 ('dac OutputVoltage 0'), TIM6 TRGO trigger. Touch: 'tsc Touch group io true'. Pins: add 'pins: Miscellaneous.PinRecorder @ gpioPortA 0' and connections such as 'gpioPortA:' / '    5 -> led2@0 | pins@5' (a .repl file), then 'sysbus.gpioPortA.pins Edges 5'. Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeF0 examples (tools/stm32cube/run_examples.py with examples_f051.txt in the Renode tree)"
+  }
+}

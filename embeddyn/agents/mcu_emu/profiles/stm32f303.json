@@ -1,0 +1,68 @@
+{
+  "name": "stm32f303",
+  "description": "ST STM32F303xE (Cortex-M4F 72 MHz, 512 KB flash, 64 KB SRAM + 16 KB CCM, USB FS device, bxCAN, 5 U(S)ARTs, 4 SPI, 3 I2C, ADC1, DAC, TIM1/2/3/4/6/7/8/15/16/17): GNU Arm toolchain with the STM32CubeF3 HAL/LL, Renode stm32f303 platform",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeF3",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m4",
+      "-mthumb",
+      "-mfpu=fpv4-sp-d16",
+      "-mfloat-abi=hard",
+      "-Os",
+      "-g",
+      "-DSTM32F303xE",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32F3xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32F3xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with a STM32F303RETx_FLASH.ld and startup_stm32f303xe.s from a Cube example (Projects/STM32F303RE-Nucleo/Templates). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree; CubeIDE board projects build with `embeddyn mechatronics import`."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32F3xx/Include/stm32f303xe.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x0807FFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x2000FFFF"
+    ],
+    "ccm": [
+      "0x10000000",
+      "0x10003FFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x50000BFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32f303xe.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/st/nucleo_f303re.repl (LD2 PA5 = led2, B1 PC13 = sysbus.gpioPortC.userButton, active low, VCP usart2). The RCC clock tree (HSI/HSE, PREDIV, PLL, HPRE, PPRE1/PPRE2) drives SysTick and the timers; bit-band aliases at 0x22000000/0x42000000. DMA1 (7) and DMA2 (5) channels take their fixed requests. EXTI lines take the port SYSCFG_EXTICR selects. ADC1: 'adc1 SetVoltage microvolts channel'. DAC: 'dac OutputVoltage 0'. USB FS device with the packet memory view at 0x40006000. Pins: add 'pins: Miscellaneous.PinRecorder @ gpioPortA 0' and connections such as 'gpioPortA:' / '    5 -> led2@0 | pins@5' (a .repl file), then 'sysbus.gpioPortA.pins Edges 5'. Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeF3 examples (tools/stm32cube/run_examples.py with examples_f303.txt in the Renode tree)"
+  }
+}

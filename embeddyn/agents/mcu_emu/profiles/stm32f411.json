@@ -1,0 +1,64 @@
+{
+  "name": "stm32f411",
+  "description": "ST STM32F411xE (Cortex-M4F 100 MHz, 512 KB flash, 128 KB SRAM, USB OTG FS, 5 SPI, 3 I2C, USART1/2/6, ADC1, 2 DMA with CHSEL routing): GNU Arm toolchain with the STM32CubeF4 HAL/LL, Renode stm32f411 platform",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeF4",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m4",
+      "-mthumb",
+      "-mfpu=fpv4-sp-d16",
+      "-mfloat-abi=hard",
+      "-Os",
+      "-g",
+      "-DSTM32F411xE",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32F4xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with a STM32F411RETx_FLASH.ld and startup_stm32f411xe.s from a Cube example (Projects/STM32F411RE-Nucleo/Templates). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree; CubeIDE board projects build with `embeddyn mechatronics import`."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f411xe.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x0807FFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x2001FFFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x5003FFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32f411.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/st/nucleo_f411re.repl (LD2 PA5 = led2, B1 PC13 = sysbus.gpioPortC.userButton, active low, VCP usart2). The RCC clock tree (HSI/HSE/PLL, HPRE, PPRE1/PPRE2) drives SysTick and the timers; CIR ready interrupts. DMA requests (SPI, USART1/2/6, ADC1, TIM1-5 update) reach the stream whose CHSEL selects them (dmaRouter). ADC1 (F4 layout): 'adc1 SetVoltage microvolts channel', temperature on 16/18, VREFINT 17, TIM1-5 TRGO triggers. USB OTG FS device: attach USB.USBSerialHost ('usbSerial Attach sysbus.usbOtgFs'). Pins: add 'pins: Miscellaneous.PinRecorder @ gpioPortA 0' and connections such as 'gpioPortA:' / '    5 -> led2@0 | pins@5' (a .repl file), then 'sysbus.gpioPortA.pins Edges 5'. Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeF4 examples (tools/stm32cube/run_examples.py with examples_f411.txt in the Renode tree)"
+  }
+}

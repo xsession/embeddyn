@@ -1,0 +1,63 @@
+{
+  "name": "stm32f103",
+  "description": "ST STM32F103x8/xB (Cortex-M3 72 MHz, 64/128 KB flash, 20 KB SRAM, USB FS device, bxCAN, 2 ADC, 3 USART, 2 SPI, 2 I2C, TIM1-4, RTC): GNU Arm toolchain with the STM32CubeF1 HAL/LL, Renode stm32f103 platform",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeF1",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m3",
+      "-mthumb",
+      "-mfloat-abi=soft",
+      "-Os",
+      "-g",
+      "-DSTM32F103xB",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32F1xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32F1xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with a STM32F103RBTx_FLASH.ld and startup_stm32f103xb.s from a Cube example (Projects/STM32F103RB-Nucleo/Templates). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree; CubeIDE board projects build with `embeddyn mechatronics import`."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f103xb.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x0801FFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x20004FFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x40023FFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32f103xb.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/st/nucleo_f103rb.repl (LD2 PA5 = led2, B1 PC13 = sysbus.gpioPortC.userButton, active low, VCP usart2) and platforms/boards/st/blue_pill_stm32f103.repl (LED PC13). The RCC clock tree (HSI/HSE/PLL, HPRE, PPRE1/PPRE2, ADCPRE, RTCSEL) drives SysTick, the timers and the RTC. GPIO uses the F1 CRL/CRH model with AFIO EXTICR and remaps; bit-band aliases at 0x22000000/0x42000000. DMA1 requests are wired to their fixed channels (RM0008 table 78). ADC1/2: 'adc1 SetVoltage microvolts channel', temperature sensor channel 16 ('adc1 Temperature 30'), VREFINT 17; TIM1/2/3/4 TRGO reach the ADC trigger inputs. Flash: page erase/program/mass erase with FPEC keys. RTC: 32-bit counter with prescaler, alarm (EXTI 17). USB FS device: packet memory at 0x40006000 (16-bit words on a 32-bit stride). Pins: add 'pins: Miscellaneous.PinRecorder @ gpioPortA 0' and connections such as 'gpioPortA:' / '    5 -> led2@0 | pins@5' (a .repl file), then 'sysbus.gpioPortA.pins Edges 5'. Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeF1 examples (tools/stm32cube/run_examples.py with examples_f103.txt in the Renode tree)"
+  }
+}

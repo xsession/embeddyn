@@ -47,6 +47,31 @@ parts:
     kind: mcu
     family: stm32u5
     platform: platforms/cpus/st/stm32u585.repl
+  - id: st-stm32f103
+    match: ['^STM32F103[A-Z][8B]']
+    kind: mcu
+    family: stm32f1
+    platform: platforms/cpus/st/stm32f103xb.repl
+  - id: st-stm32f411
+    match: ['^STM32F411']
+    kind: mcu
+    family: stm32f4
+    platform: platforms/cpus/st/stm32f411.repl
+  - id: st-stm32f303
+    match: ['^STM32F303[A-Z][DE]']
+    kind: mcu
+    family: stm32f3
+    platform: platforms/cpus/st/stm32f303xe.repl
+  - id: st-stm32f051
+    match: ['^STM32F051', '^STM32F030[A-Z]8']
+    kind: mcu
+    family: stm32f0
+    platform: platforms/cpus/st/stm32f051.repl
+  - id: st-stm32g071
+    match: ['^STM32G07[01]']
+    kind: mcu
+    family: stm32g0
+    platform: platforms/cpus/st/stm32g071.repl
 
   # --- sensors ------------------------------------------------------------------------------------------------
   - id: bosch-bmi088

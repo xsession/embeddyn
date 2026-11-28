@@ -1,0 +1,67 @@
+{
+  "name": "stm32g071",
+  "description": "ST STM32G071xB (Cortex-M0+ 64 MHz, 128 KB flash, 36 KB SRAM, USART1-4, LPUART1, SPI1-2, I2C1-2, TIM1/2/3/6/7/14/15/16/17, LPTIM1-2, ADC, 2-channel DAC, DMAMUX): GNU Arm toolchain with the STM32CubeG0 HAL/LL, Renode stm32g071 platform",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeG0",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0plus",
+      "-mthumb",
+      "-mfloat-abi=soft",
+      "-Os",
+      "-g",
+      "-DSTM32G071xx",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32G0xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32G0xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with a STM32G071RBTx_FLASH.ld and startup_stm32g071xx.s from a Cube example (Projects/NUCLEO-G071RB/Templates). Whole Cube examples build with tools/stm32cube/build_example.py in the Renode tree; CubeIDE board projects build with `embeddyn mechatronics import`."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32G0xx/Include/stm32g071xx.h"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x0801FFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x20008FFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x40025FFF"
+    ],
+    "gpio": [
+      "0x50000000",
+      "0x500017FF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32g071.repl",
+    "pc_command": "cpu PC",
+    "notes": "Boards: platforms/boards/st/nucleo_g071rb.repl (LD4 PA5 = led4, B1 PC13 = sysbus.gpioPortC.userButton, active low, VCP usart2). The RCC clock tree (HSI16/HSIDIV, HSE, PLL R output, HPRE, PPRE) drives SysTick and the timers. Peripheral DMA requests go to DMAMUX inputs numbered by request ID (e.g. USART2_TX = 53) and reach the DMA1 channel whose DMAMUX_CxCR selects them. EXTI lines take the port EXTI_EXTICR selects. ADC: 'adc SetVoltage microvolts channel'. DAC: 'dac OutputVoltage 0'. RTC (RTCv3) and TAMP share the RTC_TAMP vector. Not modelled: UCPD, COMP, CEC. Pins: add 'pins: Miscellaneous.PinRecorder @ gpioPortA 0' and connections such as 'gpioPortA:' / '    5 -> led2@0 | pins@5' (a .repl file), then 'sysbus.gpioPortA.pins Edges 5'. Docs: tools/stm32cube/README.md."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the STM32CubeG0 examples (tools/stm32cube/run_examples.py with examples_g071.txt in the Renode tree)"
+  }
+}
