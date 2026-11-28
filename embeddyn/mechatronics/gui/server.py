@@ -88,6 +88,7 @@ class LabState:
         self.startup = startup
         self.sessions: dict[str, RunSession] = {}
         self.lock = threading.Lock()
+        self.scan_images: set[str] = set()          # overlay pictures the Scan view may fetch
 
     def session(self, session_id: str) -> RunSession:
         try:
@@ -174,6 +175,11 @@ def make_handler(state: LabState):
                     return self._send(200, _pcap(session, query.get("proto", "can")), "application/vnd.tcpdump.pcap",
                                       {"Content-Disposition": f'attachment; filename="run-{session.id}-'
                                                               f'{query.get("proto", "can")}.pcap"'})
+                if url.path == "/api/scan/image":
+                    path = str(Path(query.get("path", "")).resolve())
+                    if path not in state.scan_images or not Path(path).is_file():
+                        return self._json({"error": "not found"}, 404)
+                    return self._send(200, Path(path).read_bytes(), "image/png")
                 if url.path == "/api/csv":
                     session = state.session(query.get("session", ""))
                     return self._send(200, session.csv().encode(), "text/csv",
@@ -322,6 +328,18 @@ def make_handler(state: LabState):
             original = path.read_text(encoding="utf-8") if path.exists() else None
             target.write_text(breadboard.export_netlist(body["board"], original), encoding="utf-8")
             return {"path": str(target)}
+
+        # scan view: printed schematics (PDF, pictures) to a netlist and an imported board -----------------
+        def _post_scan_run(self, body: dict[str, Any]) -> dict[str, Any]:
+            from .scanview import run_scan
+            result = run_scan(body)
+            with state.lock:
+                state.scan_images.update(str(Path(p["overlay"]).resolve()) for p in result["pages"] if p["overlay"])
+            return result
+
+        def _post_scan_import(self, body: dict[str, Any]) -> dict[str, Any]:
+            from .scanview import import_board
+            return import_board(body)
 
         # analyzer: frame sender, captures, decoder settings ------------------------------------------
         def _post_analyzer_inject(self, body: dict[str, Any]) -> dict[str, Any]:

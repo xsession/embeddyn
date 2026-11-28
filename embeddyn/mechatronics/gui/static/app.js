@@ -6,6 +6,7 @@ import { render as renderInspector } from './inspector.js';
 import { draw as drawScene } from './scene3d.js';
 import { onFrame as analyzerFrame, runStarted as analyzerRunStarted, setVisible as setAnalyzer } from './analyzer.js';
 import { fit as fitBreadboard, projectSaved, setActive as setBreadboard, updateLive as updateBreadboard, bb } from './breadboard.js';
+import { fit as fitScan, setActive as setScan } from './scan.js';
 
 const $ = (id) => document.getElementById(id);
 let stream = null;
@@ -286,14 +287,15 @@ function bind() {
     data.cursor = Number(e.target.value); frameDirty = true;
   });
   $('btn-replay').onclick = replay;
-  $('btn-fit').onclick = () => (bb.active ? fitBreadboard() : fit());
+  $('btn-fit').onclick = () => (bb.active ? fitBreadboard() : $('views').className === 'view-scan' ? fitScan() : fit());
   $('modal-close').onclick = () => $('modal').classList.add('hidden');
   $('modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal') $('modal').classList.add('hidden'); });
   document.querySelectorAll('#view-tabs button[data-view]').forEach((b) => (b.onclick = () => {
     document.querySelectorAll('#view-tabs button[data-view]').forEach((x) => x.classList.toggle('active', x === b));
     $('views').className = 'view-' + b.dataset.view;
     setBreadboard(b.dataset.view === 'breadboard');
-    if (!['scene', 'breadboard'].includes(b.dataset.view)) requestAnimationFrame(fit);
+    setScan(b.dataset.view === 'scan');
+    if (!['scene', 'breadboard', 'scan'].includes(b.dataset.view)) requestAnimationFrame(fit);
   }));
   document.querySelectorAll('#dock-tabs button').forEach((b) => (b.onclick = () => showDock(b.dataset.dock)));
   document.addEventListener('keydown', (e) => {
@@ -318,6 +320,10 @@ function bind() {
   on('graph-changed', () => { frameDirty = true; renderInspector(); });
   on('graph-changed-soft', () => { renderSchematic(); renderInspector(); });
   on('selection', () => { renderInspector(); });
+  on('open-project', async (path) => {          // e.g. a board imported from a scanned schematic
+    await openPath(path);
+    if (state.graph?.path === path) document.querySelector('#view-tabs button[data-view="schematic"]').click();
+  });
   on('node-open', (id) => { showDock('instruments'); reveal(id); });
   on('control', () => { frameDirty = true; });
   on('error', (error) => { toast(error.message || String(error), true); log(error.message || String(error), 'err'); });

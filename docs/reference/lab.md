@@ -28,7 +28,7 @@ the built-in mocks.
 
 ```text
 ┌ toolbar: New · Open ▾ · Save · Save as · YAML · Check │ ▶ Run ❚❚ ■ · mock hardware · real-time × │ t · status ┐
-├ parts library ┬─ Schematic │ Breadboard │ 3-D view │ Split ─────────┬ inspector ─────────────┤
+├ parts library ┬─ Schematic │ Breadboard │ Scan │ 3-D view │ Split ──┬ inspector ─────────────┤
 │ Controllers   │                                                       │ project / part / wire  │
 │ Electrical    │   parts with pins, wires, live values on the pins     │ parameters, options,   │
 │ Mechanical    │                                                       │ pins, transforms       │
@@ -223,6 +223,29 @@ replay like the instruments.
 `strobe firmware → electrical.gpio` on an MCU pin). The probe flags show which instances
 read each output, so one board shows the whole electrical side of the co-simulation.
 
+## Scan view
+
+The **Scan** tab reads a printed schematic into a netlist: a PDF (exported from an EDA
+tool, or scanned) or pictures (PNG, JPEG, TIFF ...). Drop the files on the tab, choose
+them, or type their paths (several files are the pages of one design). The scan runs the
+[schematic scanner](../guides/schematic-scan.md) on the Lab server and writes
+`schematic.net`, `scan.json` and an overlay per page into `.embeddyn/scans/NAME` in the
+project folder (or the **out** folder).
+
+* The page shows the overlay: each net in its own colour, parts boxed with their
+  reference, pins as dots (red: number guessed). Wheel zooms, drag pans, double-click fits.
+* **Parts** and **Nets** list what was read. Clicking a part zooms to it and marks its pins;
+  clicking a net marks every pin on it, on its page.
+* **reference** scores the scan against a known KiCad netlist (precision and recall of pin
+  connections, identical nets, matching values).
+* **Import as an emulated board** runs the board importer on the scanned netlist: Renode
+  board, bindings and a project in `<scan folder>/board`, then opens the project.
+  **substitute** (`REF=PART`) emulates a part as another library part, or names the MCU
+  when its value was not read. **firmware** sets an ELF/HEX/BIN for the board to run.
+
+A vector PDF scans in seconds. A picture takes a minute or more because of OCR, and dense
+black-and-white pictures are not reliable yet: check the overlay before importing.
+
 ## Files
 
 Saving writes an ordinary project file. Simulator instances, signals and couplings
@@ -245,8 +268,9 @@ part exposes gets a net-label terminal.
 | `gui/sources.py` | `FunctionGenerator`, `ServoPulseGenerator` plants |
 | `gui/session.py` | `RunSession`: thread around `CoSimulationOrchestrator.iterate()`; pause, stop, real-time pacing, forced signals, metrics, CSV |
 | `gui/server.py` | `ThreadingHTTPServer`; JSON API under `/api`, Server-Sent Events at `/api/stream` |
+| `gui/scanview.py` | Scan view: schematic scan of uploaded or local files, pin and part positions for the overlay, import as a board |
 | `gui/breadboard.py` | SPICE netlist parser, part types and palette, automatic breadboard layout, connectivity check, netlist export, `.breadboard.yaml` sidecars |
-| `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `breadboard.js` (breadboard view), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `analyzer.js` (protocol analyzer) with `bytediff.js` (changes view), `scene3d.js` (flat-shaded canvas renderer) |
+| `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `breadboard.js` (breadboard view), `scan.js` (scan view), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `analyzer.js` (protocol analyzer) with `bytediff.js` (changes view), `scene3d.js` (flat-shaded canvas renderer) |
 
 Two core changes support the Lab:
 

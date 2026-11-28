@@ -66,6 +66,45 @@ label { user-select: none; }
 #schematic-wrap, #scene-wrap, #breadboard-wrap { flex: 1; position: relative; min-width: 0; }
 .view-schematic #scene-wrap { display: none; } .view-scene #schematic-wrap { display: none; }
 #breadboard-wrap { display: none; flex-direction: column; }
+#scan-wrap { display: none; flex: 1; flex-direction: column; min-width: 0; }
+.view-scan #scan-wrap { display: flex; } .view-scan #schematic-wrap, .view-scan #scene-wrap { display: none; }
+#layout.scanning #library, #layout.scanning #inspector { display: none; }
+#scan-wrap.drop { outline: 2px dashed var(--accent); outline-offset: -4px; }
+#sc-toolbar { display: flex; gap: 6px; align-items: center; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+#sc-path { flex: 1; min-width: 180px; }
+#sc-files { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+#sc-body { flex: 1; display: flex; min-height: 0; }
+#sc-pageside { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#sc-pagetabs { display: flex; gap: 4px; padding: 4px 8px; }
+#sc-pagetabs:empty { display: none; }
+#sc-viewport { flex: 1; position: relative; overflow: hidden; background: #15171b; cursor: grab; }
+#sc-viewport.panning { cursor: grabbing; }
+#sc-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: white; box-shadow: 0 2px 16px #000a; }
+#sc-stage:empty { display: none; }
+#sc-stage img { width: 100%; height: 100%; display: block; user-select: none; }
+#sc-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+#sc-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 40px; color: var(--muted); line-height: 1.7; }
+.sc-hit { fill: #4ea1ff22; stroke: #0a84ff; stroke-width: 1.4; }
+.sc-pin { fill: #ffd60a; stroke: #111; stroke-width: .6; } .sc-pin.guessed { fill: #ff5c5c; }
+.sc-label { font: 6px ui-monospace, monospace; fill: #0a3d91; paint-order: stroke; stroke: white; stroke-width: 2px; }
+.sc-help { padding: 2px 8px; }
+#sc-side { width: 340px; border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+#sc-summary { padding: 8px; border-bottom: 1px solid var(--line); display: grid; gap: 3px; }
+#sc-summary code { font-size: 11px; word-break: break-all; }
+#sc-summary .warn { color: var(--warn); }
+.sc-score { color: var(--ok); font-size: 12px; }
+#sc-listtabs { display: flex; gap: 4px; padding: 6px 8px; align-items: center; }
+#sc-filter { flex: 1; min-width: 60px; }
+#sc-list { flex: 1; overflow: auto; padding: 0 6px; }
+.sc-row { display: grid; grid-template-columns: 64px 1fr auto; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; align-items: baseline; }
+.sc-row.net { grid-template-columns: 1fr; gap: 1px; }
+.sc-row:hover { background: var(--panel2); } .sc-row.sel { background: #34404f; outline: 1px solid var(--accent); }
+.sc-row span { overflow: hidden; text-overflow: ellipsis; } .sc-row .guessed { color: var(--err); }
+#sc-importbox { border-top: 1px solid var(--line); padding: 6px 8px; }
+#sc-importbox[open] { display: grid; gap: 4px; }
+#sc-importbox summary { cursor: pointer; }
+#sc-importbox label { display: grid; grid-template-columns: 70px 1fr; align-items: center; }
+#sc-import-result { max-height: 120px; overflow: auto; }
 .view-breadboard #breadboard-wrap { display: flex; } .view-breadboard #schematic-wrap, .view-breadboard #scene-wrap { display: none; }
 .view-split #schematic-wrap { border-right: 2px solid var(--line); }
 #schematic { width: 100%; height: 100%; display: block; background: var(--sheet); outline: none; }

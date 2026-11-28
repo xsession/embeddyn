@@ -54,6 +54,7 @@
     <nav class="tabs" id="view-tabs">
       <button data-view="schematic" class="active">Schematic</button>
       <button data-view="breadboard" title="Circuits as breadboard prototypes">Breadboard</button>
+      <button data-view="scan" title="Read a printed schematic (PDF, PNG, JPEG) into a netlist and import it as a board">Scan</button>
       <button data-view="scene">3-D view</button>
       <button data-view="split">Split</button>
       <span class="spacer"></span>
@@ -74,6 +75,46 @@
           <span id="bb-status"></span>
         </div>
         <svg id="breadboard" tabindex="0"></svg><div id="bb-tip"></div>
+      </div>
+      <div id="scan-wrap">
+        <div id="sc-toolbar">
+          <button id="sc-choose" title="A PDF (vector or scanned) or pictures of the schematic; several files are the pages of one design">Choose files…</button>
+          <input id="sc-input" type="file" multiple accept=".pdf,image/*" class="hidden">
+          <span id="sc-files" class="small"></span>
+          <input id="sc-path" placeholder="…or path(s) on this computer: board.pdf, page2.png" title="Paths are read by the Lab server; relative to the project folder">
+          <label class="small" title="PDF pages to read, e.g. 2-5 or 1,3 (empty: all)">pages <input id="sc-pages" size="5"></label>
+          <label class="small" title="Picture resolution (empty: from the file, else 200); scanned PDF pages are rendered at this resolution (default 300)">dpi <input id="sc-dpi" type="number" min="50" max="1200" step="50" style="width:64px"></label>
+          <label class="small" title="A KiCad netlist of the same design to score the scan against (optional)">reference <input id="sc-ref" placeholder="—" size="12"></label>
+          <label class="small" title="Folder for schematic.net, scan.json and the overlays (empty: .embeddyn/scans/NAME in the project folder)">out <input id="sc-out" placeholder="auto" size="12"></label>
+          <button id="sc-run" class="primary">Scan</button>
+          <span id="sc-status" class="small"></span>
+        </div>
+        <div id="sc-body">
+          <div id="sc-pageside">
+            <div id="sc-pagetabs"></div>
+            <div id="sc-viewport"><div id="sc-stage"></div>
+              <div id="sc-empty" class="empty">Drop a <b>PDF</b> or a <b>picture</b> of a schematic here (or choose files above).<br>
+                Its parts, pins, wires and labels are read into a KiCad netlist; the overlay shows what was read:
+                each net in its own colour, parts boxed with their reference, guessed pin numbers in red.<br>
+                <span class="small">PDFs exported from an EDA tool read best; dense black-and-white pictures are not reliable yet.</span></div>
+            </div>
+            <div class="sc-help small">wheel: zoom · drag: pan · double-click: fit</div>
+          </div>
+          <div id="sc-side">
+            <div id="sc-summary"></div>
+            <div id="sc-listtabs"><button data-list="parts" class="active">Parts</button><button data-list="nets">Nets</button>
+              <input id="sc-filter" type="search" placeholder="filter"></div>
+            <div id="sc-list"></div>
+            <details id="sc-importbox">
+              <summary class="menu-title">Import as an emulated board</summary>
+              <label class="small">title <input id="sc-title" placeholder="board"></label>
+              <label class="small" title="Emulate a part as another library part, e.g. U300=goertek-spl06-001; also names the MCU when its value was not read">substitute <input id="sc-subst" placeholder="REF=PART, …"></label>
+              <label class="small" title="An ELF/HEX/BIN the board should run (optional)">firmware <input id="sc-fw" placeholder="/path/to/firmware.elf"></label>
+              <button id="sc-import" class="primary" disabled title="Renode board, bindings and a project from the scanned netlist; opens the project">Import &amp; open</button>
+              <div id="sc-import-result"></div>
+            </details>
+          </div>
+        </div>
       </div>
       <div id="scene-wrap"><canvas id="scene"></canvas>
         <div class="scene-help">drag: orbit · shift/right-drag: pan · wheel: zoom · double-click: reset</div></div>
