@@ -1,0 +1,69 @@
+{
+  "name": "lm3s2965",
+  "description": "TI Stellaris LM3S2965 (Cortex-M3 up to 50 MHz, 256 KB flash, 64 KB SRAM, 2 CAN, 3 UART, 2 I2C, SSI, 4 GPTM, 6-output PWM with dead band and fault, QEI, 10-bit ADC with 4 sequencers, 3 comparators, hibernation module, watchdog). Board: EK-LM3S2965 (128x96 OLED, CAN device board with an LM3S2110).",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "STELLARISWARE": "/opt/StellarisWare",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m3",
+      "-mthumb",
+      "-Os",
+      "-g",
+      "-DPART_LM3S2965",
+      "-Dgcc",
+      "-I${STELLARISWARE}",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "-L${STELLARISWARE}/driverlib/gcc",
+      "-ldriver"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Board examples build with their own makefile; tools/stellaris/build_stellaris.py in the Renode tree builds them (patched linker scripts) and examples/peripherals programs (startup_lm3s.c, pin-multiplexer names as no-ops). Flash at 0, SRAM at 0x20000000: the linker script of any board example (e.g. boards/ek-lm3s2965/hello/hello.ld) fits."
+  },
+  "files": {
+    "header": "${STELLARISWARE}/inc/lm3s2965.h"
+  },
+  "image": {
+    "base": "0x00000000",
+    "notes": "load the ELF; the vector table is at 0 (InitVectorTableOffset 0, also for a boot loader that runs from SRAM)"
+  },
+  "memory": {
+    "flash": [
+      "0x00000000",
+      "0x0003FFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x2000FFFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x400FFFFF"
+    ],
+    "bitband_sram": [
+      "0x22000000",
+      "0x221FFFFF"
+    ],
+    "bitband_peripherals": [
+      "0x42000000",
+      "0x43FFFFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/ti/lm3s2965.repl",
+    "pc_command": "cpu PC",
+    "notes": "Board: platforms/boards/ti/ek-lm3s2965.repl (OLED = ssi0.oled, an SSD1329 with D/C on PC7; LED PG2 = gpioPortG.led; select button PG4 = gpioPortG.select; console uart0). CAN device board: platforms/boards/ti/ek-lm3s2965-can-device.repl (LM3S2110; LED PF2, up / down buttons PF0 / PF1); put both machines' can0 on one CAN hub. Models in Peripherals/Stellaris. Pins: 'sysbus.gpioPortB OnGPIO 3 false' drives PB3; input 8+n of a port is the peripheral function of pin n; open-drain pins release the line when driven high. 'sysbus.sysctl SystemClock' gives the clock; 'sysbus.adc SetInputVoltage 0 1.5' and 'sysbus.adc Temperature 30' set what the ADC measures; 'sysbus.qei0 Rotate 100' turns the encoder; 'sysbus.ssi0.oled LoadFont @<StellarisWare>/boards/ek-lm3s2965/drivers/rit128x96x4.c' then 'sysbus.ssi0.oled Text 0 24 20' reads text back from the panel, 'LitPixels' counts lit pixels. Flash programming goes through the flash controller (FMA/FMD/FMC); CPU stores to flash are ignored. CAN runs on a fixed 8 MHz clock and sends at the configured bit rate. Docs: tools/stellaris/README.md (36 checks pass)."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the StellarisWare EK-LM3S2965 board examples (incl. boot loader, CAN with the device board, quickstart game) and examples/peripherals (tools/stellaris/run_stellaris_examples.py with examples_ek-lm3s2965.txt in the Renode tree)"
+  }
+}
