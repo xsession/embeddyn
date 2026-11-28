@@ -1,0 +1,77 @@
+{
+  "name": "samd10",
+  "description": "Microchip ATSAMD10D14AM (Cortex-M0+ up to 48 MHz, 16 KB flash, 4 KB SRAM, 3 SERCOMs (USART/SPI/I2C), TC1/TC2, TCC0, 12-bit ADC, 10-bit DAC, 2 comparators, RTC, WDT, 6-channel DMAC, event system). Board: SAMD10 Xplained Mini.",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "ASF": "/opt/xdk-asf-3.52.0",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m0plus",
+      "-mthumb",
+      "-O1",
+      "-g",
+      "-D__SAMD10D14AM__",
+      "-I${ASF}/sam0/utils/cmsis/samd10/include",
+      "-I${ASF}/sam0/utils/cmsis/samd10/source",
+      "-I${ASF}/thirdparty/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "-T${ASF}/sam0/utils/linker_scripts/samd10/gcc/samd10d14am_flash.ld"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Startup sam0/utils/cmsis/samd10/source/gcc/startup_samd10.c and system_samd10.c. Whole ASF examples build with tools/asf/build_asf.py in the Renode tree (from their gcc/config.mk; --part samd10d14am retargets SAMD11 Xplained Pro examples)."
+  },
+  "files": {
+    "header": "${ASF}/sam0/utils/cmsis/samd10/include/samd10d14am.h"
+  },
+  "image": {
+    "base": "0x00000000",
+    "notes": "load the ELF; the flash reads erased (0xFF) where the program does not reach"
+  },
+  "memory": {
+    "flash": [
+      "0x00000000",
+      "0x00003FFF"
+    ],
+    "nvm_aux": [
+      "0x00800000",
+      "0x0080BFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x20000FFF"
+    ],
+    "apba": [
+      "0x40000000",
+      "0x40001FFF"
+    ],
+    "apbb": [
+      "0x41000000",
+      "0x41007FFF"
+    ],
+    "apbc": [
+      "0x42000000",
+      "0x42002FFF"
+    ],
+    "iobus": [
+      "0x60000000",
+      "0x600000FF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/microchip/atsamd10d14am.repl",
+    "pc_command": "cpu PC",
+    "notes": "Board: platforms/boards/microchip/samd10_xplained_mini.repl (LED0 PA09 = port.led0, active high; SW0 PA25 = port.sw0, active low; mEDBG virtual COM port = sercom2). Models in Peripherals/SAMD1x. Pins: 'sysbus.port OnGPIO 25 false' drives PA25; 'sysbus.port SetPinVoltage 2 0.5' sets the analog voltage of PA02 (ADC AIN0; AC AIN0-3 are PA04-PA07; the DAC drives PA02). Peripheral outputs reach pins through the PORT: input 32 (1 + f) + pin is function f (A = 0 ... H = 7) of that pin. A SERCOM serves USART, SPI or I2C as the firmware selects: SPI devices register at '@ sercom0 0', I2C devices at their address; external masters for slave firmware: 'sysbus.sercom2 MasterWrite 0x12 \"01 02\"', 'MasterRead 0x12 10', 'MasterWriteRead', 'sysbus.sercom0 MasterTransfer \"00 01\"' (what they read is logged). 'sysbus.gclk ChannelFrequency 18' gives a peripheral clock; GCLK sets SysTick and the core speed from the CPU clock. NVM user row at 0x00804000 holds the factory fuses (no EEPROM section): write it to set the EEPROM size. PTC: registers after Adafruit FreeTouch's reverse-engineered map; 'sysbus.ptc Touch 2' / 'Release 2' / 'SetTouchAmount 2 0.5' change what a Y line measures. TCC: faults (recoverable A/B from the MC0/MC1 events, non-recoverable from EV0/EV1), dithering, RAMP2/2A, output matrix, dead time, swap. DMAC: CRC-16/CRC-32 engine. Docs: tools/asf/README.md (70 checks pass)."
+  },
+  "reference": {
+    "simulator": "none; the models are checked with the ASF3 examples for the SAMD10 Xplained Mini and the SAMD11 Xplained Pro built for the SAMD10, all tcc_features_example variants and two test programs (tools/asf/run_asf_examples.py with examples_samd10.txt in the Renode tree)"
+  }
+}

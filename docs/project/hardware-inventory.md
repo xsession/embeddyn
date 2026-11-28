@@ -23,7 +23,7 @@ the chip is on a side that was not photographed or its marking is unreadable.
 | 6 | Renesas SK-S7G2 (SK-S7G2-REV3.1) | R7FS7G27H3A01CFC Synergy S7G2, Cortex-M4 240 MHz (doc) | near (RA6M5 / RA8M1 platforms) |
 | 7 | LAUNCHXL-F28069M (InstaSPIN-MOTION) | TMS320F28069M | done (`tms320f28069` profile) |
 | 8 | Renesas YRPBRL78G13 | R5F100LEA RL78/G13 (seen) | new — RL78 core does not exist in tlib |
-| 9 | SAMD10 Xplained Mini | ATSAMD10D14AM (seen "SAMD10E…") | near (`atsamd21j17d`) |
+| 9 | SAMD10 Xplained Mini | ATSAMD10D14AM (seen "SAMD10E…") | done (`samd10` profile, platform `microchip/atsamd10d14am.repl`, board `microchip/samd10_xplained_mini.repl`; 70 ASF3 checks pass: the board's two examples, the SAMD11 Xplained Pro set built for the SAMD10, all TCC feature variants, CRC and touch tests) |
 | 10 | NodeMCU-32S | ESP-WROOM-32 (ESP32-D0WDQ6, dual Xtensa LX6) | new — only ESP32-C3/C6/H2 (RISC-V) exist |
 | 11 | LP-MSPM0G3507 | MSPM0G3507 | done (`mspm0g3507` profile) |
 | 12 | EK-LM3S2965 CAN evaluation board | LM3S2965 (seen), Cortex-M3 50 MHz | near (`ti/tm4c123gh6pm.repl`, the Stellaris successor) |
