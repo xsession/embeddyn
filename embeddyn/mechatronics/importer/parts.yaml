@@ -1,0 +1,138 @@
+# Part library for `embeddyn mechatronics import`: how a schematic part becomes emulated hardware.
+#
+# Each entry matches a component by regular expressions (case-insensitive) on its MPN/value (`match`), its symbol
+# (`symbol`) or its footprint (`footprint`), and says what it is:
+#
+#   kind: mcu        platform: the Renode CPU platform; family for pin/peripheral naming
+#   kind: device     devices: one or more Renode models on a bus. Pin roles name the symbol pins:
+#                      spi: {sck, mosi, miso, cs}  i2c: {sda, scl, address: {pin, low, high}}
+#                      mode: {pin, spi_when: low|high}   which bus a dual-interface part uses
+#                      outputs: {SYMBOL_PIN: ModelGpioProperty}  (interrupt/data-ready pins to MCU GPIOs)
+#                      quantities: {name: {properties: [...], unit, si_unit, from_si}}  physical inputs; the value
+#                        in si_unit times from_si is written to the model property
+#   kind: led / rgb_led  anode/cathode pins (rgb: channel cathodes or anodes)
+#   kind: regulator  topology, vref and the feedback pin (output from the divider)
+#   kind: crystal    frequency from the value
+#   kind: usb        a USB connector (D+/D- pins)
+#   firmware: identifiers whose presence in the firmware sources means "the firmware has a driver for this part"
+parts:
+  # --- microcontrollers ---------------------------------------------------------------------------------------
+  - id: st-stm32f405
+    match: ['^STM32F405', '^STM32F415']
+    kind: mcu
+    family: stm32f4
+    platform: platforms/cpus/st/stm32f405.repl
+  - id: st-stm32f407
+    match: ['^STM32F40[47]', '^STM32F417']
+    kind: mcu
+    family: stm32f4
+    platform: platforms/cpus/st/stm32f407.repl
+  - id: st-stm32l476
+    match: ['^STM32L476']
+    kind: mcu
+    family: stm32l4
+    platform: platforms/cpus/st/stm32l476.repl
+  - id: st-stm32l496
+    match: ['^STM32L496']
+    kind: mcu
+    family: stm32l4
+    platform: platforms/cpus/st/stm32l496.repl
+  - id: st-stm32l053
+    match: ['^STM32L053']
+    kind: mcu
+    family: stm32l0
+    platform: platforms/cpus/st/stm32l053.repl
+  - id: st-stm32u575
+    match: ['^STM32U57[55]', '^STM32U585']
+    kind: mcu
+    family: stm32u5
+    platform: platforms/cpus/st/stm32u585.repl
+
+  # --- sensors ------------------------------------------------------------------------------------------------
+  - id: bosch-bmi088
+    match: ['^BMI088']
+    title: Bosch BMI088 6-axis IMU (accelerometer and gyroscope dies)
+    kind: device
+    firmware: ['BMI088']
+    devices:
+      - name: accel
+        model: Sensors.BMI088_Accelerometer
+        spi: {sck: SCK, mosi: SDI, miso: SDO1, cs: CSB1}
+        i2c: {sda: SDI, scl: SCK, address: {pin: SDO1, low: 0x18, high: 0x19}}
+        mode: {pin: PS, spi_when: low}
+        outputs: {INT1: Int1, INT2: Int2}
+        quantities:
+          acceleration: {properties: [AccelerationX, AccelerationY, AccelerationZ], unit: g, si_unit: m/s^2, from_si: 0.10197162129779283}
+          temperature: {properties: [Temperature], unit: degC, si_unit: degC, from_si: 1.0}
+      - name: gyro
+        model: Sensors.BMI088_Gyroscope
+        spi: {sck: SCK, mosi: SDI, miso: SDO2, cs: CSB2}
+        i2c: {sda: SDI, scl: SCK, address: {pin: SDO2, low: 0x68, high: 0x69}}
+        mode: {pin: PS, spi_when: low}
+        outputs: {INT3: Int3, INT4: Int4}
+        quantities:
+          angular_rate: {properties: [AngularRateX, AngularRateY, AngularRateZ], unit: deg/s, si_unit: rad/s, from_si: 57.29577951308232}
+  - id: bosch-bmp280
+    match: ['^BMP280']
+    title: Bosch BMP280 barometer
+    kind: device
+    firmware: ['BMP280', 'bmp2_']
+    devices:
+      - name: baro
+        model: Sensors.BMP280
+        spi: {sck: SCK, mosi: SDI, miso: SDO, cs: CSB}
+        i2c: {sda: SDI, scl: SCK, address: {pin: SDO, low: 0x76, high: 0x77}}
+        mode: {pin: CSB, spi_when: driven}
+        quantities:
+          pressure: {properties: [Pressure], unit: Pa, si_unit: Pa, from_si: 1.0}
+          temperature: {properties: [Temperature], unit: degC, si_unit: degC, from_si: 1.0}
+  - id: goertek-spl06-001
+    match: ['^SPL06']
+    title: Goertek SPL06-001 barometer
+    kind: device
+    firmware: ['SPL06']
+    devices:
+      - name: baro
+        model: Sensors.SPL06_001
+        spi: {sck: SCK, mosi: SDI, miso: SDO, cs: CSB}
+        i2c: {sda: SDI, scl: SCK, address: {pin: SDO, low: 0x76, high: 0x77}}
+        mode: {pin: CSB, spi_when: driven}
+        quantities:
+          pressure: {properties: [Pressure], unit: Pa, si_unit: Pa, from_si: 1.0}
+          temperature: {properties: [Temperature], unit: degC, si_unit: degC, from_si: 1.0}
+
+  # --- memories -----------------------------------------------------------------------------------------------
+  - id: winbond-w25n01gv
+    match: ['^W25N01G']
+    title: Winbond W25N01GV 1 Gbit SPI NAND
+    kind: device
+    firmware: ['W25N']
+    devices:
+      - name: flash
+        model: SPI.W25N01GV
+        spi: {sck: CLK, mosi: 'DI(IO0)', miso: 'DO(IO1)', cs: '~CS'}
+
+  # --- indicators, supply, clock, connectors -------------------------------------------------------------------
+  - id: led-rgb
+    symbol: ['LED_RGB', 'LED_RGBA', 'LED_ARGB']
+    kind: rgb_led
+    channels: {red: RK, green: GK, blue: BK}
+    common: A
+  - id: led
+    symbol: ['^LED$', '^LED_Small$', '^LED_Small_ALT$', '^LED_ALT$']
+    kind: led
+    anode: A
+    cathode: K
+  - id: mps-mp2359
+    match: ['^MP2359']
+    title: MPS MP2359 1.2 A step-down converter
+    kind: regulator
+    topology: buck
+    vref: 0.81
+    pins: {feedback: FB, input: IN, switch: SW, enable: EN}
+  - id: crystal
+    symbol: ['^Crystal', '^Resonator']
+    kind: crystal
+  - id: usb-connector
+    symbol: ['^USB_B_Micro', '^USB_C_Receptacle', '^USB_B_Mini', '^USB_A']
+    kind: usb

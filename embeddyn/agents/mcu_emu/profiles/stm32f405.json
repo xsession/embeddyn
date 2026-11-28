@@ -1,0 +1,70 @@
+{
+  "name": "stm32f405",
+  "description": "ST STM32F405xG (Cortex-M4F 168 MHz, 1 MB flash, 128 KB SRAM + 64 KB CCM, USB OTG FS, 3 SPI, 3 I2C, 2 DMA with CHSEL routing): GNU Arm toolchain with the STM32CubeF4 HAL/LL, Renode stm32f405 platform (boards come from `embeddyn mechatronics import`)",
+  "env_defaults": {
+    "ARM_BIN": "/usr/bin",
+    "CUBE": "/opt/STM32CubeF4",
+    "SVD_DIR": "/opt/svd",
+    "RENODE_ROOT": "/opt/renode"
+  },
+  "toolchain": {
+    "cc": "${ARM_BIN}/arm-none-eabi-gcc",
+    "cflags": [
+      "-mcpu=cortex-m4",
+      "-mthumb",
+      "-mfpu=fpv4-sp-d16",
+      "-mfloat-abi=hard",
+      "-Os",
+      "-g",
+      "-DSTM32F405xx",
+      "-DUSE_HAL_DRIVER",
+      "-I${CUBE}/Drivers/STM32F4xx_HAL_Driver/Inc",
+      "-I${CUBE}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+      "-I${CUBE}/Drivers/CMSIS/Include",
+      "-ffunction-sections",
+      "-fdata-sections"
+    ],
+    "cflags_post": [
+      "-Wl,--gc-sections",
+      "--specs=nano.specs",
+      "--specs=nosys.specs"
+    ],
+    "objcopy": "${ARM_BIN}/arm-none-eabi-objcopy",
+    "objdump": "${ARM_BIN}/arm-none-eabi-objdump",
+    "notes": "Link with the STM32F405RGTX_FLASH.ld and startup_stm32f405rgtx.s of a CubeIDE project. A whole CubeIDE project builds with `embeddyn mechatronics import` (settings from its .cproject)."
+  },
+  "files": {
+    "header": "${CUBE}/Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f405xx.h",
+    "svd": "${SVD_DIR}/STM32F405.svd"
+  },
+  "image": {
+    "base": "0x08000000",
+    "notes": "load the ELF; the vector table is at 0x08000000"
+  },
+  "memory": {
+    "flash": [
+      "0x08000000",
+      "0x080FFFFF"
+    ],
+    "sram": [
+      "0x20000000",
+      "0x2001FFFF"
+    ],
+    "ccm": [
+      "0x10000000",
+      "0x1000FFFF"
+    ],
+    "peripherals": [
+      "0x40000000",
+      "0x5006FFFF"
+    ]
+  },
+  "renode": {
+    "platform": "platforms/cpus/st/stm32f405.repl",
+    "pc_command": "cpu PC",
+    "notes": "SysTick and timer clocks follow the RCC (set rcc hseFrequency to the board's crystal, default 8 MHz). SPI DMA requests reach the stream whose CHSEL selects them (STM32F4_DMARequestRouter); the SPIs keep one received byte as the F4 data register does. USB OTG FS is a device: attach `USB.USBSerialHost` (`usbSerial Attach sysbus.usbOtgFs`) to read its CDC port as a UART. Sensors: Sensors.BMI088_Accelerometer/BMI088_Gyroscope (Acceleration* g, AngularRate* deg/s, data-ready Int1/Int3), Sensors.BMP280, Sensors.SPL06_001 (Pressure Pa, Temperature degC), SPI.W25N01GV. For several devices on one SPI use SPI.SPIMultiplexer with multipleSelection: true. Docs: docs/guides/import-a-board.md."
+  },
+  "reference": {
+    "simulator": "none; checked with STM32CubeIDE firmware of an STM32F405 IMU board through `embeddyn mechatronics import` (tests/mechatronics/test_importer.py)"
+  }
+}

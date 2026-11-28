@@ -11,5 +11,6 @@ Short, task-oriented recipes. They assume you have done the first [tutorials](..
 | [Build Renode with custom cores](build-renode.md) | build the xsession Renode fork that embeddyn is tested with |
 | [Agent kit: full MCU emulation with Hermes](agent-kit-mcu-emulation.md) | skills and an MCP server that let a Hermes agent (27B-class model) repeat the full-MCU emulation workflow |
 | [Emulate a real product end to end](emulate-a-product.md) | turn an existing board set (physics, electronics, firmware, buses) into a verified emulation; worked example: SPECT body contour |
+| [Import a board project](import-a-board.md) | turn a KiCad + STM32CubeMX/CubeIDE project into an emulated board with its own firmware, sensors driven by a motion plant, and a report |
 | [Export a KiCad schematic to SPICE](kicad.md) | simulate your board's analog circuit in the loop |
 | [Rebuild these docs and figures](docs.md) | regenerate images from fresh runs and preview the site |

@@ -123,6 +123,7 @@ nav:
       - Build Renode with custom cores: guides/build-renode.md
       - Emulate a real product end to end: guides/emulate-a-product.md
       - 'Agent kit: full MCU emulation with Hermes': guides/agent-kit-mcu-emulation.md
+      - Import a board project (KiCad + CubeMX): guides/import-a-board.md
       - Export a KiCad schematic to SPICE: guides/kicad.md
       - Rebuild these docs and figures: guides/docs.md
   - Reference:

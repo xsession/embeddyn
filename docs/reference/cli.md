@@ -316,6 +316,17 @@ Report which external tools (Renode, ngspice, Webots, KiCad, LTspice) are found.
 embeddyn mechatronics doctor [OPTIONS]
 ```
 
+## import
+
+```
+embeddyn mechatronics import SOURCE [-o OUT] [--title T] [--gcc DIR] [--no-build] [--firmware NAME]...
+                                    [--substitute REF=PART_ID]... [--parts FILE]... [--renode-root DIR]
+```
+
+Turn a board project (folder or `.zip`: KiCad netlist or schematic, STM32CubeMX `.ioc`, STM32CubeIDE or Makefile
+firmware) into a Renode board, the built firmware, a mechatronic project per firmware and an import report. See
+[Import a board project](../guides/import-a-board.md).
+
 ## kicad-export
 
 Export a KiCad schematic to a SPICE netlist with kicad-cli.

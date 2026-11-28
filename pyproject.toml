@@ -53,6 +53,7 @@ embeddyn = [
     "local/static/*",
     "local/assets/*",
     "mechatronics/gui/static/*",
+    "mechatronics/importer/*.yaml",
 ]
 
 [project.optional-dependencies]

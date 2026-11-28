@@ -841,3 +841,37 @@ def evidence_report(
     if run_id:
         database_service.link_artifact(run_id, artifact.digest, "evidence", output.name)
     typer.echo(json.dumps({"report_id": report_id, "status": status, "output": str(output), "artifact": artifact.to_dict()}, indent=2))
+
+
+@mechatronics_app.command("import")
+def import_command(
+    source: Path = typer.Argument(..., exists=True, help="Hardware project folder or .zip (KiCad schematic + CubeMX/CubeIDE firmware)."),
+    output: Path = typer.Option(Path(".embeddyn/imports/board"), "--output", "-o", help="Folder for the generated files."),
+    title: Optional[str] = typer.Option(None, "--title", help="Project title (default: the source folder name)."),
+    gcc: Optional[Path] = typer.Option(None, "--gcc", help="GNU Arm toolchain folder (default: $GCC_ARM or PATH)."),
+    no_build: bool = typer.Option(False, "--no-build", help="Do not compile: use the firmware ELFs shipped with the project."),
+    firmware: Optional[list[str]] = typer.Option(None, "--firmware", help="Only these firmware projects (name or folder). Repeatable."),
+    substitute: Optional[list[str]] = typer.Option(None, "--substitute", help="Emulate a part as another library part: REF=PART_ID, e.g. U300=goertek-spl06-001. Repeatable."),
+    parts: Optional[list[Path]] = typer.Option(None, "--parts", help="Extra part library YAML (same format as importer/parts.yaml). Repeatable."),
+    renode_root: Optional[Path] = typer.Option(None, "--renode-root", help="Renode source tree with the platform files (default: $RENODE_ROOT)."),
+) -> None:
+    """Turn a board project into an emulated mechatronic system: Renode board, firmware, motion plant, report."""
+    from .importer import import_project
+
+    substitutions = {}
+    for item in substitute or []:
+        if "=" not in item:
+            raise typer.BadParameter(f"--substitute needs REF=PART_ID, got {item!r}")
+        ref, part = item.split("=", 1)
+        substitutions[ref.strip()] = part.strip()
+    result = import_project(source, output, title=title, gcc=gcc, build_firmware=not no_build,
+                            firmware_filter=firmware, substitutions=substitutions, parts=parts, renode_root=renode_root)
+    typer.echo(json.dumps({
+        "output": str(result.out),
+        "mcu": f"{result.plan.mcu_ref} {result.plan.mcu_part}",
+        "devices": [f"{d.ref} {d.name} -> {d.model} on {d.bus}" for d in result.plan.devices],
+        "firmware": [str(p) for p in result.firmware],
+        "build_errors": result.build_errors,
+        "findings": [f"{f.level}: {f.message}" for f in result.plan.findings],
+        "files": sorted(result.files),
+    }, indent=2))
