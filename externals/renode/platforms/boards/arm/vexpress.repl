@@ -1,3 +1,0 @@
-using "platforms/cpus/arm/vexpress.repl"
-using "./vexpress-externals.repl"
-

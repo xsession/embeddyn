@@ -1,7 +1,7 @@
 [submodule "externals/renode"]
 	path = externals/renode
 	url = https://github.com/xsession/renode.git
-	branch = custom-cores
+	branch = merge-renode-1.17.1
 [submodule "externals/openFPGALoader"]
 	path = externals/openFPGALoader
 	url = https://github.com/xsession/openFPGALoader.git

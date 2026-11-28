@@ -1,3 +1,0 @@
-sysbus:
-    init:
-        Tag <0x403b1444 4> "trng_reg_1444h" 0xffffffff

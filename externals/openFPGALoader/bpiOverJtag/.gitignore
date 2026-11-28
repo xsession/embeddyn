@@ -1,6 +1,0 @@
-tmp_*
-*.bit
-*.rbf
-vivado*.jou
-vivado*.log
-.Xil

@@ -1,7 +1,0 @@
-<Project>
-  <Import Project="../Directory.Build.props" />
-
-  <PropertyGroup>
-    <TestNuPkg Condition="'$(TestNuPkg)' == ''">false</TestNuPkg>
-  </PropertyGroup>
-</Project>
