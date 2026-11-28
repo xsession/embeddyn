@@ -133,6 +133,8 @@ def import_board(body: dict[str, Any]) -> dict[str, Any]:
     from ..importer import import_project
     out = Path(str(body.get("out") or "")).expanduser().resolve()
     netlist = out / "schematic.net"
+    if not netlist.is_file() and (out / "board.net").is_file():
+        netlist = out / "board.net"                  # a board read from photos
     if not netlist.is_file():
         raise FileNotFoundError(f"{netlist}: scan the schematic first")
     source = out / "board-source"

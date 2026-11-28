@@ -246,6 +246,16 @@ project folder (or the **out** folder).
 A vector PDF scans in seconds. A picture takes a minute or more because of OCR, and dense
 black-and-white pictures are not reliable yet: check the overlay before importing.
 
+**Board photos** (the mode menu at the left of the tab's toolbar) reads a real board instead of
+a drawing: give the **top** photo, optionally the **bottom** photo, **close-ups** for the
+markings and the board **size** in mm (chosen files fill the fields in that order). Reading
+takes one to a few minutes. The pages are the straightened top and bottom with each net's
+copper in colour, and a draft net-label **schematic**. Clicking a part shows its package (and
+the alternatives), body size, marking and how it decodes; typing the marking and **Apply**
+decodes it, numbers its pins from the marking's direction and rewrites the netlist. The
+**SMD decoder** box decodes any marking (`472`, `A7` + `SOT-23`, `74HC595D`) or finds the
+package for a body size. See [Reverse engineer a board from photos](../guides/pcb-photo.md).
+
 ## Files
 
 Saving writes an ordinary project file. Simulator instances, signals and couplings
@@ -268,6 +278,7 @@ part exposes gets a net-label terminal.
 | `gui/sources.py` | `FunctionGenerator`, `ServoPulseGenerator` plants |
 | `gui/session.py` | `RunSession`: thread around `CoSimulationOrchestrator.iterate()`; pause, stop, real-time pacing, forced signals, metrics, CSV |
 | `gui/server.py` | `ThreadingHTTPServer`; JSON API under `/api`, Server-Sent Events at `/api/stream` |
+| `gui/pcbview.py` | Scan view, board-photo mode: read a board from photos, markings typed in by hand, SMD decoder |
 | `gui/scanview.py` | Scan view: schematic scan of uploaded or local files, pin and part positions for the overlay, import as a board |
 | `gui/breadboard.py` | SPICE netlist parser, part types and palette, automatic breadboard layout, connectivity check, netlist export, `.breadboard.yaml` sidecars |
 | `gui/static/` | `app.js` (shell), `schematic.js` (SVG editor), `breadboard.js` (breadboard view), `scan.js` (scan view), `ops.js` (edit operations), `inspector.js`, `instruments.js`, `analyzer.js` (protocol analyzer) with `bytediff.js` (changes view), `scene3d.js` (flat-shaded canvas renderer) |

@@ -1,0 +1,72 @@
+# SMD marking codes: the short top-marks small packages carry instead of the part number.
+#
+# Built in: common, widely second-sourced parts whose codes are stable across makers. A code is not unique:
+# the same two characters mean different parts from different makers and in different packages, so a lookup
+# gives candidates, ranked by package. "confidence: check" marks codes worth confirming in the datasheet.
+#
+# More codes: put CSV/YAML/JSON files in ~/.config/embeddyn/smd-codes/ (or list them in $EMBEDDYN_SMD_CODES);
+# CSV columns: code,package,part,maker,function[,pins][,confidence][,prefix]. "prefix: true" means the code is
+# only the start of the marking (the rest is a date or lot code, e.g. Microchip and TI small packages).
+#
+# Nexperia (and Philips/NXP before it) append a site letter to the code (p, t, W, %): "1Ft" is code "1F". The
+# decoder strips it.
+codes:
+  # --- small-signal bipolar transistors, SOT-23 ---------------------------------------------------------------
+  - {code: "1A", package: SOT-23, part: BC846A, maker: Nexperia/onsemi, function: NPN 65 V 100 mA}
+  - {code: "1B", package: SOT-23, part: BC846B, maker: Nexperia/onsemi, function: NPN 65 V 100 mA}
+  - {code: "1E", package: SOT-23, part: BC847A, maker: Nexperia/onsemi, function: NPN 45 V 100 mA}
+  - {code: "1F", package: SOT-23, part: BC847B, maker: Nexperia/onsemi, function: NPN 45 V 100 mA}
+  - {code: "1G", package: SOT-23, part: BC847C, maker: Nexperia/onsemi, function: NPN 45 V 100 mA}
+  - {code: "1J", package: SOT-23, part: BC848A, maker: Nexperia/onsemi, function: NPN 30 V 100 mA}
+  - {code: "1K", package: SOT-23, part: BC848B, maker: Nexperia/onsemi, function: NPN 30 V 100 mA}
+  - {code: "1L", package: SOT-23, part: BC848C, maker: Nexperia/onsemi, function: NPN 30 V 100 mA}
+  - {code: "3A", package: SOT-23, part: BC856A, maker: Nexperia/onsemi, function: PNP 65 V 100 mA}
+  - {code: "3B", package: SOT-23, part: BC856B, maker: Nexperia/onsemi, function: PNP 65 V 100 mA}
+  - {code: "3E", package: SOT-23, part: BC857A, maker: Nexperia/onsemi, function: PNP 45 V 100 mA}
+  - {code: "3F", package: SOT-23, part: BC857B, maker: Nexperia/onsemi, function: PNP 45 V 100 mA}
+  - {code: "3G", package: SOT-23, part: BC857C, maker: Nexperia/onsemi, function: PNP 45 V 100 mA}
+  - {code: "3J", package: SOT-23, part: BC858A, maker: Nexperia/onsemi, function: PNP 30 V 100 mA}
+  - {code: "3K", package: SOT-23, part: BC858B, maker: Nexperia/onsemi, function: PNP 30 V 100 mA}
+  - {code: "3L", package: SOT-23, part: BC858C, maker: Nexperia/onsemi, function: PNP 30 V 100 mA}
+  - {code: "6A", package: SOT-23, part: BC817-16, maker: Nexperia/onsemi, function: NPN 45 V 500 mA}
+  - {code: "6B", package: SOT-23, part: BC817-25, maker: Nexperia/onsemi, function: NPN 45 V 500 mA}
+  - {code: "6C", package: SOT-23, part: BC817-40, maker: Nexperia/onsemi, function: NPN 45 V 500 mA}
+  - {code: "5A", package: SOT-23, part: BC807-16, maker: Nexperia/onsemi, function: PNP 45 V 500 mA}
+  - {code: "5B", package: SOT-23, part: BC807-25, maker: Nexperia/onsemi, function: PNP 45 V 500 mA}
+  - {code: "5C", package: SOT-23, part: BC807-40, maker: Nexperia/onsemi, function: PNP 45 V 500 mA}
+  - {code: "1AM", package: SOT-23, part: MMBT3904, maker: onsemi, function: NPN 40 V 200 mA (2N3904)}
+  - {code: "1A", package: SOT-23, part: FMMT3904, maker: Diodes, function: NPN 40 V 200 mA (2N3904), confidence: check}
+  - {code: "2A", package: SOT-23, part: MMBT3906, maker: onsemi, function: PNP 40 V 200 mA (2N3906)}
+  - {code: "1P", package: SOT-23, part: MMBT2222A, maker: onsemi, function: NPN 40 V 600 mA (2N2222A)}
+  - {code: "2F", package: SOT-23, part: MMBT2907A, maker: onsemi, function: PNP 60 V 600 mA (2N2907A)}
+  - {code: "J3Y", package: SOT-23, part: S8050, maker: various (China), function: NPN 25 V 500 mA, confidence: check}
+  - {code: "2TY", package: SOT-23, part: S8550, maker: various (China), function: PNP 25 V 500 mA, confidence: check}
+  # --- MOSFETs, SOT-23 ----------------------------------------------------------------------------------------
+  - {code: "702", package: SOT-23, part: 2N7002, maker: onsemi, function: N-MOSFET 60 V 115 mA}
+  - {code: "K72", package: SOT-23, part: 2N7002, maker: Diodes, function: N-MOSFET 60 V 115 mA, confidence: check}
+  - {code: "SS", package: SOT-23, part: BSS138, maker: onsemi, function: N-MOSFET 50 V 200 mA (level shifters)}
+  - {code: "PD", package: SOT-23, part: BSS84, maker: onsemi, function: P-MOSFET 50 V 130 mA, confidence: check}
+  - {code: "K84", package: SOT-23, part: BSS84, maker: Diodes, function: P-MOSFET 50 V 130 mA, confidence: check}
+  - {code: "A1SHB", package: SOT-23, part: SI2301 (clone), maker: various, function: P-MOSFET 20 V 2.3 A, confidence: check}
+  - {code: "A2SHB", package: SOT-23, part: SI2302 (clone), maker: various, function: N-MOSFET 20 V 2.5 A, confidence: check}
+  # --- switching and Schottky diodes ---------------------------------------------------------------------------
+  - {code: "A7", package: SOT-23, part: BAV99, maker: Nexperia/onsemi, function: two diodes in series (common node = pin 3), pins: "1 A1, 2 K2, 3 K1/A2"}
+  - {code: "A6", package: SOT-23, part: BAS16, maker: Nexperia/onsemi, function: switching diode 100 V, pins: "1 A, 2 n.c., 3 K"}
+  - {code: "A4", package: SOT-23, part: BAV70, maker: Nexperia/onsemi, function: two diodes, common cathode (pin 3)}
+  - {code: "A1", package: SOT-23, part: BAW56, maker: Nexperia/onsemi, function: two diodes, common anode (pin 3)}
+  - {code: "JS", package: SOT-23, part: BAS21, maker: Nexperia/onsemi, function: switching diode 250 V, confidence: check}
+  - {code: "L4", package: SOT-23, part: BAT54, maker: Nexperia, function: Schottky 30 V 200 mA, confidence: check}
+  - {code: "KL1", package: SOT-23, part: BAT54, maker: Diodes, function: Schottky 30 V 200 mA, confidence: check}
+  - {code: "KL3", package: SOT-23, part: BAT54C, maker: Diodes, function: two Schottky, common cathode, confidence: check}
+  - {code: "KL4", package: SOT-23, part: BAT54S, maker: Diodes, function: two Schottky in series, confidence: check}
+  - {code: "T4", package: SOD-123, part: 1N4148W, maker: Diodes/others, function: switching diode 100 V}
+  - {code: "SL", package: SOD-123, part: B5819W, maker: various, function: Schottky 40 V 1 A, confidence: check}
+  - {code: "M1", package: SMA, part: 1N4001 (M1), maker: various, function: rectifier 50 V 1 A}
+  - {code: "M4", package: SMA, part: 1N4004 (M4), maker: various, function: rectifier 400 V 1 A}
+  - {code: "M7", package: SMA, part: 1N4007 (M7), maker: various, function: rectifier 1000 V 1 A}
+  - {code: "SS14", package: SMA, part: SS14, maker: various, function: Schottky 40 V 1 A}
+  - {code: "SS34", package: SMA, part: SS34, maker: various, function: Schottky 40 V 3 A}
+  - {code: "SS54", package: SMA, part: SS54, maker: various, function: Schottky 40 V 5 A, confidence: check}
+  # --- regulators and power ------------------------------------------------------------------------------------
+  - {code: "BZ", package: SOT-23-6, part: MCP1640, maker: Microchip, function: synchronous boost converter from 0.65 V (one or two cells), prefix: true, confidence: check}
+  - {code: "LTH7", package: SOT-23-5, part: LTC4054 / TP4054 clone, maker: various, function: Li-ion charger 500 mA, confidence: check}

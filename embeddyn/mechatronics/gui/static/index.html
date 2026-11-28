@@ -78,13 +78,25 @@
       </div>
       <div id="scan-wrap">
         <div id="sc-toolbar">
+          <select id="sc-mode" title="What the pictures show">
+            <option value="drawing">Schematic drawing</option>
+            <option value="board">Board photos</option>
+          </select>
           <button id="sc-choose" title="A PDF (vector or scanned) or pictures of the schematic; several files are the pages of one design">Choose files…</button>
           <input id="sc-input" type="file" multiple accept=".pdf,image/*" class="hidden">
           <span id="sc-files" class="small"></span>
+          <span class="sc-drawing">
           <input id="sc-path" placeholder="…or path(s) on this computer: board.pdf, page2.png" title="Paths are read by the Lab server; relative to the project folder">
           <label class="small" title="PDF pages to read, e.g. 2-5 or 1,3 (empty: all)">pages <input id="sc-pages" size="5"></label>
           <label class="small" title="Picture resolution (empty: from the file, else 200); scanned PDF pages are rendered at this resolution (default 300)">dpi <input id="sc-dpi" type="number" min="50" max="1200" step="50" style="width:64px"></label>
           <label class="small" title="A KiCad netlist of the same design to score the scan against (optional)">reference <input id="sc-ref" placeholder="—" size="12"></label>
+          </span>
+          <span class="sc-board hidden">
+          <label class="small" title="The component side, whole board in the picture (path, or the name of a chosen file)">top <input id="sc-top" size="14" placeholder="top.jpg"></label>
+          <label class="small" title="The other side, whole board in the picture (optional)">bottom <input id="sc-bottom" size="14" placeholder="—"></label>
+          <label class="small" title="Close-ups for the markings, comma separated (optional)">close-ups <input id="sc-closeups" size="18" placeholder="—"></label>
+          <label class="small" title="Board width x height in mm (optional: else estimated from parts of known size)">size mm <input id="sc-boardmm" size="8" placeholder="107x126"></label>
+          </span>
           <label class="small" title="Folder for schematic.net, scan.json and the overlays (empty: .embeddyn/scans/NAME in the project folder)">out <input id="sc-out" placeholder="auto" size="12"></label>
           <button id="sc-run" class="primary">Scan</button>
           <span id="sc-status" class="small"></span>
@@ -105,6 +117,13 @@
             <div id="sc-listtabs"><button data-list="parts" class="active">Parts</button><button data-list="nets">Nets</button>
               <input id="sc-filter" type="search" placeholder="filter"></div>
             <div id="sc-list"></div>
+            <div id="sc-part" class="hidden"></div>
+            <details id="sc-smd">
+              <summary class="menu-title">SMD decoder</summary>
+              <div class="sc-smd-row"><input id="smd-text" placeholder="marking: 472, A7, 74HC595D, F051K6U6"><input id="smd-pkg" size="8" placeholder="package" title="e.g. SOT-23, 0603, SOIC-16 (optional)"></div>
+              <div class="sc-smd-row"><input id="smd-size" placeholder="body size LxW[xleads] mm, e.g. 2.9x1.6x6" title="Find the package from the body size"><button id="smd-go">Decode</button></div>
+              <div id="smd-out"></div>
+            </details>
             <details id="sc-importbox">
               <summary class="menu-title">Import as an emulated board</summary>
               <label class="small">title <input id="sc-title" placeholder="board"></label>

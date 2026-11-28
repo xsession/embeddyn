@@ -361,3 +361,16 @@ label { user-select: none; }
 .sch-bus .bus-traffic { font-size: 9.5px; fill: #7a4a14; }
 .sch-bus .bus-traffic.bad { fill: #d62828; font-weight: 600; }
 .json.bad { outline: 1px solid #e74c3c; }
+
+/* scan view: board photos */
+#sc-part { border-top: 1px solid var(--line); padding: 6px 8px; display: grid; gap: 4px; max-height: 45%; overflow: auto; }
+#sc-part .sc-part-head { display: flex; gap: 8px; align-items: baseline; }
+#sc-part .sc-reading { font-size: 12px; } #sc-part .sc-reading b { color: var(--accent); }
+#sc-part .check { color: var(--warn); }
+#sc-part .sc-mark-row { display: flex; gap: 4px; } #sc-part .sc-mark-row input { flex: 1; min-width: 0; }
+#sc-smd { border-top: 1px solid var(--line); padding: 6px 8px; }
+#sc-smd[open] { display: grid; gap: 4px; }
+#sc-smd summary { cursor: pointer; }
+.sc-smd-row { display: flex; gap: 4px; } .sc-smd-row input:first-child { flex: 1; min-width: 0; }
+#smd-out { font-size: 12px; max-height: 160px; overflow: auto; }
+#smd-out .score { color: var(--muted); display: inline-block; width: 34px; }

@@ -1,10 +1,12 @@
-// embeddyn Lab: Scan view. A printed schematic (PDF, PNG, JPEG ...) read into a netlist: the overlay of what was
-// read, the parts and nets found (click one to point at it on the page), and import as an emulated board.
+// embeddyn Lab: Scan view. A printed schematic (PDF, PNG, JPEG ...) or photos of a board read into a netlist: the
+// overlay of what was read, the parts and nets found (click one to point at it on the page), markings typed in by
+// hand, an SMD marking decoder, and import as an emulated board.
 import { api, emit, log, state, toast } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const SVG = 'http://www.w3.org/2000/svg';
-const sc = { result: null, page: 1, uploads: [], zoom: 1, x: 0, y: 0, selected: null, list: 'parts', bound: false };
+const sc = { result: null, page: 1, uploads: [], zoom: 1, x: 0, y: 0, selected: null, list: 'parts', bound: false,
+  mode: 'drawing' };
 
 function esc(text) {
   return String(text ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -21,16 +23,69 @@ function readFile(file) {
 
 async function addFiles(files) {
   const accepted = [...files].filter((f) => /\.(pdf|png|jpe?g|tiff?|bmp|gif|webp)$/i.test(f.name));
-  if (!accepted.length) { toast('Drop a PDF or an image of the schematic', true); return; }
+  if (!accepted.length) { toast('Drop a PDF or an image', true); return; }
   const tooBig = accepted.find((f) => f.size > 24 * 1024 * 1024);
   if (tooBig) { toast(`${tooBig.name} is larger than 24 MB: give its path instead`, true); return; }
   sc.uploads = await Promise.all(accepted.map(readFile));
   $('sc-files').textContent = sc.uploads.map((u) => u.name).join(', ');
   $('sc-files').title = 'These files are sent to the Lab server and scanned';
-  $('sc-path').value = '';
+  if (sc.mode === 'board') {
+    // first file: top, second: bottom, the rest: close-ups (edit the fields to change)
+    const names = sc.uploads.map((u) => u.name);
+    $('sc-top').value = names[0] || '';
+    $('sc-bottom').value = names[1] || '';
+    $('sc-closeups').value = names.slice(2).join(', ');
+  } else {
+    $('sc-path').value = '';
+  }
+}
+
+function setMode(mode) {
+  sc.mode = mode;
+  document.querySelectorAll('#sc-toolbar .sc-drawing').forEach((el) => el.classList.toggle('hidden', mode !== 'drawing'));
+  document.querySelectorAll('#sc-toolbar .sc-board').forEach((el) => el.classList.toggle('hidden', mode !== 'board'));
+  $('sc-input').accept = mode === 'board' ? 'image/*' : '.pdf,image/*';
+  $('sc-choose').title = mode === 'board'
+    ? 'Photos of the board: the top side, the bottom side, then close-ups (in that order)'
+    : 'A PDF (vector or scanned) or pictures of the schematic; several files are the pages of one design';
+}
+
+async function runBoard() {
+  const top = $('sc-top').value.trim();
+  if (!top) { toast('Choose the board photos, or type the path of the top photo', true); return; }
+  const names = new Set(sc.uploads.map((u) => u.name));
+  const closeups = $('sc-closeups').value.split(/[,;\n]/).map((p) => p.trim()).filter(Boolean);
+  const wanted = [top, $('sc-bottom').value.trim(), ...closeups].filter((n) => names.has(n));
+  const body = {
+    root: state.graph?.root, top, bottom: $('sc-bottom').value.trim() || null, closeups,
+    board_mm: $('sc-boardmm').value.trim() || null, out: $('sc-out').value.trim() || null,
+    uploads: sc.uploads.filter((u) => wanted.includes(u.name)),
+  };
+  const button = $('sc-run');
+  button.disabled = true;
+  status('reading the board… (a few minutes: every photo is straightened, segmented and read)');
+  const t0 = performance.now();
+  try {
+    sc.result = await api('scan/board', body);
+    sc.page = 1;
+    sc.selected = null;
+    $('sc-out').placeholder = sc.result.out;
+    const r = sc.result;
+    const marked = r.parts.filter((p) => p.marking).length;
+    status(`${r.parts.length} parts (${marked} with a marking), ${r.nets.length} nets, ${r.board_mm.join(' x ')} mm in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
+    log(`board photos: ${r.parts.length} parts, ${r.nets.length} nets → ${r.netlist}`, 'ok');
+    for (const c of r.closeups || []) log(`close-up ${c.photo.split('/').pop()}: ${c.placed ? `placed, ${c.markings} markings` : (c.note || 'not placed')}`, c.placed ? '' : 'warn');
+    if (!$('sc-title').value) $('sc-title').value = r.out.split('/').pop();
+    render();
+    requestAnimationFrame(fitPage);
+  } catch (error) {
+    status('');
+    toast(error.message, true); log(error.message, 'err');
+  } finally { button.disabled = false; }
 }
 
 async function runScan() {
+  if (sc.mode === 'board') return runBoard();
   const paths = $('sc-path').value.split(/[,;\n]/).map((p) => p.trim()).filter(Boolean);
   if (!paths.length && !sc.uploads.length) { toast('Choose or drop a PDF/image, or type its path', true); return; }
   const body = {
@@ -71,7 +126,7 @@ function renderPage() {
   tabs.innerHTML = '';
   for (const p of sc.result?.pages || []) {
     const b = document.createElement('button');
-    b.textContent = `p${p.index}`;
+    b.textContent = p.name || `p${p.index}`;
     b.title = `${p.source.split('/').pop()} · ${p.parts} parts${p.unnamed ? `, ${p.unnamed} symbols without a reference` : ''}${p.raster ? ' · read from pixels' : ' · vector'}`;
     b.classList.toggle('active', p.index === sc.page);
     b.onclick = () => { sc.page = p.index; renderPage(); fitPage(); };
@@ -87,7 +142,7 @@ function renderPage() {
   stage.style.height = page.height + 'px';
   if (page.overlay) {
     const img = document.createElement('img');
-    img.src = '/api/scan/image?path=' + encodeURIComponent(page.overlay);
+    img.src = '/api/scan/image?path=' + encodeURIComponent(page.overlay) + '&v=' + (sc.stamp || 0);
     img.draggable = false;
     stage.appendChild(img);
   }
@@ -165,6 +220,7 @@ function renderLists() {
   summary.innerHTML = `
     <div><b>${r.parts.length}</b> parts · <b>${r.nets.length}</b> nets · <b>${r.pages.length}</b> page(s)</div>
     ${guessed ? `<div class="small" title="Pins the drawing gives no number for: numbered 1, 2 left to right / top to bottom. Check diodes and polarised capacitors.">${guessed} pin numbers guessed (red)</div>` : ''}
+    ${r.mode === 'board' ? `<div class="small">board ${r.board_mm.join(' x ')} mm at ${r.px_per_mm} px/mm · ${r.parts.filter((p) => p.marking).length} markings read: click a part to type one</div>` : ''}
     ${r.pages.some((p) => p.raster) ? '<div class="small warn">Read from pixels: check the overlay before trusting the netlist.</div>' : ''}
     ${r.score ? `<div class="sc-score">${esc(r.score.summary)}</div>` : ''}
     ${r.notes.length ? `<details><summary class="small">${r.notes.length} note(s)</summary>${r.notes.map((n) => `<div class="small">${esc(n)}</div>`).join('')}</details>` : ''}
@@ -175,15 +231,16 @@ function renderLists() {
   document.querySelectorAll('#sc-listtabs button').forEach((b) => b.classList.toggle('active', b.dataset.list === sc.list));
   if (sc.list === 'parts') {
     for (const part of r.parts) {
-      if (query && !`${part.ref} ${part.value}`.toLowerCase().includes(query)) continue;
+      if (query && !`${part.ref} ${part.value} ${part.package || ''} ${part.marking || ''}`.toLowerCase().includes(query)) continue;
       const row = document.createElement('div');
       row.className = 'sc-row' + (sc.selected?.kind === 'part' && sc.selected.ref === part.ref ? ' sel' : '');
-      row.innerHTML = `<b>${esc(part.ref)}</b><span>${esc(part.value) || '<i class="small">no value</i>'}</span><span class="small">${part.pins} pins · p${part.page ?? '?'}</span>`;
+      const where = r.mode === 'board' ? esc(part.package || part.kind || '') : `p${part.page ?? '?'}`;
+      row.innerHTML = `<b>${esc(part.ref)}</b><span>${esc(part.value) || '<i class="small">no value</i>'}</span><span class="small">${part.pins} pins · ${where}</span>`;
       row.onclick = () => {
         sc.selected = { kind: 'part', ref: part.ref };
         const box = r.boxes[part.ref];
         if (box) centreOn(box[0], (box[1] + box[3]) / 2, (box[2] + box[4]) / 2);
-        drawMarks(); renderLists();
+        drawMarks(); renderLists(); renderPart();
       };
       list.appendChild(row);
     }
@@ -197,6 +254,7 @@ function renderLists() {
         `<span class="${n.guessed ? 'guessed' : ''}" title="${esc(n.name)}">${esc(n.ref)}.${esc(n.pin)}</span>`).join(' ')}</span>`;
       row.onclick = () => {
         sc.selected = { kind: 'net', index };
+        renderPart();
         const pages = net.nodes.map((n) => r.positions[`${n.ref}.${n.pin}`]).filter(Boolean);
         if (pages.length && !pages.some((p) => p[0] === sc.page)) { sc.page = pages[0][0]; renderPage(); fitPage(); }
         drawMarks(); renderLists();
@@ -206,9 +264,69 @@ function renderLists() {
   }
 }
 
+// -- a board part: what was read, and the marking typed in by hand -----------------------------------------
+function readingLine(r) {
+  const flag = r.confidence === 'check' ? ' <span class="check">check</span>' : '';
+  return `<div class="sc-reading"><b>${esc(r.part)}</b>${r.package ? ` · ${esc(r.package)}` : ''}${r.detail ? ` — ${esc(r.detail)}` : ''}${r.pins ? ` · pins ${esc(r.pins)}` : ''}${flag} <span class="small">${Math.round((r.score || 0) * 100)}%</span></div>`;
+}
+
+function renderPart() {
+  const panel = $('sc-part');
+  const r = sc.result;
+  const part = r && r.mode === 'board' && sc.selected?.kind === 'part' ? r.parts.find((p) => p.ref === sc.selected.ref) : null;
+  if (!part) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  panel.innerHTML = `
+    <div class="sc-part-head"><b>${esc(part.ref)}</b><span>${esc(part.value || '')}</span><span class="small">${esc(part.kind || '')}</span></div>
+    <div class="small">${esc(part.package || '?')} (body ${part.size_mm.join(' x ')} mm, ${part.pins} pads)${part.candidates?.length > 1 ? ` · or ${esc(part.candidates.slice(1).join(', '))}` : ''}</div>
+    ${part.marking ? `<div class="small">marking: <code>${esc(part.marking.replace(/\n/g, ' / '))}</code></div>` : '<div class="small">no marking read</div>'}
+    ${(part.readings || []).map(readingLine).join('')}
+    <div class="sc-mark-row"><input id="sc-mark" placeholder="type the marking (lines with /)" value="${esc((part.marking || '').replace(/\n/g, ' / '))}">
+      <select id="sc-pin1" title="How the marking sits in the picture (sets pin 1: counted counter-clockwise from the lower left of the text)">
+        <option value="auto">text: as read</option><option value="upright">text upright</option><option value="upside_down">upside down</option>
+        <option value="reads_up">reads upward</option><option value="reads_down">reads downward</option></select>
+      <button id="sc-mark-go" class="primary">Apply</button></div>
+    ${(part.notes || []).map((n) => `<div class="small">${esc(n)}</div>`).join('')}`;
+  $('sc-mark-go').onclick = () => applyMarking(part.ref);
+  $('sc-mark').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyMarking(part.ref); });
+}
+
+async function applyMarking(ref) {
+  const text = $('sc-mark').value.split('/').map((t) => t.trim()).join('\n');
+  try {
+    const page = sc.page;
+    sc.result = await api('scan/marking', { out: sc.result.out, ref, text, pin1: $('sc-pin1').value });
+    sc.page = page;
+    log(`${ref}: marking "${text.replace(/\n/g, ' / ')}" → ${sc.result.parts.find((p) => p.ref === ref)?.value || 'no reading'}`, 'ok');
+    const keep = { zoom: sc.zoom, x: sc.x, y: sc.y };
+    render();
+    Object.assign(sc, keep); applyView();
+  } catch (error) { toast(error.message, true); }
+}
+
+async function decodeSmd() {
+  try {
+    const answer = await api('smd/decode', { text: $('smd-text').value, package: $('smd-pkg').value.trim() || null,
+      size: $('smd-size').value.trim() || null });
+    const out = [];
+    if (answer.decoded) {
+      out.push(...answer.decoded.readings.slice(0, 6).map(readingLine));
+      out.push(...answer.decoded.notes.map((n) => `<div class="small">${esc(n)}</div>`));
+      if (!answer.decoded.readings.length && !answer.decoded.notes.length) out.push('<div class="small">nothing known</div>');
+    }
+    if (answer.packages) {
+      out.push('<div class="small">packages for that body:</div>');
+      out.push(...answer.packages.map((m) => `<div class="sc-reading"><span class="score">${Math.round(m.score * 100)}%</span> <b>${esc(m.package)}</b> · ${m.leads} leads · ${esc(m.kinds.join(', '))}</div>`));
+    }
+    $('smd-out').innerHTML = out.join('');
+  } catch (error) { toast(error.message, true); }
+}
+
 function render() {
+  sc.stamp = Date.now();                     // overlays are rewritten after a marking edit
   renderPage();
   renderLists();
+  renderPart();
   $('sc-import').disabled = !sc.result;
 }
 
@@ -239,6 +357,9 @@ function bind() {
   if (sc.bound) return;
   sc.bound = true;
   $('sc-choose').onclick = () => $('sc-input').click();
+  $('sc-mode').onchange = (e) => setMode(e.target.value);
+  $('smd-go').onclick = decodeSmd;
+  ['smd-text', 'smd-pkg', 'smd-size'].forEach((id) => $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') decodeSmd(); }));
   $('sc-input').onchange = (e) => addFiles(e.target.files);
   $('sc-run').onclick = runScan;
   $('sc-path').addEventListener('keydown', (e) => { if (e.key === 'Enter') runScan(); });
@@ -251,7 +372,7 @@ function bind() {
   wrap.addEventListener('dragleave', (e) => { if (e.target === wrap || !wrap.contains(e.relatedTarget)) wrap.classList.remove('drop'); });
   wrap.addEventListener('drop', (e) => {
     e.preventDefault(); wrap.classList.remove('drop');
-    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files).then(() => sc.uploads.length && runScan());
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files).then(() => sc.uploads.length && sc.mode === 'drawing' && runScan());
   });
   const vp = $('sc-viewport');
   vp.addEventListener('wheel', (e) => {

@@ -89,6 +89,7 @@ class LabState:
         self.sessions: dict[str, RunSession] = {}
         self.lock = threading.Lock()
         self.scan_images: set[str] = set()          # overlay pictures the Scan view may fetch
+        self.boards: dict[str, Any] = {}             # board-photo reads kept for marking edits
 
     def session(self, session_id: str) -> RunSession:
         try:
@@ -179,7 +180,8 @@ def make_handler(state: LabState):
                     path = str(Path(query.get("path", "")).resolve())
                     if path not in state.scan_images or not Path(path).is_file():
                         return self._json({"error": "not found"}, 404)
-                    return self._send(200, Path(path).read_bytes(), "image/png")
+                    kind = mimetypes.guess_type(path)[0] or "application/octet-stream"
+                    return self._send(200, Path(path).read_bytes(), kind)
                 if url.path == "/api/csv":
                     session = state.session(query.get("session", ""))
                     return self._send(200, session.csv().encode(), "text/csv",
@@ -336,6 +338,26 @@ def make_handler(state: LabState):
             with state.lock:
                 state.scan_images.update(str(Path(p["overlay"]).resolve()) for p in result["pages"] if p["overlay"])
             return result
+
+        def _post_scan_board(self, body: dict[str, Any]) -> dict[str, Any]:
+            from .pcbview import read
+            result = read(body, state.boards)
+            self._allow_images(result)
+            return result
+
+        def _post_scan_marking(self, body: dict[str, Any]) -> dict[str, Any]:
+            from .pcbview import marking
+            result = marking(body, state.boards)
+            self._allow_images(result)
+            return result
+
+        def _post_smd_decode(self, body: dict[str, Any]) -> dict[str, Any]:
+            from .pcbview import decode_marking
+            return decode_marking(body)
+
+        def _allow_images(self, result: dict[str, Any]) -> None:
+            with state.lock:
+                state.scan_images.update(str(Path(p["overlay"]).resolve()) for p in result["pages"] if p["overlay"])
 
         def _post_scan_import(self, body: dict[str, Any]) -> dict[str, Any]:
             from .scanview import import_board
