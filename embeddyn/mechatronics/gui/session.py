@@ -106,6 +106,23 @@ class RunSession:
             return {"instance": name, "bytes": count}
         raise LookupError(f"no UART publishes {signal}")
 
+    def display_png(self, signal: str) -> bytes | None:
+        """The latest frame of the display that publishes `signal` (a Renode `displays` binding), as PNG.
+
+        Frames stay readable after the run ends; None until the firmware showed its first frame."""
+        orchestrator = self._orchestrator
+        if orchestrator is None:
+            raise LookupError("the run has not started")
+        for adapter in orchestrator.adapters.values():
+            reader = getattr(adapter, "display_png", None)
+            if reader is None:
+                continue
+            try:
+                return reader(signal)
+            except KeyError:
+                continue
+        raise LookupError(f"no display publishes {signal}")
+
     def inject(self, topic: str, payload: Any, period: float = 0.0, count: int = 0) -> dict[str, Any]:
         """Send an event into the running simulation (a CAN frame, a radio packet...).
 

@@ -374,3 +374,7 @@ label { user-select: none; }
 .sc-smd-row { display: flex; gap: 4px; } .sc-smd-row input:first-child { flex: 1; min-width: 0; }
 #smd-out { font-size: 12px; max-height: 160px; overflow: auto; }
 #smd-out .score { color: var(--muted); display: inline-block; width: 34px; }
+
+/* LCD display instrument: the firmware's frame, scaled to fit (rotated by the card's setting) */
+.lcd-body { display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+.lcd { image-rendering: auto; flex: none; }

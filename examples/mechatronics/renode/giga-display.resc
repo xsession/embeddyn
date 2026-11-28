@@ -1,0 +1,14 @@
+# Renode script for the GIGA Display Shield demo (firmware domain, STM32H747 Cortex-M7).
+# Embeddyn runs Renode with:
+#   -e '$bin=@<firmware>; include @<this file>; emulation CreateExternalControlServer "embeddyn" <port>'
+# and advances virtual time with RunFor. The Lab reads the frame the LTDC shows from the emulated SDRAM.
+
+mach create "giga"
+machine LoadPlatformDescription $ORIGIN/giga-display.repl
+
+# Arduino mbed sketch (.hex), linked after the bootloader at 0x08040000
+$bin?=$ORIGIN/../firmware/giga-display-demo.hex
+sysbus LoadHEX $bin
+cpu InitVectorTableOffset 0x08040000
+
+logLevel 3

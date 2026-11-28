@@ -294,6 +294,7 @@ function buildCard(node) {
     } };
   }
   if (kind === 'serial_monitor') return serialCard(node);
+  if (kind === 'display') return displayCard(node);
   if (kind === 'slider') return sliderCard(node);
   if (kind === 'switch') return switchCard(node);
   return null;
@@ -343,6 +344,42 @@ function serialCard(node) {
     screenEl.textContent = !signal ? 'Wire a Renode UART pin (uart:…) to channel A.'
       : lines.slice(-400).map((e) => `${e.time_seconds.toFixed(3).padStart(8)}  ${e.topic.endsWith('.tx') ? '> ' : ''}${String(e.payload).replace(/[\r\n]+$/, '')}`).join('\n') || '(no data yet)';
     screenEl.scrollTop = screenEl.scrollHeight;
+  } };
+}
+
+function displayCard(node) {
+  // The picture is read from the emulated frame buffer by the Renode adapter; events on the signal say a new frame
+  // is there (payload {frame, width, height}) and /api/display serves the latest one as PNG.
+  const img = h('img', { class: 'lcd', alt: '' });
+  const info = h('span', { class: 'note' });
+  const body = h('div', { class: 'card-body lcd-body' }, img);
+  const rotate = select([0, 90, 180, 270], Number(node.settings.rotate || 0), (v) => setting(node, 'rotate', Number(v)), (v) => `${v}°`);
+  const root = h('div', { class: 'card wide' }, header(node, 'rotate', rotate, info), body);
+  root.style.height = '420px';
+  let shown = null;
+  return { root, draw: () => {
+    const signal = node.ports[0]?.signal;
+    const session = state.session;
+    const deg = Number(node.settings.rotate || 0);
+    img.style.transform = deg ? `rotate(${deg}deg)` : '';
+    // a quarter turn swaps the picture's width and height: fit its unrotated box to the swapped card size
+    const turned = deg === 90 || deg === 270, box = body.getBoundingClientRect();
+    img.style.maxWidth = (turned ? box.height : box.width) - 8 + 'px';
+    img.style.maxHeight = (turned ? box.width : box.height) - 8 + 'px';
+    if (!signal) { info.textContent = 'wire a display signal to A'; img.removeAttribute('src'); shown = null; return; }
+    const now = data.now();
+    let last = null;
+    for (let i = data.events.length - 1; i >= 0; i--) {
+      const e = data.events[i];
+      if (e.topic === signal && e.time_seconds <= now + 1e-9) { last = e; break; }
+    }
+    if (!last || !session) { info.textContent = 'no frame yet'; return; }
+    const p = last.payload || {};
+    info.textContent = `frame ${p.frame} · ${p.width}×${p.height} · t ${last.time_seconds.toFixed(2)} s`;
+    const key = session.session + ':' + p.frame;
+    if (key === shown) return;
+    shown = key;
+    img.src = `/api/display?session=${encodeURIComponent(session.session)}&signal=${encodeURIComponent(signal)}&f=${p.frame}`;
   } };
 }
 

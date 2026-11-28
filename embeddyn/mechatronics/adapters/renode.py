@@ -94,6 +94,7 @@ from .base import SimulatorAdapter, StepResult
 from .renode_api import GpioEvent, RenodeExternalControl
 from ..spi_devices import SpiDevice, create_device
 from .renode_api_v2 import CanFrame, RenodeMessageClient
+from .renode_display import DisplayGrabber
 
 
 @dataclass
@@ -335,6 +336,7 @@ class RenodeAdapter(SimulatorAdapter):
         api: str = "auto",
         can: dict[str, Any] | None = None,
         spi: list[dict[str, Any]] | None = None,
+        displays: list[dict[str, Any]] | None = None,
     ) -> None:
         self.host, self.port, self.timeout = host, int(port), float(timeout)
         self.machine = machine
@@ -368,6 +370,7 @@ class RenodeAdapter(SimulatorAdapter):
         self._can_last: dict[int, bytes] = {}
         self._faults: Any = None                     # a FaultInjector with frame faults, if any
         self.spi = [_parse_spi(spec) for spec in spi or []]
+        self.displays = [DisplayGrabber.from_spec(dict(spec)) for spec in displays or []]
         self._spi_devices: list[SpiDevice] = []
         self.uarts: list[_Uart] = []
         for spec in uarts or []:
@@ -533,7 +536,26 @@ class RenodeAdapter(SimulatorAdapter):
         if self.can:
             outputs.update(self._can_outputs())
             diagnostics.setdefault("events", []).extend(self._can_events())
+        now_seconds = (target_us - self._origin_us) / 1_000_000
+        for display in self.displays:
+            if display.due(now_seconds):
+                event = display.grab(now_seconds, self._bus_word, self._bus_bytes)
+                if event:
+                    diagnostics.setdefault("events", []).append(event)
         return StepResult(outputs, diagnostics)
+
+    def _bus_word(self, address: int) -> int:
+        return self.client.bus_read(self.machine or "", address, 4)
+
+    def _bus_bytes(self, address: int, count: int) -> bytes:
+        return self.client.bus_read_bytes(self.machine or "", address, count)
+
+    def display_png(self, name_or_signal: str) -> bytes | None:
+        """The latest frame of a display binding (by name or signal) as PNG, or None before the first frame."""
+        for display in self.displays:
+            if name_or_signal in (display.name, display.signal):
+                return display.png()
+        raise KeyError(f"no display {name_or_signal!r}")
 
     def _can_events(self) -> list[dict[str, Any]]:
         """Frames the firmware sent this step: on its signal topic, or on the shared bus's input topic."""

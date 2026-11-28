@@ -74,6 +74,7 @@ _BUS_READ, _BUS_WRITE = 0, 1
 _CAN_SEND, _CAN_REGISTER = 0, 2
 _SPI_TRANSMIT, _SPI_FINISH = 0, 1
 _WIDTH_FORMATS = {1: "<B", 2: "<H", 4: "<I", 8: "<Q"}
+_MULTI_BYTE = 128                     # AccessWidth.MultiByte: count is in bytes
 
 
 @dataclass(frozen=True)
@@ -236,6 +237,11 @@ class RenodeMessageClient:
     def bus_read(self, machine: str, address: int, width: int = 4, context: str = "sysbus") -> int:
         data = self.request(Command.SYSTEM_BUS, self._bus_header(machine, context, _BUS_READ, width, address, 1))
         return struct.unpack(_WIDTH_FORMATS[width], data[:width])[0]
+
+    def bus_read_bytes(self, machine: str, address: int, count: int, context: str = "sysbus") -> bytes:
+        """Read `count` bytes in one request (multi-byte access), e.g. a frame buffer."""
+        data = self.request(Command.SYSTEM_BUS, self._bus_header(machine, context, _BUS_READ, _MULTI_BYTE, address, count))
+        return bytes(data[:count])
 
     def bus_write(self, machine: str, address: int, value: int, width: int = 4, context: str = "sysbus") -> None:
         mask = (1 << (8 * width)) - 1

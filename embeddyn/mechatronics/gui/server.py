@@ -182,6 +182,11 @@ def make_handler(state: LabState):
                         return self._json({"error": "not found"}, 404)
                     kind = mimetypes.guess_type(path)[0] or "application/octet-stream"
                     return self._send(200, Path(path).read_bytes(), kind)
+                if url.path == "/api/display":
+                    png = state.session(query.get("session", "")).display_png(query.get("signal", ""))
+                    if png is None:
+                        return self._json({"error": "no frame yet"}, 404)
+                    return self._send(200, png, "image/png", {"Cache-Control": "no-store"})
                 if url.path == "/api/csv":
                     session = state.session(query.get("session", ""))
                     return self._send(200, session.csv().encode(), "text/csv",

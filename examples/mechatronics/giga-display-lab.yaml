@@ -1,0 +1,50 @@
+name: giga-display-lab
+step_seconds: 0.01
+duration_seconds: 20.0
+metadata:
+  description: >
+    Arduino GIGA R1 with the GIGA Display Shield, running real Arduino mbed firmware in Renode. The firmware
+    draws an animation with Arduino_GigaDisplay_GFX (bouncing ball, rotating wheel, scrolling sine, frame
+    counter): Adafruit GFX into an SDRAM back buffer, DMA2D copy into the LTDC frame buffer, ST7701 panel over
+    DSI. The Lab reads the frame the LTDC shows straight out of the emulated SDRAM (a `displays` binding) and
+    the LCD card plays it; Serial1 logs the frame count. Needs a Renode build with the Arduino support
+    (RENODE_BIN). Rebuild the firmware with
+    arduino-cli compile -b arduino:mbed_giga:giga examples/mechatronics/firmware/giga-display-demo
+  gui:
+    nodes:
+      - id: lcd
+        kind: instrument
+        part: display
+        label: GIGA Display Shield (ST7701 over DSI)
+        icon: lcd
+        settings: {rotate: 270}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: mcu.display}
+      - id: console
+        kind: instrument
+        part: serial_monitor
+        label: Serial1 (USART1)
+        icon: terminal
+        settings: {line_end: LF}
+        ports: [{name: A, direction: in, unit: ''}]
+        channels: {A: mcu.console}
+
+instances:
+  mcu:
+    domain: firmware
+    options:
+      backend: renode
+      launch: true
+      script: renode/giga-display.resc
+      firmware: firmware/giga-display-demo.hex
+      machine: giga
+      port: 21250
+      log: ../../.embeddyn/renode-giga-display.log
+      uarts:
+        - {name: console, peripheral: sysbus.usart1, signal: mcu.console}
+      displays:                             # LTDC on the STM32H747: the layer it shows, read from SDRAM
+        - {name: lcd, signal: mcu.display, controller: ltdc, base: 0x50001000, period: 0.1}
+
+signals:
+  mcu.console: {domain: firmware, kind: event}
+  mcu.display: {domain: firmware, kind: event}

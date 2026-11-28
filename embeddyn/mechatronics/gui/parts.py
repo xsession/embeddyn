@@ -137,6 +137,8 @@ _INSTRUMENTS = [
     ("data_table", "Watch table", "table", 8, "Live values of up to eight signals.", {}),
     ("serial_monitor", "Serial monitor", "terminal", 1, "UART console of a Renode MCU: received lines and a send box.",
      {"line_end": "CRLF"}),
+    ("display", "LCD display", "lcd", 1, "Frames a Renode MCU shows on its LCD (wire a `displays` signal to A).",
+     {"rotate": 0}),
 ]
 
 _SCENE = [

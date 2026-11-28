@@ -63,6 +63,7 @@ _GPIO_GET_STATE, _GPIO_SET_STATE, _GPIO_REGISTER_EVENT = 0, 1, 2
 _BUS_READ, _BUS_WRITE = 0, 1
 ACCESS_WIDTHS = {"multibyte": 0, "byte": 1, "word": 2, "dword": 4, "doubleword": 4, "qword": 8, "quadword": 8}
 _WIDTH_FORMATS = {1: "<B", 2: "<H", 4: "<I", 8: "<Q"}
+_MULTI_BYTE = 128                     # AccessWidth.MultiByte: count is in bytes
 
 
 class RenodeApiError(RuntimeError):
@@ -251,6 +252,11 @@ class RenodeExternalControl:
             raise ValueError(f"unsupported access width: {width}")
         data = self.execute(Command.SYSTEM_BUS, self._bus_header(machine, context, _BUS_READ, width, address, 1))
         return struct.unpack(_WIDTH_FORMATS[width], data[:width])[0]
+
+    def bus_read_bytes(self, machine: str, address: int, count: int, context: str = "sysbus") -> bytes:
+        """Read `count` bytes in one request (multi-byte access), e.g. a frame buffer."""
+        data = self.execute(Command.SYSTEM_BUS, self._bus_header(machine, context, _BUS_READ, _MULTI_BYTE, address, count))
+        return bytes(data[:count])
 
     def bus_write(self, machine: str, address: int, value: int, width: int = 4, context: str = "sysbus") -> None:
         if width not in _WIDTH_FORMATS:

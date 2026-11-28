@@ -44,6 +44,7 @@ def renode_kwargs(project: MechatronicProject, cfg) -> dict:
         "api": str(options.get("api", "auto")),
         "can": dict(options.get("can") or {}),
         "spi": list(options.get("spi") or []),
+        "displays": list(options.get("displays") or []),
     }
 
 

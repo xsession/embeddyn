@@ -1,0 +1,10 @@
+// Arduino GIGA R1 WiFi with the GIGA Display Shield. Needs a Renode build with the Arduino support (the GIGA board
+// description, STM32H7_DSIHost, ST7701 and GT911 models).
+using "platforms/boards/arduino/arduino_giga_r1.repl"
+
+// ST7701 480x800 panel on the DSI connector, fed by the LTDC; GT911 touch on I2C4 (Wire1) at 0x5D, INT on PI1
+display: Video.ST7701 @ dsi0
+    video: ltdc
+
+touch: Parts.GT911 @ i2c4 0x5D
+    -> gpioPortI@1
